@@ -29,18 +29,21 @@ This is not meant to be noise. This is meant to be fuel.
 
 ## Project Status
 
-**Current status:** Public placeholder / coming soon
+**Current status:** Tech preview / active development
 
-This repo is the first public home for PMG while development continues behind the scenes.
+This repo is the first public home for PMG while development continues through an active tech-preview period.
 
 What that means right now:
 
-* the project is real
-* the work is active
-* public builds are not ready yet
-* some design details may still change before first release
+- the project is real
+- development is active
+- tech-preview testing is underway
+- active testers are providing feedback
+- fixes and feature improvements are being folded back into the project as development continues
+- some design details may still change before first release
 
-When PMG is ready for the first public serving, this repo will be updated with screenshots, installation steps, usage guidance, and release notes.
+As PMG moves through tech preview toward a broader public release, this repo will continue to be updated with project progress, screenshots, installation steps, usage guidance, and release notes.
+
 
 ---
 
