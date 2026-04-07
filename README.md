@@ -44,6 +44,15 @@ When PMG is ready for the first public serving, this repo will be updated with s
 
 ---
 
+## Inspiration
+
+Pitmaster's Grill was inspired in part by **Pirates Little Helper (PLH)** and the kind of value older community-made EVE tools brought to the game.
+
+PMG is not a re-creation of PLH, and it is not trying to replace what it was. This project exists as its own thing. But it would be dishonest not to acknowledge the spark: tools like PLH helped show what a useful community-built companion could feel like, and that inspiration helped light the fire for this project.
+
+To the original creators and contributors who helped make those tools part of EVE's history: thank you.
+
+---
 ## What PMG is being built to do
 
 Pitmaster's Grill is planned to help with things like:
