@@ -6,6 +6,10 @@
 >
 > PMG is being developed as a lightweight, human-in-the-loop companion for players who need quick answers when local spikes, scouts report movement, or a response fleet needs cleaner intel.
 
+## Getting Started
+
+New here? Start with the [First-Time Use Guide](FIRST-TIME-USE.md).
+
 
 
 <img width="784" height="768" alt="image" src="https://github.com/user-attachments/assets/9f8a94dd-95de-40ed-b297-7a8e7b4f5667" />
