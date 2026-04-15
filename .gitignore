@@ -1,0 +1,65 @@
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+[Bb]uild/
+[Rr]elease/
+[Dd]ebug/
+x64/
+x86/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+logs/
+*.log
+*.log.*
+*.ziplog
+*.baklog
+
+# Runtime data / databases
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.mdb
+
+# App-local caches / generated content
+cache/
+temp/
+tmp/
+artifacts/
+downloads/
+imports/
+extracted/
+archive/
+archives/
+
+# Killmail / intel data that may be generated at runtime
+*.tar
+*.tar.gz
+*.tgz
+
+# Crash / diagnostics
+*.dmp
+*.stackdump
+
+# Dotnet test / coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+# Local publish profiles
+PitmastersLittleGrill/Properties/PublishProfiles/
