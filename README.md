@@ -1,10 +1,12 @@
 # Pitmaster's Grill
 
-> **Coming soon**
+> Active technical preview
 >
-> The grill is warming up.
+> Pitmaster's Grill (PMG) is a free desktop intel tool for EVE Online built to turn local chat into fast, useful pilot context without making you fight your tools while the heat is on.
 >
-> Pitmaster's Grill is an upcoming free desktop intel tool for EVE Online built to turn local chat into fast, useful pilot context without making you fight your tools while the heat is on.
+> PMG is being developed as a lightweight, human-in-the-loop companion for players who need quick answers when local spikes, scouts report movement, or a response fleet needs cleaner intel.
+
+
 
 <img width="784" height="768" alt="image" src="https://github.com/user-attachments/assets/9f8a94dd-95de-40ed-b297-7a8e7b4f5667" />
 
@@ -15,18 +17,20 @@
 
 ## What is PMG?
 
-**Pitmaster's Grill** is a pilot-intel companion for the moments when local lights up and you need the useful part **now**.
+Pitmaster's Grill (PMG) is a desktop pilot-intel companion for EVE Online built for the moments when local spikes and you need the useful part now.
 
-Drop in the names. Let PMG start cooking. Get back the context that matters.
+Paste in a local list, let PMG resolve the supporting context, and get back a cleaner view of who is present, what they are tied to, and which pilots deserve a closer look.
 
 The mission is simple:
 
-* take a local list of pilots
-* resolve useful intel quickly
-* present it in a clean, readable way
-* stay practical during real gameplay, not just in theory
+- take a local list of pilots
+- resolve useful intel quickly
+- present it in a clean, readable way
+- stay practical during real gameplay, not just in theory
 
-PMG is inspired by the old spirit of community-made EVE tools: useful, shared, a little rough around the edges at first, and built because somebody cared enough to make something for other people.
+PMG is inspired by the older spirit of community-built EVE tools: useful, shared, a little rough around the edges at first, and built because somebody cared enough to make something for other players.
+
+This is not meant to be noise. This is meant to be fuel.
 
 This is not meant to be noise. This is meant to be fuel.
 
@@ -34,20 +38,20 @@ This is not meant to be noise. This is meant to be fuel.
 
 ## Project Status
 
-**Current status:** Tech preview / active development
+**Current status:** Active technical preview
 
-This repo is the first public home for PMG while development continues through an active tech-preview period.
+PMG is in active development and already usable as a technical-preview build. The core workflow is real, live testing is underway, and feedback from actual use is shaping fixes, polish, and next-step improvements.
 
 What that means right now:
 
 - the project is real
 - development is active
-- tech-preview testing is underway
+- technical-preview builds are available
 - active testers are providing feedback
-- fixes and feature improvements are being folded back into the project as development continues
-- some design details may still change before first release
+- fixes and feature improvements are being folded back into the project
+- some design details, reliability work, and release-scope decisions may still change as PMG matures
 
-As PMG moves through tech preview toward a broader public release, this repo will continue to be updated with project progress, screenshots, installation steps, usage guidance, and release notes.
+This repository is the public home for PMG. It now serves both as project documentation and as the place where builds, patch notes, screenshots, and future setup guidance will continue to be published.
 
 
 ---
@@ -61,17 +65,22 @@ PMG is not a re-creation of PLH, and it is not trying to replace what it was. Th
 To the original creators and contributors who helped make those tools part of EVE's history: thank you.
 
 ---
+
 ## What PMG is being built to do
 
-Pitmaster's Grill is planned to help with things like:
+Pitmaster's Grill is being built to help players move from raw local data to usable intel with less friction and less wasted time.
 
-* reading pasted or captured local pilot lists
-* resolving character, corporation, and alliance context
-* surfacing recent activity that actually matters
-* reducing the number of browser tabs needed to answer simple questions
-* helping scouts, hunters, small gangs, and response fleets get to decision-grade intel faster
+That includes:
 
-The focus is **usable intel**, not just dumping raw ingredients on the counter and calling it a meal.
+- reading pasted local pilot lists quickly
+- resolving character, corporation, and alliance context
+- surfacing recent activity that actually matters
+- reducing the number of browser tabs needed to answer simple questions
+- helping scouts, hunters, small gangs, response fleets, and support roles get to decision-grade intel faster
+
+PMG is not trying to drown the user in data for its own sake.
+
+The goal is to take the raw ingredients, cut down the noise, and serve something that is fast, readable, and useful when decisions need to happen now.
 
 ---
 
@@ -159,19 +168,21 @@ then PMG is being built for that moment.
 
 ---
 
-## What will show up here later
+## What you will find here
 
-As PMG gets closer to release, this repository will grow to include:
+This repository is the public home for PMG and now includes both project context and runnable builds.
 
-* screenshots and previews
-* installation instructions
-* release downloads
-* configuration guidance
-* known limitations
-* changelog
-* contribution guidance
+As PMG continues to mature, this repo will be used to provide:
 
-Right now, this repo is the smoker warming up before the full cook.
+- screenshots and previews
+- release downloads for testers and players
+- installation and setup guidance
+- configuration notes
+- patch notes and changelog history
+- known limitations
+- project direction and future improvements
+
+The goal is simple: if someone wants to understand PMG, follow its progress, or download the current build, this repo should be the place to do it.
 
 ---
 
@@ -192,9 +203,9 @@ For now, the best contribution is interest, patience, and honest feedback when t
 
 ## License
 
-**Planned license:** GPL-3.0-or-later
+Pitmaster's Grill is licensed under the GNU General Public License v3.0.
 
-This will be finalized alongside the first public release.
+See the [LICENSE](LICENSE) file for the full license text.
 
 ---
 
@@ -202,15 +213,19 @@ This will be finalized alongside the first public release.
 
 ### Is PMG available right now?
 
-Not yet. This repository is currently a public placeholder while development continues.
+Yes. PMG is now available as an active technical-preview build.
+
+The project is still maturing, but runnable builds are being published so testers and interested players can follow along, try it, and help shape where it goes next.
 
 ### Will PMG be free?
 
-Yes. The intent is for PMG to be freely available.
+Yes. PMG is intended to remain a free community tool.
 
 ### Can I donate?
 
-Maybe someday, maybe not. But the preferred answer is still the same: support a local food bank or feed somebody.
+The preferred answer is still the same: support a local food bank, cook for somebody, or help feed someone in your community.
+
+That fits the spirit of this project better than a tip jar.
 
 ### Is PMG trying to replace player judgment?
 
