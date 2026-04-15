@@ -36,8 +36,6 @@ PMG is inspired by the older spirit of community-built EVE tools: useful, shared
 
 This is not meant to be noise. This is meant to be fuel.
 
-This is not meant to be noise. This is meant to be fuel.
-
 ---
 
 ## Project Status
