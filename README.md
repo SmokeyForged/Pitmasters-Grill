@@ -6,7 +6,7 @@
 >
 > Pitmaster's Grill is an upcoming free desktop intel tool for EVE Online built to turn local chat into fast, useful pilot context without making you fight your tools while the heat is on.
 
-<img width="769" height="762" alt="image" src="https://github.com/user-attachments/assets/aa56e06a-6453-4227-9965-70751fbe8644" />
+<img width="784" height="768" alt="image" src="https://github.com/user-attachments/assets/9f8a94dd-95de-40ed-b297-7a8e7b4f5667" />
 
 
 ---
