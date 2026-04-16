@@ -32,6 +32,7 @@ namespace PitmastersGrill
         private AppSettings _appSettings = new();
 
         private readonly LocalListParser _localListParser;
+        private readonly ClipboardPayloadInspector _clipboardPayloadInspector;
         private readonly ClipboardIngestService _clipboardIngestService;
         private readonly BoardRowFactory _boardRowFactory;
         private readonly DatabaseBootstrap _databaseBootstrap;
@@ -83,7 +84,8 @@ namespace PitmastersGrill
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
 
             _localListParser = new LocalListParser();
-            _clipboardIngestService = new ClipboardIngestService(_localListParser);
+            _clipboardPayloadInspector = new ClipboardPayloadInspector();
+            _clipboardIngestService = new ClipboardIngestService(_localListParser, _clipboardPayloadInspector);
             _boardRowFactory = new BoardRowFactory();
 
             var databasePath = AppPaths.GetDatabasePath();
@@ -454,7 +456,7 @@ namespace PitmastersGrill
 
             try
             {
-                string rawClipboardText;
+                string? rawClipboardText;
 
                 try
                 {
@@ -477,6 +479,7 @@ namespace PitmastersGrill
 
                 if (!result.ShouldProcess)
                 {
+                    AppLogger.ClipboardInfo($"Ignored clipboard board. reason={result.IgnoreReason}");
                     return;
                 }
 

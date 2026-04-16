@@ -57,6 +57,11 @@
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
             <Setter Property="Padding" Value="8,4"/>
             <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="BorderBrush" Value="#8A8A8A"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                </Trigger>
+
                 <DataTrigger Binding="{Binding BaitOverride}" Value="True">
                     <Setter Property="Background" Value="#D4A017"/>
                     <Setter Property="Foreground" Value="Black"/>
@@ -85,6 +90,11 @@
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="{DynamicResource GridBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="SettingsLabelStyle" TargetType="TextBlock">
@@ -313,6 +323,10 @@
                                       SelectionUnit="FullRow"
                                       SelectionChanged="PilotBoard_SelectionChanged"
                                       MouseDoubleClick="PilotBoard_MouseDoubleClick" Grid.ColumnSpan="4">
+                                <DataGrid.Resources>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
+                                </DataGrid.Resources>
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn Header="Sig" Width="42">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -565,7 +579,7 @@
                                                Margin="0,0,0,12"/>
 
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Technical Preview-v0.8.0"/>
+                                               Text="Technical Preview-v0.8.1"/>
 
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"

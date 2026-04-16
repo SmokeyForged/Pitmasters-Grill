@@ -6,29 +6,40 @@ namespace PitmastersGrill.Services
     public class ClipboardIngestService
     {
         private readonly LocalListParser _parser;
+        private readonly ClipboardPayloadInspector _payloadInspector;
 
-        public ClipboardIngestService(LocalListParser parser)
+        public ClipboardIngestService(
+            LocalListParser parser,
+            ClipboardPayloadInspector payloadInspector)
         {
-            _parser = parser;
+            _parser = parser ?? throw new ArgumentNullException(nameof(parser));
+            _payloadInspector = payloadInspector ?? throw new ArgumentNullException(nameof(payloadInspector));
         }
 
-        public ClipboardProcessResult Process(string rawClipboardText, string lastProcessedClipboardText)
+        public ClipboardProcessResult Process(string? rawClipboardText, string? lastProcessedClipboardText)
         {
             if (string.IsNullOrWhiteSpace(rawClipboardText))
             {
-                return ClipboardProcessResult.Ignored();
+                return ClipboardProcessResult.Ignored("Clipboard was empty.");
             }
 
             if (rawClipboardText == lastProcessedClipboardText)
             {
-                return ClipboardProcessResult.Ignored();
+                return ClipboardProcessResult.Ignored("Clipboard matched the last processed payload.");
+            }
+
+            var inspection = _payloadInspector.Inspect(rawClipboardText);
+
+            if (!inspection.IsPlausibleLocalList)
+            {
+                return ClipboardProcessResult.Ignored(inspection.IgnoreReason);
             }
 
             var parsedNames = _parser.Parse(rawClipboardText);
 
             if (parsedNames.Count < 2)
             {
-                return ClipboardProcessResult.Ignored();
+                return ClipboardProcessResult.Ignored("Clipboard did not contain enough parsed pilot names.");
             }
 
             return ClipboardProcessResult.Accepted(rawClipboardText, parsedNames);
@@ -40,12 +51,14 @@ namespace PitmastersGrill.Services
         public bool ShouldProcess { get; private set; }
         public string AcceptedClipboardText { get; private set; } = string.Empty;
         public List<string> ParsedNames { get; private set; } = new();
+        public string IgnoreReason { get; private set; } = string.Empty;
 
-        public static ClipboardProcessResult Ignored()
+        public static ClipboardProcessResult Ignored(string? reason = null)
         {
             return new ClipboardProcessResult
             {
-                ShouldProcess = false
+                ShouldProcess = false,
+                IgnoreReason = reason ?? string.Empty
             };
         }
 
@@ -54,8 +67,8 @@ namespace PitmastersGrill.Services
             return new ClipboardProcessResult
             {
                 ShouldProcess = true,
-                AcceptedClipboardText = acceptedClipboardText,
-                ParsedNames = parsedNames
+                AcceptedClipboardText = acceptedClipboardText ?? string.Empty,
+                ParsedNames = parsedNames ?? new List<string>()
             };
         }
     }
