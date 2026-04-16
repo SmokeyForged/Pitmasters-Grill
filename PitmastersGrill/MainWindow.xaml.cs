@@ -1,7 +1,7 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
-using PitmastersLittleGrill.Providers;
-using PitmastersLittleGrill.Services;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
+using PitmastersGrill.Providers;
+using PitmastersGrill.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -18,7 +18,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 
-namespace PitmastersLittleGrill
+namespace PitmastersGrill
 {
     public partial class MainWindow : Window
     {

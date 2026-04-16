@@ -1,9 +1,9 @@
-﻿using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Persistence;
 using System;
 using System.Diagnostics;
 using System.IO;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class BrowserLauncher
     {

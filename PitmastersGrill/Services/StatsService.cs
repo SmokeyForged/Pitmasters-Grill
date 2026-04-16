@@ -1,13 +1,13 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
-using PitmastersLittleGrill.Providers;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
+using PitmastersGrill.Providers;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class StatsService
     {

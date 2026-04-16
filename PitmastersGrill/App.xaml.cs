@@ -1,14 +1,14 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
-using PitmastersLittleGrill.Providers;
-using PitmastersLittleGrill.Services;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
+using PitmastersGrill.Providers;
+using PitmastersGrill.Services;
 using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
-namespace PitmastersLittleGrill
+namespace PitmastersGrill
 {
     public partial class App : Application
     {

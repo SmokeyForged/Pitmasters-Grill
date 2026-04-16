@@ -1,8 +1,8 @@
 ﻿using Microsoft.Data.Sqlite;
-using PitmastersLittleGrill.Models;
+using PitmastersGrill.Models;
 using System;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public class StatsCacheRepository
     {

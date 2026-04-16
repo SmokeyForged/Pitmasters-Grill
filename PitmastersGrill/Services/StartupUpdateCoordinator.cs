@@ -1,10 +1,10 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class StartupUpdateCoordinator
     {

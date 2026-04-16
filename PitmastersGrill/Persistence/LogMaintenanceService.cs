@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public static class LogMaintenanceService
     {

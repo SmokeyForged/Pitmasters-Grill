@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace PitmastersLittleGrill.Providers
+namespace PitmastersGrill.Providers
 {
     public class CynoShipCatalog
     {

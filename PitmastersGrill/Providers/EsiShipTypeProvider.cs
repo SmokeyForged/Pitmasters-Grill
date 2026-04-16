@@ -1,4 +1,4 @@
-﻿using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PitmastersLittleGrill.Providers
+namespace PitmastersGrill.Providers
 {
     public class EsiShipTypeInfo
     {

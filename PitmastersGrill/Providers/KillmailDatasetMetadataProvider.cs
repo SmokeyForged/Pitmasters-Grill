@@ -1,5 +1,5 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -8,7 +8,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace PitmastersLittleGrill.Providers
+namespace PitmastersGrill.Providers
 {
     public class KillmailDatasetMetadataProvider
     {

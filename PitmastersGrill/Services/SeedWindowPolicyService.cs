@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Globalization;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class SeedWindowPolicyService
     {

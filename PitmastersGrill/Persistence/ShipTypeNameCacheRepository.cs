@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public class ShipTypeNameCacheRepository
     {

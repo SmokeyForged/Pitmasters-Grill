@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public class DatabaseBootstrap
     {

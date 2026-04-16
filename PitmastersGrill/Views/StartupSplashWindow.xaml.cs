@@ -1,7 +1,7 @@
-﻿using PitmastersLittleGrill.Models;
+﻿using PitmastersGrill.Models;
 using System.Windows;
 
-namespace PitmastersLittleGrill.Views
+namespace PitmastersGrill.Views
 {
     public partial class StartupSplashWindow : Window
     {

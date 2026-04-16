@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PitmastersLittleGrill.Models
+namespace PitmastersGrill.Models
 {
     public enum ProviderOutcomeKind
     {

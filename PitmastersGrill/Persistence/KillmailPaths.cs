@@ -1,13 +1,13 @@
-﻿using PitmastersLittleGrill.Models;
+﻿using PitmastersGrill.Models;
 using System;
 using System.IO;
 using System.Text.Json;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public static class KillmailPaths
     {
-        private const string DefaultDisplayPath = @"%LOCALAPPDATA%\PitmastersLittleGrill\KillmailDb";
+        private const string DefaultDisplayPath = @"%LOCALAPPDATA%\PitmastersGrill\KillmailDb";
 
         public static string GetDefaultKillmailDataDirectory()
         {

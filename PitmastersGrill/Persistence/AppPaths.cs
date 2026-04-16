@@ -1,11 +1,11 @@
 ﻿using System;
 using System.IO;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public static class AppPaths
     {
-        private const string AppDirectoryName = "PitmastersLittleGrill";
+        private const string AppDirectoryName = "PitmastersGrill";
 
         public static string GetAppDataDirectory()
         {

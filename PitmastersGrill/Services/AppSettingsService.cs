@@ -1,10 +1,10 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
 using System;
 using System.IO;
 using System.Text.Json;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class AppSettingsService
     {

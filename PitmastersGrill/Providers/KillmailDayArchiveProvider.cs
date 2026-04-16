@@ -1,4 +1,4 @@
-﻿using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,7 +9,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PitmastersLittleGrill.Providers
+namespace PitmastersGrill.Providers
 {
     public class KillmailDayArchiveProvider
     {

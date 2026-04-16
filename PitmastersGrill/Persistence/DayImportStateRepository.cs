@@ -1,9 +1,9 @@
 ﻿using Microsoft.Data.Sqlite;
-using PitmastersLittleGrill.Models;
+using PitmastersGrill.Models;
 using System;
 using System.Collections.Generic;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public class DayImportStateRepository
     {

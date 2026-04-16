@@ -2,7 +2,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace PitmastersLittleGrill.Models
+namespace PitmastersGrill.Models
 {
     public class PilotBoardRow : INotifyPropertyChanged
     {

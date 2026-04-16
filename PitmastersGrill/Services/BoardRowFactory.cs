@@ -1,9 +1,9 @@
-﻿using PitmastersLittleGrill.Models;
+﻿using PitmastersGrill.Models;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class BoardRowFactory
     {

@@ -1,4 +1,4 @@
-﻿namespace PitmastersLittleGrill.Models
+﻿namespace PitmastersGrill.Models
 {
     public class KillmailRemoteDayInfo
     {

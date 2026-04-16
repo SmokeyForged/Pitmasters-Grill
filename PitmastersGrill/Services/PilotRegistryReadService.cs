@@ -1,8 +1,8 @@
-﻿using PitmastersLittleGrill.Models;
-using PitmastersLittleGrill.Persistence;
+﻿using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
 using System.Collections.Generic;
 
-namespace PitmastersLittleGrill.Services
+namespace PitmastersGrill.Services
 {
     public class PilotRegistryReadService
     {

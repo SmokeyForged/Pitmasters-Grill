@@ -2,7 +2,7 @@
 using System.IO;
 using System.Linq;
 
-namespace PitmastersLittleGrill.Persistence
+namespace PitmastersGrill.Persistence
 {
     public static class AppLogger
     {
