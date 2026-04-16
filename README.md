@@ -11,10 +11,12 @@
 New here? Start with the [First-Time Use Guide](FIRST-TIME-USE.md).
 
 
-
+## PMG Intel Board
 <img width="784" height="768" alt="image" src="https://github.com/user-attachments/assets/9f8a94dd-95de-40ed-b297-7a8e7b4f5667" />
 
-<img width="796" height="527" alt="image" src="https://github.com/user-attachments/assets/66f696b4-091f-459d-8c70-709a1e9a3558" />
+## PMG Settings
+<img width="1173" height="1338" alt="image" src="https://github.com/user-attachments/assets/a185149a-9b57-4f74-b562-deb0063b1393" />
+
 
 
 ---
