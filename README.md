@@ -1,8 +1,8 @@
-# Pitmaster's Grill
+# Pitmasters Grill
 
 > Active technical preview
 >
-> Pitmaster's Grill (PMG) is a free desktop intel tool for EVE Online built to turn local chat into fast, useful pilot context without making you fight your tools while the heat is on.
+> Pitmasters Grill (PMG) is a free desktop intel tool for EVE Online built to turn local chat into fast, useful pilot context without making you fight your tools while the heat is on.
 >
 > PMG is being developed as a lightweight, human-in-the-loop companion for players who need quick answers when local spikes, scouts report movement, or a response fleet needs cleaner intel.
 
@@ -21,7 +21,7 @@ New here? Start with the [First-Time Use Guide](FIRST-TIME-USE.md).
 
 ## What is PMG?
 
-Pitmaster's Grill (PMG) is a desktop pilot-intel companion for EVE Online built for the moments when local spikes and you need the useful part now.
+Pitmasters Grill (PMG) is a desktop pilot-intel companion for EVE Online built for the moments when local spikes and you need the useful part now.
 
 Paste in a local list, let PMG resolve the supporting context, and get back a cleaner view of who is present, what they are tied to, and which pilots deserve a closer look.
 
@@ -60,7 +60,7 @@ This repository is the public home for PMG. It now serves both as project docume
 
 ## Inspiration
 
-Pitmaster's Grill was inspired in part by **Pirates Little Helper (PLH)** and the kind of value older community-made EVE tools brought to the game.
+Pitmasters Grill was inspired in part by **Pirates Little Helper (PLH)** and the kind of value older community-made EVE tools brought to the game.
 
 PMG is not a re-creation of PLH, and it is not trying to replace what it was. This project exists as its own thing. But it would be dishonest not to acknowledge the spark: tools like PLH helped show what a useful community-built companion could feel like, and that inspiration helped light the fire for this project.
 
@@ -70,7 +70,7 @@ To the original creators and contributors who helped make those tools part of EV
 
 ## What PMG is being built to do
 
-Pitmaster's Grill is being built to help players move from raw local data to usable intel with less friction and less wasted time.
+Pitmasters Grill is being built to help players move from raw local data to usable intel with less friction and less wasted time.
 
 That includes:
 
@@ -205,7 +205,7 @@ For now, the best contribution is interest, patience, and honest feedback when t
 
 ## License
 
-Pitmaster's Grill is licensed under the GNU General Public License v3.0.
+Pitmasters Grill is licensed under the GNU General Public License v3.0.
 
 See the [LICENSE](LICENSE) file for the full license text.
 
