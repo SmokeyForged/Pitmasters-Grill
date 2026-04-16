@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PitmastersLittleGrill"
         mc:Ignorable="d"
-        Title="Pitmaster's Grill — Technical Preview-v0.7.0"
+        Title="Pitmasters Grill — Technical Preview-v0.7.0"
         Height="430"
         Width="760"
         MinHeight="430"
@@ -178,7 +178,7 @@
                                 Orientation="Vertical"
                                 VerticalAlignment="Center"
                                 Margin="0,0,20,0">
-                        <TextBlock Text="Pitmaster's Grill"
+                        <TextBlock Text="Pitmasters Grill"
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource HeaderTextBrush}"/>
