@@ -145,7 +145,6 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header / legend section -->
         <Border Grid.Row="0"
                 Background="{DynamicResource SurfaceBrush}"
                 Padding="12"
@@ -168,7 +167,6 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Top line -->
                 <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -242,7 +240,6 @@
                     </Grid>
                 </Grid>
 
-                <!-- Legend -->
                 <Border Grid.Row="1"
                         Margin="0,12,0,0"
                         Padding="10,8"
@@ -286,14 +283,12 @@
             </Grid>
         </Border>
 
-        <!-- Board / settings area -->
         <Grid Grid.Row="1" Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Compact toggle control bar -->
             <Grid Grid.Row="0" Margin="0,0,0,6">
                 <ToggleButton x:Name="CompactModeToggleButton"
                               Style="{StaticResource CompactModeToggleStyle}"
@@ -569,12 +564,75 @@
 
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                Text="Enable local killmail DB pull from a rolling 30-day seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
-                                    <Button x:Name="EnableKillmailDbPullButton"
-                                            Width="180"
-                                            Padding="14,6"
-                                            HorizontalAlignment="Left"
-                                            Content="Enable KillMail DB Pull"
-                                            Click="EnableKillmailDbPullButton_Click"/>
+
+                                    <WrapPanel Margin="0,4,0,0">
+                                        <Button x:Name="EnableKillmailDbPullButton"
+                                                Width="180"
+                                                Padding="14,6"
+                                                Margin="0,0,10,0"
+                                                HorizontalAlignment="Left"
+                                                Content="Enable KillMail DB Pull"
+                                                Click="EnableKillmailDbPullButton_Click"/>
+
+                                        <Button x:Name="OpenLogsButton"
+                                                Width="120"
+                                                Padding="14,6"
+                                                HorizontalAlignment="Left"
+                                                Margin="0,0,10,0"
+                                                Content="Logs"
+                                                Click="OpenLogsButton_Click"/>
+                                    </WrapPanel>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,10,0,0"
+                                               Text="Open the PMG logs folder for startup, UI, clipboard, import, database, and error diagnostics."/>
+
+                                    <Separator Margin="0,8,0,14"/>
+
+                                    <TextBlock Text="Killmail Data Location"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+
+                                    <TextBlock x:Name="KillmailDataPathModeText"
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               Text="Using default LocalAppData path."/>
+
+                                    <TextBlock x:Name="EffectiveKillmailDataPathText"
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Text="Effective path: --"/>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,6,0,4"
+                                               Text="Set a custom killmail data root for Proton or non-standard storage layouts. Leave blank or click Use Default to return to PMG's default LocalAppData location."/>
+
+                                    <TextBox x:Name="KillmailDataRootPathTextBox"
+                                             Margin="0,0,0,10"
+                                             MinWidth="420"
+                                             TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto"/>
+
+                                    <WrapPanel>
+                                        <Button x:Name="SaveKillmailPathButton"
+                                                Width="120"
+                                                Padding="14,6"
+                                                Margin="0,0,10,0"
+                                                Content="Save Path"
+                                                Click="SaveKillmailPathButton_Click"/>
+
+                                        <Button x:Name="UseDefaultKillmailPathButton"
+                                                Width="120"
+                                                Padding="14,6"
+                                                Margin="0,0,10,0"
+                                                Content="Use Default"
+                                                Click="UseDefaultKillmailPathButton_Click"/>
+                                    </WrapPanel>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,10,0,0"
+                                               Text="Restart PMG after changing the killmail data path. Path changes do not migrate existing killmail data automatically."/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

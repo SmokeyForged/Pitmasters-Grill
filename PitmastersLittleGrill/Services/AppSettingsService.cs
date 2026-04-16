@@ -1,4 +1,5 @@
 ﻿using PitmastersLittleGrill.Models;
+using PitmastersLittleGrill.Persistence;
 using System;
 using System.IO;
 using System.Text.Json;
@@ -11,7 +12,7 @@ namespace PitmastersLittleGrill.Services
 
         public AppSettingsService()
         {
-            _settingsPath = Path.Combine(AppContext.BaseDirectory, "Data", "settings.json");
+            _settingsPath = AppPaths.GetSettingsPath();
         }
 
         public AppSettings Load()
@@ -20,16 +21,20 @@ namespace PitmastersLittleGrill.Services
             {
                 if (!File.Exists(_settingsPath))
                 {
+                    AppLogger.AppInfo($"Settings file not found. Using defaults. path={_settingsPath}");
                     return new AppSettings();
                 }
 
                 var json = File.ReadAllText(_settingsPath);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
 
+                AppLogger.AppInfo($"Settings loaded successfully. path={_settingsPath}");
                 return settings ?? new AppSettings();
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.AppWarn($"Failed to load settings. Using defaults. path={_settingsPath}");
+                AppLogger.ErrorOnly("Settings load failure.", ex);
                 return new AppSettings();
             }
         }
@@ -52,10 +57,12 @@ namespace PitmastersLittleGrill.Services
                     });
 
                 File.WriteAllText(_settingsPath, json);
+                AppLogger.AppInfo($"Settings saved successfully. path={_settingsPath}");
             }
-            catch
+            catch (Exception ex)
             {
-                // best effort only
+                AppLogger.AppWarn($"Failed to save settings. path={_settingsPath}");
+                AppLogger.ErrorOnly("Settings save failure.", ex);
             }
         }
     }

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -79,6 +80,8 @@ namespace PitmastersLittleGrill
             _isApplyingSettings = true;
             InitializeComponent();
 
+            AppLogger.UiInfo("MainWindow InitializeComponent complete.");
+
             _localListParser = new LocalListParser();
             _clipboardIngestService = new ClipboardIngestService(_localListParser);
             _boardRowFactory = new BoardRowFactory();
@@ -108,9 +111,12 @@ namespace PitmastersLittleGrill
             {
                 _databaseBootstrap.Initialize();
                 DebugTraceWriter.Clear();
+                AppLogger.DatabaseInfo($"MainWindow local database initialized. path={databasePath}");
             }
             catch (Exception ex)
             {
+                AppLogger.DatabaseError("MainWindow failed to initialize local database.", ex);
+
                 MessageBox.Show(
                     $"Failed to initialize local database.\n\n{ex.Message}",
                     "PMG Startup Error",
@@ -126,17 +132,25 @@ namespace PitmastersLittleGrill
             DarkModeCheckBox.IsChecked = _appSettings.DarkModeEnabled;
             AlwaysOnTopCheckBox.IsChecked = _appSettings.AlwaysOnTopEnabled;
             WindowOpacitySlider.Value = CoerceOpacityPercent(_appSettings.WindowOpacityPercent);
+            KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
 
             _isApplyingSettings = false;
 
             ApplyTheme(_appSettings.DarkModeEnabled);
             ApplyWindowSettings();
+            UpdateKillmailPathUi();
 
             PilotBoard.ItemsSource = _currentRows;
             UpdateLastRefreshed();
             UpdateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
             HideDetailPane();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
+
+            AppLogger.DatabaseInfo(
+                $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
+
+            AppLogger.UiInfo(
+                $"MainWindow ready. darkMode={_appSettings.DarkModeEnabled} alwaysOnTop={_appSettings.AlwaysOnTopEnabled} opacityPercent={CoerceOpacityPercent(_appSettings.WindowOpacityPercent):0}");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -150,16 +164,22 @@ namespace PitmastersLittleGrill
             source?.AddHook(WndProc);
 
             ApplyTitleBarTheme();
+
+            AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
         }
 
         protected override void OnClosed(EventArgs e)
         {
+            AppLogger.UiInfo("MainWindow closing requested.");
+
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
 
             var hwnd = new WindowInteropHelper(this).Handle;
             RemoveClipboardFormatListener(hwnd);
+
+            AppLogger.UiInfo("MainWindow closed. Clipboard listener removed and retry state cancelled.");
 
             base.OnClosed(e);
         }
@@ -174,6 +194,8 @@ namespace PitmastersLittleGrill
             _appSettings.DarkModeEnabled = DarkModeCheckBox.IsChecked == true;
             _appSettingsService.Save(_appSettings);
             ApplyTheme(_appSettings.DarkModeEnabled);
+
+            AppLogger.UiInfo($"Dark mode changed. enabled={_appSettings.DarkModeEnabled}");
         }
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -186,6 +208,8 @@ namespace PitmastersLittleGrill
             _appSettings.AlwaysOnTopEnabled = AlwaysOnTopCheckBox.IsChecked == true;
             _appSettingsService.Save(_appSettings);
             ApplyWindowSettings();
+
+            AppLogger.UiInfo($"Always on top changed. enabled={_appSettings.AlwaysOnTopEnabled}");
         }
 
         private void WindowOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -205,6 +229,8 @@ namespace PitmastersLittleGrill
             _appSettings.WindowOpacityPercent = opacityPercent;
             _appSettingsService.Save(_appSettings);
             ApplyWindowSettings();
+
+            AppLogger.UiInfo($"Window opacity changed. opacityPercent={opacityPercent:0}");
         }
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -224,6 +250,9 @@ namespace PitmastersLittleGrill
             if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
             {
                 selectedRow.KnownCynoOverride = KnownCynoOverrideCheckBox.IsChecked == true;
+
+                AppLogger.UiInfo(
+                    $"Known cyno override changed. character='{selectedRow.CharacterName}' enabled={selectedRow.KnownCynoOverride}");
             }
         }
 
@@ -244,6 +273,9 @@ namespace PitmastersLittleGrill
             if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
             {
                 selectedRow.BaitOverride = BaitOverrideCheckBox.IsChecked == true;
+
+                AppLogger.UiInfo(
+                    $"Bait override changed. character='{selectedRow.CharacterName}' enabled={selectedRow.BaitOverride}");
             }
         }
 
@@ -431,8 +463,9 @@ namespace PitmastersLittleGrill
 
                     rawClipboardText = Clipboard.GetText();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    AppLogger.ClipboardWarn($"Clipboard read failed. message={ex.Message}");
                     return;
                 }
 
@@ -448,6 +481,9 @@ namespace PitmastersLittleGrill
                 _lastProcessedClipboardText = result.AcceptedClipboardText;
                 CancelBoardPopulationRetry();
                 ResetBoardPopulationTracking();
+
+                AppLogger.ClipboardInfo(
+                    $"Accepted clipboard board. parsedNames={result.ParsedNames.Count} retryReset=true");
 
                 await ProcessNamesAsync(result.ParsedNames, false);
             }
@@ -1111,10 +1147,12 @@ namespace PitmastersLittleGrill
             if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
             {
                 ShowDetailPane(selectedRow);
+                AppLogger.UiInfo($"Board selection changed. character='{selectedRow.CharacterName}'");
                 return;
             }
 
             HideDetailPane();
+            AppLogger.UiInfo("Board selection cleared.");
         }
 
         private void PilotBoard_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1132,12 +1170,16 @@ namespace PitmastersLittleGrill
         {
             SaveCurrentNotesAndTags();
 
+            AppLogger.UiInfo("Detail pane close requested.");
+
             PilotBoard.SelectedItem = null;
             HideDetailPane();
         }
 
         private void ClearBoardButton_Click(object sender, RoutedEventArgs e)
         {
+            var clearedRowCount = _currentRows.Count;
+
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             _processingGeneration++;
@@ -1153,12 +1195,15 @@ namespace PitmastersLittleGrill
 
             UpdateLastRefreshed();
             UpdateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
+
+            AppLogger.UiInfo($"Board cleared. removedRows={clearedRowCount}");
         }
 
         private void OpenZkillButton_Click(object sender, RoutedEventArgs e)
         {
             if (PilotBoard.SelectedItem is not PilotBoardRow selectedRow)
             {
+                AppLogger.UiWarn("Open zKill requested with no selected row.");
                 return;
             }
 
@@ -1170,6 +1215,139 @@ namespace PitmastersLittleGrill
             await RunEnableKillmailDbPullAsync();
         }
 
+        private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var logsRootPath = AppPaths.GetLogsRootDirectory();
+
+                AppLogger.UiInfo($"Open logs requested. path={logsRootPath}");
+                _browserLauncher.OpenPath(logsRootPath);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Open logs failed.", ex);
+
+                MessageBox.Show(
+                    $"Failed to open logs folder.\n\n{ex.Message}",
+                    "PMG Logs Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void SaveKillmailPathButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var rawValue = KillmailDataRootPathTextBox.Text?.Trim() ?? string.Empty;
+                var normalizedDefaultPath = KillmailPaths.NormalizeForComparison(KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath());
+
+                if (string.IsNullOrWhiteSpace(rawValue))
+                {
+                    _appSettings.KillmailDataRootPath = string.Empty;
+                    _appSettingsService.Save(_appSettings);
+                    KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
+                    UpdateKillmailPathUi();
+
+                    AppLogger.UiInfo("Killmail data path override cleared via blank save. Restart required.");
+
+                    MessageBox.Show(
+                        "Killmail data path reset to the default %LOCALAPPDATA% location. Restart PMG to apply the new path fully.",
+                        "PMG Killmail Data Path",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    return;
+                }
+
+                var normalizedPath = KillmailPaths.NormalizeForComparison(rawValue);
+
+                if (string.Equals(normalizedPath, normalizedDefaultPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    _appSettings.KillmailDataRootPath = string.Empty;
+                }
+                else
+                {
+                    var expandedPath = KillmailPaths.ExpandPathTokens(rawValue);
+                    Directory.CreateDirectory(expandedPath);
+
+                    _appSettings.KillmailDataRootPath = rawValue;
+                }
+
+                _appSettingsService.Save(_appSettings);
+                KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
+                UpdateKillmailPathUi();
+
+                AppLogger.UiInfo(
+                    $"Killmail data path saved. configuredValue='{_appSettings.KillmailDataRootPath ?? string.Empty}' displayPath='{KillmailPaths.GetKillmailDataDirectoryDisplayPath()}' source={KillmailPaths.GetKillmailDataDirectorySourceDescription()} restartRequired=true");
+
+                MessageBox.Show(
+                    "Killmail data path saved. Restart PMG to apply the new path fully. Existing killmail data is not migrated automatically.",
+                    "PMG Killmail Data Path",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Failed to save killmail data path.", ex);
+
+                MessageBox.Show(
+                    $"Failed to save killmail data path.\n\n{ex.Message}",
+                    "PMG Killmail Data Path Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void UseDefaultKillmailPathButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _appSettings.KillmailDataRootPath = string.Empty;
+                _appSettingsService.Save(_appSettings);
+                KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
+                UpdateKillmailPathUi();
+
+                AppLogger.UiInfo("Killmail data path reset to default %LOCALAPPDATA% location. Restart required.");
+
+                MessageBox.Show(
+                    "Killmail data path reset to the default %LOCALAPPDATA% location. Restart PMG to apply the new path fully.",
+                    "PMG Killmail Data Path",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Failed to reset killmail data path to default.", ex);
+
+                MessageBox.Show(
+                    $"Failed to reset killmail data path.\n\n{ex.Message}",
+                    "PMG Killmail Data Path Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void UpdateKillmailPathUi()
+        {
+            var displayPath = KillmailPaths.GetKillmailDataDirectoryDisplayPath();
+            var sourceDescription = KillmailPaths.GetKillmailDataDirectorySourceDescription();
+
+            KillmailDataPathModeText.Text = $"Source: {sourceDescription}";
+            EffectiveKillmailDataPathText.Text = $"Effective path: {displayPath}";
+        }
+
+        private string GetKillmailPathEditorText()
+        {
+            if (!string.IsNullOrWhiteSpace(_appSettings.KillmailDataRootPath))
+            {
+                return _appSettings.KillmailDataRootPath;
+            }
+
+            return KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath();
+        }
+
         private void OpenZkillForRow(PilotBoardRow selectedRow)
         {
             try
@@ -1178,10 +1356,17 @@ namespace PitmastersLittleGrill
                     ? _zkillUrlBuilder.BuildSearchUrl(selectedRow.CharacterName)
                     : _zkillUrlBuilder.BuildCharacterUrl(selectedRow.CharacterId);
 
+                AppLogger.UiInfo(
+                    $"Opening zKill. character='{selectedRow.CharacterName}' characterId='{selectedRow.CharacterId ?? ""}'");
+
                 _browserLauncher.OpenUrl(url);
             }
             catch (Exception ex)
             {
+                AppLogger.UiError(
+                    $"Failed to open zKill. character='{selectedRow?.CharacterName ?? ""}'",
+                    ex);
+
                 MessageBox.Show(
                     $"Failed to open browser.\n\n{ex.Message}",
                     "PMG Browser Error",
@@ -1195,6 +1380,8 @@ namespace PitmastersLittleGrill
             if (e.Key == Key.Escape && DetailPane.Visibility == Visibility.Visible)
             {
                 SaveCurrentNotesAndTags();
+
+                AppLogger.UiInfo("Escape pressed. Closing detail pane.");
 
                 PilotBoard.SelectedItem = null;
                 HideDetailPane();
@@ -1454,10 +1641,17 @@ namespace PitmastersLittleGrill
             {
                 EnableKillmailDbPullButton.IsEnabled = false;
 
+                AppLogger.UiInfo(
+                    $"Enable KillMail DB Pull requested. seedDays=30 displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
+
                 await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(30, CancellationToken.None);
+
+                AppLogger.UiInfo("Enable KillMail DB Pull completed successfully.");
             }
             catch (Exception ex)
             {
+                AppLogger.UiError("Enable KillMail DB Pull failed.", ex);
+
                 MessageBox.Show(
                     $"Failed to enable killmail DB pull.\n\n{ex.Message}",
                     "PMG Killmail DB Pull Error",
