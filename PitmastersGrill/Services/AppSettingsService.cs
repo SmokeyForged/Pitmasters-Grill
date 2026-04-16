@@ -22,20 +22,22 @@ namespace PitmastersGrill.Services
                 if (!File.Exists(_settingsPath))
                 {
                     AppLogger.AppInfo($"Settings file not found. Using defaults. path={_settingsPath}");
-                    return new AppSettings();
+                    return Sanitize(new AppSettings());
                 }
 
                 var json = File.ReadAllText(_settingsPath);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
 
+                var sanitized = Sanitize(settings ?? new AppSettings());
+
                 AppLogger.AppInfo($"Settings loaded successfully. path={_settingsPath}");
-                return settings ?? new AppSettings();
+                return sanitized;
             }
             catch (Exception ex)
             {
                 AppLogger.AppWarn($"Failed to load settings. Using defaults. path={_settingsPath}");
                 AppLogger.ErrorOnly("Settings load failure.", ex);
-                return new AppSettings();
+                return Sanitize(new AppSettings());
             }
         }
 
@@ -49,8 +51,10 @@ namespace PitmastersGrill.Services
                     Directory.CreateDirectory(directory);
                 }
 
+                var sanitized = Sanitize(settings);
+
                 var json = JsonSerializer.Serialize(
-                    settings,
+                    sanitized,
                     new JsonSerializerOptions
                     {
                         WriteIndented = true
@@ -64,6 +68,12 @@ namespace PitmastersGrill.Services
                 AppLogger.AppWarn($"Failed to save settings. path={_settingsPath}");
                 AppLogger.ErrorOnly("Settings save failure.", ex);
             }
+        }
+
+        private static AppSettings Sanitize(AppSettings settings)
+        {
+            settings.MaxKillmailAgeDays = KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(settings.MaxKillmailAgeDays);
+            return settings;
         }
     }
 }

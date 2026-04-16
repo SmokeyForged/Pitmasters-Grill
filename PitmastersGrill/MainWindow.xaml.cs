@@ -132,12 +132,14 @@ namespace PitmastersGrill
             DarkModeCheckBox.IsChecked = _appSettings.DarkModeEnabled;
             AlwaysOnTopCheckBox.IsChecked = _appSettings.AlwaysOnTopEnabled;
             WindowOpacitySlider.Value = CoerceOpacityPercent(_appSettings.WindowOpacityPercent);
+            MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
             KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
 
             _isApplyingSettings = false;
 
             ApplyTheme(_appSettings.DarkModeEnabled);
             ApplyWindowSettings();
+            UpdateMaxKillmailAgeUi();
             UpdateKillmailPathUi();
 
             PilotBoard.ItemsSource = _currentRows;
@@ -1236,6 +1238,98 @@ namespace PitmastersGrill
             }
         }
 
+
+        private void SaveMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var rawValue = MaxKillmailAgeDaysTextBox.Text?.Trim() ?? string.Empty;
+
+                if (!int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedDays))
+                {
+                    MessageBox.Show(
+                        $"Enter a whole number between {KillmailDatasetFreshnessService.MinimumMaxKillmailAgeDays} and {KillmailDatasetFreshnessService.MaximumMaxKillmailAgeDays}.",
+                        "PMG Max Killmail Age",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
+                    return;
+                }
+
+                var normalizedDays = KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(parsedDays);
+                _appSettings.MaxKillmailAgeDays = normalizedDays;
+                _appSettingsService.Save(_appSettings);
+                MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
+                UpdateMaxKillmailAgeUi();
+
+                AppLogger.UiInfo($"Max killmail age saved. days={normalizedDays}");
+
+                MessageBox.Show(
+                    $"Max killmail age saved as {normalizedDays} day{(normalizedDays == 1 ? "" : "s")}. The new value will apply the next time you use Enable KillMail DB Pull.",
+                    "PMG Max Killmail Age",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Failed to save max killmail age.", ex);
+
+                MessageBox.Show(
+                    $"Failed to save max killmail age.\n\n{ex.Message}",
+                    "PMG Max Killmail Age Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void UseDefaultMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _appSettings.MaxKillmailAgeDays = KillmailDatasetFreshnessService.DefaultMaxKillmailAgeDays;
+                _appSettingsService.Save(_appSettings);
+                MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
+                UpdateMaxKillmailAgeUi();
+
+                AppLogger.UiInfo($"Max killmail age reset to default. days={_appSettings.MaxKillmailAgeDays}");
+
+                MessageBox.Show(
+                    $"Max killmail age reset to the default of {_appSettings.MaxKillmailAgeDays} days.",
+                    "PMG Max Killmail Age",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Failed to reset max killmail age to default.", ex);
+
+                MessageBox.Show(
+                    $"Failed to reset max killmail age.\n\n{ex.Message}",
+                    "PMG Max Killmail Age Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private int GetMaxKillmailAgeDaysSettingValue()
+        {
+            return KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(_appSettings.MaxKillmailAgeDays);
+        }
+
+        private string GetMaxKillmailAgeTextBoxText()
+        {
+            return GetMaxKillmailAgeDaysSettingValue().ToString(CultureInfo.InvariantCulture);
+        }
+
+        private void UpdateMaxKillmailAgeUi()
+        {
+            var days = GetMaxKillmailAgeDaysSettingValue();
+            var suffix = days == 1 ? "day" : "days";
+
+            EffectiveMaxKillmailAgeText.Text = $"Effective max killmail age: {days} {suffix}";
+        }
+
         private void SaveKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -1641,12 +1735,14 @@ namespace PitmastersGrill
             {
                 EnableKillmailDbPullButton.IsEnabled = false;
 
+                var seedDays = GetMaxKillmailAgeDaysSettingValue();
+
                 AppLogger.UiInfo(
-                    $"Enable KillMail DB Pull requested. seedDays=30 displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
+                    $"Enable KillMail DB Pull requested. seedDays={seedDays} displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
 
-                await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(30, CancellationToken.None);
+                await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, CancellationToken.None);
 
-                AppLogger.UiInfo("Enable KillMail DB Pull completed successfully.");
+                AppLogger.UiInfo($"Enable KillMail DB Pull completed successfully. seedDays={seedDays}");
             }
             catch (Exception ex)
             {

@@ -7,6 +7,10 @@ namespace PitmastersGrill.Services
 {
     public class KillmailDatasetFreshnessService
     {
+        public const int DefaultMaxKillmailAgeDays = 30;
+        public const int MinimumMaxKillmailAgeDays = 1;
+        public const int MaximumMaxKillmailAgeDays = 365;
+
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly DayImportStateRepository _dayImportStateRepository;
 
@@ -14,6 +18,30 @@ namespace PitmastersGrill.Services
         {
             _metadataRepository = metadataRepository;
             _dayImportStateRepository = new DayImportStateRepository(KillmailPaths.GetKillmailDatabasePath());
+        }
+
+        public static int NormalizeMaxKillmailAgeDays(int value)
+        {
+            if (value < MinimumMaxKillmailAgeDays)
+            {
+                return DefaultMaxKillmailAgeDays;
+            }
+
+            if (value > MaximumMaxKillmailAgeDays)
+            {
+                return MaximumMaxKillmailAgeDays;
+            }
+
+            return value;
+        }
+
+        public static string BuildBootstrapStartDayUtc(DateTime utcNow, int maxKillmailAgeDays)
+        {
+            var normalizedDays = NormalizeMaxKillmailAgeDays(maxKillmailAgeDays);
+            var requiredThroughDay = utcNow.Date.AddDays(-1);
+            var bootstrapStartDay = requiredThroughDay.AddDays(-(normalizedDays - 1));
+
+            return bootstrapStartDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
 
         public KillmailDatasetFreshnessStatus GetFreshnessStatus()

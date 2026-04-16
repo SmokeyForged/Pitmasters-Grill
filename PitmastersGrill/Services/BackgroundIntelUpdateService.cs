@@ -71,7 +71,32 @@ namespace PitmastersGrill.Services
             var bootstrapStartDay = requiredThroughDay.AddDays(-(lookbackDays - 1));
             var bootstrapStartDayUtc = bootstrapStartDay.ToString("yyyy-MM-dd");
 
-            await ResetLocalKillmailDerivedStateAsync(bootstrapStartDayUtc, cancellationToken);
+            lock (_sync)
+            {
+                _currentImportDayUtc = bootstrapStartDayUtc;
+                _lastError = "";
+                _notPublishedBoundaryDayUtc = "";
+                _isRunning = true;
+                PublishLocked();
+            }
+
+            try
+            {
+                await Task.Run(
+                    () => ResetLocalKillmailDerivedState(bootstrapStartDayUtc, cancellationToken),
+                    cancellationToken);
+            }
+            catch
+            {
+                lock (_sync)
+                {
+                    _currentImportDayUtc = "";
+                    _isRunning = false;
+                    PublishLocked();
+                }
+
+                throw;
+            }
 
             lock (_sync)
             {
@@ -231,12 +256,14 @@ namespace PitmastersGrill.Services
             }
         }
 
-        private async Task ResetLocalKillmailDerivedStateAsync(string bootstrapStartDayUtc, CancellationToken cancellationToken)
+        private void ResetLocalKillmailDerivedState(string bootstrapStartDayUtc, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             DebugTraceWriter.WriteLine("killmail reset start: clearing archive cache and derived state");
             KillmailPaths.ClearArchiveCacheBestEffort();
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             var connectionString = $"Data Source={KillmailPaths.GetKillmailDatabasePath()}";
             using var connection = new SqliteConnection(connectionString);
@@ -248,6 +275,8 @@ namespace PitmastersGrill.Services
             ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_fleet_observations_day;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_ship_observations_day;");
             transaction.Commit();
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             _metadataRepository.SetValue("latest_complete_day_utc", "");
             _metadataRepository.SetValue("last_successful_update_at_utc", "");

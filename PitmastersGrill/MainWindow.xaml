@@ -584,8 +584,43 @@
                                                Foreground="{DynamicResource HeaderTextBrush}"
                                                Margin="0,0,0,12"/>
 
+                                    <TextBlock Text="Max Killmail Age (days)"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+
+                                    <TextBlock x:Name="EffectiveMaxKillmailAgeText"
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               Text="Effective max killmail age: 30 days"/>
+
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Enable local killmail DB pull from a rolling 30-day seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
+                                               Margin="0,6,0,4"
+                                               Text="Controls the seed window used when you run Enable KillMail DB Pull. Changes apply the next time you trigger a fresh bootstrap."/>
+
+                                    <TextBox x:Name="MaxKillmailAgeDaysTextBox"
+                                             Margin="0,0,0,10"
+                                             Width="140"
+                                             HorizontalAlignment="Left"/>
+
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <Button x:Name="SaveMaxKillmailAgeButton"
+                                                Width="120"
+                                                Padding="14,6"
+                                                Margin="0,0,10,0"
+                                                Content="Save Age"
+                                                Click="SaveMaxKillmailAgeButton_Click"/>
+
+                                        <Button x:Name="UseDefaultMaxKillmailAgeButton"
+                                                Width="120"
+                                                Padding="14,6"
+                                                Margin="0,0,10,0"
+                                                Content="Use Default"
+                                                Click="UseDefaultMaxKillmailAgeButton_Click"/>
+                                    </WrapPanel>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Text="Enable local killmail DB pull from the configured max-age seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
 
                                     <WrapPanel Margin="0,4,0,0">
                                         <Button x:Name="EnableKillmailDbPullButton"
