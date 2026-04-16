@@ -235,6 +235,9 @@ namespace PitmastersGrill.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            DebugTraceWriter.WriteLine("killmail reset start: clearing archive cache and derived state");
+            KillmailPaths.ClearArchiveCacheBestEffort();
+
             var connectionString = $"Data Source={KillmailPaths.GetKillmailDatabasePath()}";
             using var connection = new SqliteConnection(connectionString);
             connection.Open();
@@ -249,6 +252,9 @@ namespace PitmastersGrill.Services
             _metadataRepository.SetValue("latest_complete_day_utc", "");
             _metadataRepository.SetValue("last_successful_update_at_utc", "");
             _metadataRepository.SetValue("bootstrap_start_day_utc", bootstrapStartDayUtc);
+
+            DebugTraceWriter.WriteLine(
+                $"killmail reset complete: bootstrapStartDay={bootstrapStartDayUtc}");
         }
 
         private static void ExecuteNonQuery(SqliteConnection connection, SqliteTransaction transaction, string sql)

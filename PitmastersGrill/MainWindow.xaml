@@ -232,7 +232,7 @@
                                 Padding="14,6"
                                 MinWidth="90"
                                 Content="Clear"
-                                Click="ClearBoardButton_Click"/>
+                                Click="ClearBoardButton_Click" Margin="0,0,0,26"/>
                     </Grid>
                 </Grid>
 

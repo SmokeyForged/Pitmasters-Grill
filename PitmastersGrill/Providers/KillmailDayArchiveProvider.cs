@@ -22,7 +22,7 @@ namespace PitmastersGrill.Providers
                 Timeout = TimeSpan.FromMinutes(5)
             };
 
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("PitmastersGrill/0.6.x");
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("PitmastersGrill/0.8.x");
         }
 
         public async Task<KillmailDayArchiveDownloadResult> DownloadDayArchiveAsync(
@@ -42,6 +42,8 @@ namespace PitmastersGrill.Providers
                     Error = $"Invalid day format: {dayUtc}"
                 };
             }
+
+            KillmailPaths.PurgeArchiveCacheBestEffort(dayUtc);
 
             var archiveUrl =
                 $"https://data.everef.net/killmails/{parsedDay:yyyy}/killmails-{parsedDay:yyyy-MM-dd}.tar.bz2";
@@ -89,6 +91,8 @@ namespace PitmastersGrill.Providers
                 archiveLengthBytes = 0;
             }
 
+            KillmailPaths.PurgeArchiveCacheBestEffort(dayUtc);
+
             DebugTraceWriter.WriteLine(
                 $"killmail archive download ok: day={dayUtc}, elapsedMs={downloadStopwatch.ElapsedMilliseconds}, bytes={archiveLengthBytes}");
 
@@ -108,6 +112,8 @@ namespace PitmastersGrill.Providers
             string archivePath,
             CancellationToken cancellationToken = default)
         {
+            KillmailPaths.PurgeArchiveCacheBestEffort(dayUtc);
+
             var extractRoot = KillmailPaths.GetKillmailExtractedDayDirectory(dayUtc);
             var markerPath = KillmailPaths.GetKillmailExtractedDayMarkerPath(dayUtc);
 
@@ -148,6 +154,8 @@ namespace PitmastersGrill.Providers
             var jsonFileCount = Directory.GetFiles(extractRoot, "*.json", SearchOption.AllDirectories).Length;
 
             await File.WriteAllTextAsync(markerPath, DateTime.UtcNow.ToString("o"), cancellationToken);
+
+            KillmailPaths.PurgeArchiveCacheBestEffort(dayUtc);
 
             DebugTraceWriter.WriteLine(
                 $"killmail archive extract ok: day={dayUtc}, elapsedMs={extractStopwatch.ElapsedMilliseconds}, jsonFiles={jsonFileCount}");

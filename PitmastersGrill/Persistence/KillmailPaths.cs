@@ -8,6 +8,7 @@ namespace PitmastersGrill.Persistence
     public static class KillmailPaths
     {
         private const string DefaultDisplayPath = @"%LOCALAPPDATA%\PitmastersGrill\KillmailDb";
+        private static readonly TimeSpan ArchiveCacheTtl = TimeSpan.FromHours(24);
 
         public static string GetDefaultKillmailDataDirectory()
         {
@@ -73,6 +74,81 @@ namespace PitmastersGrill.Persistence
         public static string GetKillmailExtractedDayMarkerPath(string dayUtc)
         {
             return Path.Combine(GetKillmailExtractedDayDirectory(dayUtc), ".pmg_extract_complete");
+        }
+
+        public static TimeSpan GetArchiveCacheTtl()
+        {
+            return ArchiveCacheTtl;
+        }
+
+        public static void PurgeArchiveCacheBestEffort(string excludeDayUtc = "")
+        {
+            try
+            {
+                var archiveRoot = GetKillmailArchiveCacheDirectory();
+                if (!Directory.Exists(archiveRoot))
+                {
+                    return;
+                }
+
+                var nowUtc = DateTime.UtcNow;
+
+                foreach (var archivePath in Directory.GetFiles(archiveRoot, "killmails-*.tar.bz2", SearchOption.TopDirectoryOnly))
+                {
+                    TryDeleteArchiveFileIfExpired(archivePath, excludeDayUtc, nowUtc);
+                }
+
+                foreach (var extractDirectory in Directory.GetDirectories(archiveRoot, "extract_*", SearchOption.TopDirectoryOnly))
+                {
+                    TryDeleteExtractDirectoryIfExpired(extractDirectory, excludeDayUtc, nowUtc);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugTraceWriter.WriteLine($"killmail cache purge failed: scope=best_effort, message={ex.Message}");
+            }
+        }
+
+        public static void ClearArchiveCacheBestEffort()
+        {
+            try
+            {
+                var archiveRoot = GetKillmailArchiveCacheDirectory();
+                if (!Directory.Exists(archiveRoot))
+                {
+                    return;
+                }
+
+                foreach (var archivePath in Directory.GetFiles(archiveRoot, "killmails-*.tar.bz2", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        File.Delete(archivePath);
+                        DebugTraceWriter.WriteLine($"killmail cache clear removed archive: path={archivePath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugTraceWriter.WriteLine($"killmail cache clear archive failed: path={archivePath}, message={ex.Message}");
+                    }
+                }
+
+                foreach (var extractDirectory in Directory.GetDirectories(archiveRoot, "extract_*", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        Directory.Delete(extractDirectory, true);
+                        DebugTraceWriter.WriteLine($"killmail cache clear removed extract: path={extractDirectory}");
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugTraceWriter.WriteLine($"killmail cache clear extract failed: path={extractDirectory}, message={ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugTraceWriter.WriteLine($"killmail cache clear failed: scope=best_effort, message={ex.Message}");
+            }
         }
 
         public static bool IsUsingConfiguredOverride()
@@ -156,6 +232,137 @@ namespace PitmastersGrill.Persistence
             {
                 return trimmed;
             }
+        }
+
+        private static void TryDeleteArchiveFileIfExpired(string archivePath, string excludeDayUtc, DateTime nowUtc)
+        {
+            try
+            {
+                var fileName = Path.GetFileName(archivePath);
+                var dayUtc = TryParseDayUtcFromArchiveFileName(fileName);
+
+                if (IsExcludedDay(dayUtc, excludeDayUtc))
+                {
+                    return;
+                }
+
+                var lastWriteUtc = File.GetLastWriteTimeUtc(archivePath);
+                var age = nowUtc - lastWriteUtc;
+
+                if (age <= ArchiveCacheTtl)
+                {
+                    return;
+                }
+
+                File.Delete(archivePath);
+
+                DebugTraceWriter.WriteLine(
+                    $"killmail cache purge removed archive: day={dayUtc}, ageHours={age.TotalHours:F2}, path={archivePath}");
+            }
+            catch (Exception ex)
+            {
+                DebugTraceWriter.WriteLine(
+                    $"killmail cache purge archive failed: path={archivePath}, message={ex.Message}");
+            }
+        }
+
+        private static void TryDeleteExtractDirectoryIfExpired(string extractDirectory, string excludeDayUtc, DateTime nowUtc)
+        {
+            try
+            {
+                var directoryName = Path.GetFileName(extractDirectory);
+                var dayUtc = TryParseDayUtcFromExtractDirectoryName(directoryName);
+
+                if (IsExcludedDay(dayUtc, excludeDayUtc))
+                {
+                    return;
+                }
+
+                var referenceUtc = GetExtractReferenceTimeUtc(extractDirectory, dayUtc);
+                var age = nowUtc - referenceUtc;
+
+                if (age <= ArchiveCacheTtl)
+                {
+                    return;
+                }
+
+                Directory.Delete(extractDirectory, true);
+
+                DebugTraceWriter.WriteLine(
+                    $"killmail cache purge removed extract: day={dayUtc}, ageHours={age.TotalHours:F2}, path={extractDirectory}");
+            }
+            catch (Exception ex)
+            {
+                DebugTraceWriter.WriteLine(
+                    $"killmail cache purge extract failed: path={extractDirectory}, message={ex.Message}");
+            }
+        }
+
+        private static DateTime GetExtractReferenceTimeUtc(string extractDirectory, string dayUtc)
+        {
+            try
+            {
+                var markerPath = Path.Combine(extractDirectory, ".pmg_extract_complete");
+                if (File.Exists(markerPath))
+                {
+                    return File.GetLastWriteTimeUtc(markerPath);
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                return Directory.GetLastWriteTimeUtc(extractDirectory);
+            }
+            catch
+            {
+                return DateTime.UtcNow;
+            }
+        }
+
+        private static bool IsExcludedDay(string candidateDayUtc, string excludeDayUtc)
+        {
+            if (string.IsNullOrWhiteSpace(candidateDayUtc) || string.IsNullOrWhiteSpace(excludeDayUtc))
+            {
+                return false;
+            }
+
+            return string.Equals(candidateDayUtc, excludeDayUtc, StringComparison.Ordinal);
+        }
+
+        private static string TryParseDayUtcFromArchiveFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return string.Empty;
+            }
+
+            if (!fileName.StartsWith("killmails-", StringComparison.OrdinalIgnoreCase) ||
+                !fileName.EndsWith(".tar.bz2", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            var dayUtc = fileName.Substring("killmails-".Length);
+            dayUtc = dayUtc.Substring(0, dayUtc.Length - ".tar.bz2".Length);
+            return dayUtc;
+        }
+
+        private static string TryParseDayUtcFromExtractDirectoryName(string directoryName)
+        {
+            if (string.IsNullOrWhiteSpace(directoryName))
+            {
+                return string.Empty;
+            }
+
+            if (!directoryName.StartsWith("extract_", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return directoryName.Substring("extract_".Length);
         }
 
         private static string TryGetConfiguredKillmailDataDirectory()
