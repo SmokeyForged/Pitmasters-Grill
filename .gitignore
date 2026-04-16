@@ -62,4 +62,4 @@ coverage/
 *.coverage
 *.coveragexml
 # Local publish profiles
-PitmastersLittleGrill/Properties/PublishProfiles/
+PitmastersGrill/Properties/PublishProfiles/

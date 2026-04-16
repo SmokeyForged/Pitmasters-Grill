@@ -1,6 +1,6 @@
-# Pitmaster's Grill — EVE Policy / ToS Compliance Position
+# Pitmasters Grill — EVE Policy / ToS Compliance Position
 
-This document explains the intended policy posture of **Pitmaster's Grill (PMG)** with respect to EVE Online third-party tool boundaries.
+This document explains the intended policy posture of **Pitmasters Grill (PMG)** with respect to EVE Online third-party tool boundaries.
 
 It is written to answer a practical question:
 

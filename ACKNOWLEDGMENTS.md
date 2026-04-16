@@ -1,6 +1,6 @@
 # Inspiration
 
-Pitmaster's Grill exists because community-made tools in EVE left an impression that lasted.
+Pitmasters Grill exists because community-made tools in EVE left an impression that lasted.
 
 One of the clearest inspirations behind PMG is **Pirates Little Helper (PLH)**.
 
@@ -13,3 +13,4 @@ But inspiration deserves to be named honestly.
 If PMG feels like it carries even a little of the old community-tool magic, that is in part because PLH helped prove what was possible in the first place.
 
 To those who built, maintained, and shared tools like PLH with the community: thank you for the spark.
+

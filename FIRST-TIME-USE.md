@@ -1,6 +1,6 @@
 # First-Time Use
 
-Welcome to **Pitmaster's Grill (PMG)**.
+Welcome to **Pitmasters Grill (PMG)**.
 
 This guide is for first-time setup and first-time use. It covers how to get the app running, what happens on startup, and how to get the most value out of the main intel workflow.
 
@@ -12,7 +12,7 @@ After downloading:
 
 1. Extract the ZIP to its own folder
 2. Open the extracted folder
-3. Run PitmastersLittleGrill.exe
+3. Run PitmastersGrill.exe
 
 > Keep all extracted files together in the same folder. Do not run the app directly from inside the ZIP.
 
@@ -120,7 +120,7 @@ If you are opening PMG for the first time, this is a good starting pattern:
 
 1. Download the latest release
 2. Extract the ZIP fully
-3. Run PitmastersLittleGrill.exe
+3. Run PitmastersGrill.exe
 4. Let startup complete
 5. Allow the automatic yesterday-zKill update to do its work
 6. Use the **30-day zKill pull** if you want a broader recent baseline

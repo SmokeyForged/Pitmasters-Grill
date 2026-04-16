@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PitmastersLittleGrill"
         mc:Ignorable="d"
-        Title="Pitmasters Grill — Technical Preview-v0.7.0"
+        Title="Pitmasters Grill"
         Height="430"
         Width="760"
         MinHeight="430"
@@ -182,10 +182,6 @@
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource HeaderTextBrush}"/>
-                        <TextBlock Text="Technical Preview-v0.7.0"
-                                   Margin="0,2,0,0"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource MutedTextBrush}"/>
                     </StackPanel>
 
                     <Border Grid.Column="1"
@@ -303,15 +299,20 @@
                 <TabItem Header="Board">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
                         <Grid x:Name="BoardOverlayHost">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="60*"/>
+                                <ColumnDefinition Width="12*"/>
+                                <ColumnDefinition Width="9*"/>
+                                <ColumnDefinition Width="649*"/>
+                            </Grid.ColumnDefinitions>
                             <DataGrid x:Name="PilotBoard"
                                       AutoGenerateColumns="False"
                                       CanUserAddRows="False"
                                       IsReadOnly="True"
-                                      Margin="0"
                                       SelectionMode="Single"
                                       SelectionUnit="FullRow"
                                       SelectionChanged="PilotBoard_SelectionChanged"
-                                      MouseDoubleClick="PilotBoard_MouseDoubleClick">
+                                      MouseDoubleClick="PilotBoard_MouseDoubleClick" Grid.ColumnSpan="4">
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn Header="Sig" Width="42">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -377,7 +378,7 @@
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="4"
-                                    Panel.ZIndex="10">
+                                    Panel.ZIndex="10" Grid.Column="3">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -548,6 +549,27 @@
                                                    Foreground="{DynamicResource BodyTextBrush}"
                                                    Text="100%"/>
                                     </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="16"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Version Information"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,12"/>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Text="Technical Preview-v0.8.0"/>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,4,0,0"
+                                               Text="SmokeyLabs"/>
                                 </StackPanel>
                             </Border>
 
