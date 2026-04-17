@@ -1,4 +1,5 @@
-﻿using PitmastersGrill.Models;
+﻿using PitmastersGrill.Diagnostics;
+using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using PitmastersGrill.Providers;
 using PitmastersGrill.Services;
@@ -47,6 +48,7 @@ namespace PitmastersGrill
         private readonly StatsService _statsService;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
+        private readonly MainWindowDiagnostics _diagnostics;
 
         private readonly object _timingMarkerSync = new();
 
@@ -80,6 +82,8 @@ namespace PitmastersGrill
 
             _isApplyingSettings = true;
             InitializeComponent();
+
+            _diagnostics = new MainWindowDiagnostics(Dispatcher);
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
 
@@ -182,6 +186,7 @@ namespace PitmastersGrill
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
+            _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
             RemoveClipboardFormatListener(hwnd);
@@ -472,6 +477,8 @@ namespace PitmastersGrill
                 return;
             }
 
+            _diagnostics.ClipboardProcessStart();
+
             _isClipboardProcessing = true;
             EnableKillmailDbPullButton.IsEnabled = false;
             ClearBoardButton.IsEnabled = false;
@@ -486,13 +493,16 @@ namespace PitmastersGrill
                 {
                     if (!Clipboard.ContainsText())
                     {
+                        _diagnostics.ClipboardNoText();
                         return;
                     }
 
                     rawClipboardText = Clipboard.GetText();
+                    _diagnostics.ClipboardTextRead(rawClipboardText);
                 }
                 catch (Exception ex)
                 {
+                    _diagnostics.ClipboardReadFailed(ex.Message);
                     AppLogger.ClipboardWarn($"Clipboard read failed. message={ex.Message}");
                     return;
                 }
@@ -503,6 +513,7 @@ namespace PitmastersGrill
 
                 if (!result.ShouldProcess)
                 {
+                    _diagnostics.ClipboardIntakeIgnored(result.IgnoreReason);
                     AppLogger.ClipboardInfo($"Ignored clipboard board. reason={result.IgnoreReason}");
                     return;
                 }
@@ -510,6 +521,8 @@ namespace PitmastersGrill
                 _lastProcessedClipboardText = result.AcceptedClipboardText;
                 CancelBoardPopulationRetry();
                 ResetBoardPopulationTracking();
+
+                _diagnostics.ClipboardIntakeAccepted(result.ParsedNames.Count, true);
 
                 AppLogger.ClipboardInfo(
                     $"Accepted clipboard board. parsedNames={result.ParsedNames.Count} retryReset=true");
@@ -521,6 +534,7 @@ namespace PitmastersGrill
                 EnableKillmailDbPullButton.IsEnabled = true;
                 ClearBoardButton.IsEnabled = true;
                 _isClipboardProcessing = false;
+                _diagnostics.ClipboardProcessEnd();
             }
         }
 
@@ -528,8 +542,7 @@ namespace PitmastersGrill
         {
             SaveCurrentNotesAndTags();
 
-            LogBoardLifecycleDebug(
-                $"Board process requested. retryPass={isRetryPass} incomingCount={characterNames?.Count ?? 0}");
+            _diagnostics.BoardProcessRequested(isRetryPass, characterNames?.Count ?? 0);
 
             var cleanedNames = characterNames
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -538,7 +551,7 @@ namespace PitmastersGrill
 
             if (cleanedNames.Count == 0)
             {
-                LogBoardLifecycleDebug("Board process aborted. No cleaned names remained after normalization.");
+                _diagnostics.BoardProcessAbortedNoCleanNames();
                 UpdateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
                 return;
             }
@@ -553,8 +566,12 @@ namespace PitmastersGrill
             var cachedStats = _statsService.GetCachedForResolvedRows(cachedIdentities);
             cacheStopwatch.Stop();
 
-            LogBoardLifecycleDebug(
-                $"Cache hydrate complete. retryPass={isRetryPass} cleanedNames={cleanedNames.Count} identities={cachedIdentities.Count} stats={cachedStats.Count} elapsedMs={cacheStopwatch.ElapsedMilliseconds}");
+            _diagnostics.CacheHydrateComplete(
+                isRetryPass,
+                cleanedNames.Count,
+                cachedIdentities.Count,
+                cachedStats.Count,
+                cacheStopwatch.ElapsedMilliseconds);
 
             BuildInitialBoard(cleanedNames, cachedIdentities, cachedStats);
 
@@ -565,8 +582,7 @@ namespace PitmastersGrill
                 isRetryPass ? "Board population retrying unresolved rows" : "Board population in progress",
                 isRetryPass ? BoardPopulationStatusKind.Warning : BoardPopulationStatusKind.Neutral);
 
-            LogBoardLifecycleDebug(
-                $"Board process start. generation={generation} rowCount={_currentRows.Count} retryPass={isRetryPass}");
+            _diagnostics.BoardProcessStart(generation, _currentRows.Count, isRetryPass);
 
             DebugTraceWriter.WriteLine(
                 $"board process start: generation={generation}, rowCount={_currentRows.Count}, retryPass={isRetryPass}");
@@ -577,16 +593,14 @@ namespace PitmastersGrill
 
             if (generation == _processingGeneration)
             {
-                LogBoardLifecycleDebug(
-                    $"Board process settled. generation={generation} elapsedMs={boardStopwatch.ElapsedMilliseconds}");
+                _diagnostics.BoardProcessSettled(generation, boardStopwatch.ElapsedMilliseconds);
 
                 DebugTraceWriter.WriteLine(
                     $"board process settled: generation={generation}, elapsedMs={boardStopwatch.ElapsedMilliseconds}");
             }
             else
             {
-                LogBoardLifecycleDebug(
-                    $"Board process superseded. generation={generation} elapsedMs={boardStopwatch.ElapsedMilliseconds}");
+                _diagnostics.BoardProcessSuperseded(generation, boardStopwatch.ElapsedMilliseconds);
 
                 DebugTraceWriter.WriteLine(
                     $"board process superseded: generation={generation}, elapsedMs={boardStopwatch.ElapsedMilliseconds}");
@@ -611,8 +625,7 @@ namespace PitmastersGrill
         {
             if (generation != _processingGeneration)
             {
-                LogBoardLifecycleDebug(
-                    $"Finalize skipped. generation={generation} activeGeneration={_processingGeneration}");
+                _diagnostics.FinalizeSkipped(generation, _processingGeneration);
                 return;
             }
 
@@ -630,8 +643,7 @@ namespace PitmastersGrill
                     ? $"Board population complete ({completeCount} complete, {partialCount} partial)"
                     : "Board population complete";
 
-                LogBoardLifecycleDebug(
-                    $"Board process finalized complete. generation={generation} complete={completeCount} partial={partialCount} retryable={retryableCount}");
+                _diagnostics.BoardProcessFinalizedComplete(generation, completeCount, partialCount, retryableCount);
 
                 UpdateBoardPopulationStatus(completionText, BoardPopulationStatusKind.Success);
                 return;
@@ -642,8 +654,11 @@ namespace PitmastersGrill
 
             if (_activeBoardPopulationRetryAttempt >= MaxBoardPopulationRetryAttempts)
             {
-                LogBoardLifecycleDebug(
-                    $"Board process finalized with retry limit reached. generation={generation} retryable={retryableCount} partial={partialCount} attempts={_activeBoardPopulationRetryAttempt}");
+                _diagnostics.BoardProcessRetryLimitReached(
+                    generation,
+                    retryableCount,
+                    partialCount,
+                    _activeBoardPopulationRetryAttempt);
 
                 UpdateBoardPopulationStatus(
                     $"Board population incomplete — retry limit reached ({retryableCount} retryable, {partialCount} partial)",
@@ -651,8 +666,11 @@ namespace PitmastersGrill
                 return;
             }
 
-            LogBoardLifecycleDebug(
-                $"Board process requires retry. generation={generation} retryable={retryableCount} partial={partialCount} attempts={_activeBoardPopulationRetryAttempt}");
+            _diagnostics.BoardProcessRequiresRetry(
+                generation,
+                retryableCount,
+                partialCount,
+                _activeBoardPopulationRetryAttempt);
 
             UpdateBoardPopulationStatus(
                 $"Board population delayed by source throttling or temporary failures ({retryableCount} retryable, {partialCount} partial)",
@@ -727,14 +745,14 @@ namespace PitmastersGrill
         {
             if (_activeBoardPopulationRetryScheduled)
             {
-                LogBoardLifecycleDebug("Retry schedule request ignored because a retry is already scheduled.");
+                _diagnostics.RetryScheduleIgnoredAlreadyScheduled();
                 return;
             }
 
             var retryableRows = _currentRows.Where(HasRetryableStage).ToList();
             if (retryableRows.Count == 0)
             {
-                LogBoardLifecycleDebug("Retry schedule request ignored because no retryable rows remained.");
+                _diagnostics.RetryScheduleIgnoredNoRows();
                 return;
             }
 
@@ -757,8 +775,10 @@ namespace PitmastersGrill
             _boardPopulationRetryCts = new CancellationTokenSource();
             var retryToken = _boardPopulationRetryCts.Token;
 
-            LogBoardLifecycleDebug(
-                $"Retry scheduled. attempt={_activeBoardPopulationRetryAttempt} delayMs={(int)delay.TotalMilliseconds} rowCount={retryableRows.Count}");
+            _diagnostics.RetryScheduled(
+                _activeBoardPopulationRetryAttempt,
+                (int)delay.TotalMilliseconds,
+                retryableRows.Count);
 
             DebugTraceWriter.WriteLine(
                 $"board population retry scheduled: attempt={_activeBoardPopulationRetryAttempt}, delayMs={(int)delay.TotalMilliseconds}, rowCount={retryableRows.Count}");
@@ -771,7 +791,7 @@ namespace PitmastersGrill
 
                     if (retryToken.IsCancellationRequested)
                     {
-                        LogBoardLifecycleDebug("Retry delay cancelled before dispatch.");
+                        _diagnostics.RetryDelayCancelledBeforeDispatch();
                         return;
                     }
 
@@ -779,12 +799,11 @@ namespace PitmastersGrill
                     {
                         if (retryToken.IsCancellationRequested)
                         {
-                            LogBoardLifecycleDebug("Retry dispatch skipped because the token was already cancelled.");
+                            _diagnostics.RetryDispatchSkippedBecauseCancelled();
                             return;
                         }
 
-                        LogBoardLifecycleDebug(
-                            $"Retry dispatch fired. attempt={_activeBoardPopulationRetryAttempt}");
+                        _diagnostics.RetryDispatchFired(_activeBoardPopulationRetryAttempt);
 
                         UpdateBoardPopulationStatus(
                             "Board population retrying delayed rows",
@@ -795,7 +814,7 @@ namespace PitmastersGrill
                 }
                 catch (OperationCanceledException)
                 {
-                    LogBoardLifecycleDebug("Retry delay task canceled.");
+                    _diagnostics.RetryDelayTaskCanceled();
                 }
                 finally
                 {
@@ -814,15 +833,13 @@ namespace PitmastersGrill
 
             if (retryRows.Count == 0)
             {
-                LogBoardLifecycleDebug(
-                    $"Retry pass skipped. generation={generation} readyRowCount=0");
+                _diagnostics.RetryPassSkipped(generation, 0);
 
                 FinalizeBoardPopulationPass(generation);
                 return;
             }
 
-            LogBoardLifecycleDebug(
-                $"Retry pass start. generation={generation} rowCount={retryRows.Count}");
+            _diagnostics.RetryPassStart(generation, retryRows.Count);
 
             DebugTraceWriter.WriteLine(
                 $"board retry pass start: generation={generation}, rowCount={retryRows.Count}");
@@ -831,8 +848,7 @@ namespace PitmastersGrill
             await ProcessRowBatchAsync(retryRows, generation);
             retryStopwatch.Stop();
 
-            LogBoardLifecycleDebug(
-                $"Retry pass complete. generation={generation} rowCount={retryRows.Count} elapsedMs={retryStopwatch.ElapsedMilliseconds}");
+            _diagnostics.RetryPassComplete(generation, retryRows.Count, retryStopwatch.ElapsedMilliseconds);
 
             UpdateLastRefreshed();
             FinalizeBoardPopulationPass(generation);
@@ -843,7 +859,7 @@ namespace PitmastersGrill
             try
             {
                 _boardPopulationRetryCts?.Cancel();
-                LogBoardLifecycleDebug("Retry cancellation requested.");
+                _diagnostics.RetryCancellationRequested();
             }
             catch
             {
@@ -859,7 +875,7 @@ namespace PitmastersGrill
             _activeBoardPopulationRetryAttempt = 0;
             _activeBoardNames = new List<string>();
             _lastProcessedClipboardText = string.Empty;
-            LogBoardLifecycleDebug("Board population tracking reset.");
+            _diagnostics.BoardPopulationTrackingReset();
             UpdateBoardPopulationStatus("Board population in progress", BoardPopulationStatusKind.Neutral);
         }
 
@@ -1073,8 +1089,7 @@ namespace PitmastersGrill
             Dictionary<string, ResolverCacheEntry> identities,
             Dictionary<string, StatsCacheEntry> stats)
         {
-            LogBoardLifecycleDebug(
-                $"Initial board build start. characterNames={characterNames.Count} identities={identities.Count} stats={stats.Count}");
+            _diagnostics.InitialBoardBuildStart(characterNames.Count, identities.Count, stats.Count);
 
             var buildStopwatch = Stopwatch.StartNew();
             var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
@@ -1093,8 +1108,7 @@ namespace PitmastersGrill
             UpdateLastRefreshed();
 
             buildStopwatch.Stop();
-            LogBoardLifecycleDebug(
-                $"Initial board build complete. rowCount={_currentRows.Count} elapsedMs={buildStopwatch.ElapsedMilliseconds}");
+            _diagnostics.InitialBoardBuildComplete(_currentRows.Count, buildStopwatch.ElapsedMilliseconds);
         }
 
         private void ApplyIdentityToRow(PilotBoardRow row, ResolverCacheEntry identity)
@@ -1273,6 +1287,8 @@ namespace PitmastersGrill
         {
             var clearedRowCount = _currentRows.Count;
 
+            _diagnostics.ClearBoardStart(clearedRowCount);
+
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             _processingGeneration++;
@@ -1290,6 +1306,7 @@ namespace PitmastersGrill
             UpdateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
 
             AppLogger.UiInfo($"Board cleared. removedRows={clearedRowCount}");
+            _diagnostics.ClearBoardComplete();
         }
 
         private void OpenZkillButton_Click(object sender, RoutedEventArgs e)
@@ -1871,17 +1888,6 @@ namespace PitmastersGrill
             {
                 EnableKillmailDbPullButton.IsEnabled = true;
             }
-        }
-
-        private void LogBoardLifecycleDebug(string message)
-        {
-            if (!AppLogger.IsDebugEnabled)
-            {
-                return;
-            }
-
-            AppLogger.UiDebug(message);
-            DebugTraceWriter.WriteLine(message);
         }
 
         private void TryWriteFirstGenerationMarker(ref int markerField, int generation, string message)
