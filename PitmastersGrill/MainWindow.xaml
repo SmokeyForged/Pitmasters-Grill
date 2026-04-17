@@ -579,7 +579,7 @@
                                                Margin="0,0,0,12"/>
 
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Technical Preview-v0.8.1"/>
+                                               Text="Technical Preview-v0.8.2"/>
 
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
@@ -652,11 +652,28 @@
                                                 Margin="0,0,10,0"
                                                 Content="Logs"
                                                 Click="OpenLogsButton_Click"/>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Text="Log Level"/>
+
+                                        <ComboBox x:Name="LogLevelComboBox"
+                                                  Width="140"
+                                                  VerticalAlignment="Center"
+                                                  SelectionChanged="LogLevelComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Normal"/>
+                                            <ComboBoxItem Content="Debug"/>
+                                        </ComboBox>
                                     </WrapPanel>
 
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,10,0,0"
                                                Text="Open the PMG logs folder for startup, UI, clipboard, import, database, and error diagnostics."/>
+
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,6,0,0"
+                                               Text="Use Debug only while investigating freezes or ingest issues. Normal keeps log volume lower."/>
 
                                     <Separator Margin="0,8,0,14"/>
 

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace PitmastersGrill
 {
@@ -16,21 +17,29 @@ namespace PitmastersGrill
         {
             base.OnStartup(e);
 
+            RegisterGlobalExceptionLogging();
+            AppLogger.Initialize("Technical Preview-v0.8.2", e.Args);
+            AppLogger.AppInfo("Application startup invoked.");
+
             try
             {
                 if (IsSeedBuildMode(e.Args))
                 {
+                    AppLogger.AppInfo("Startup mode detected: seed build.");
                     ShutdownMode = ShutdownMode.OnExplicitShutdown;
                     await RunSeedBuildModeAsync(e.Args);
                     Shutdown();
                     return;
                 }
 
+                AppLogger.AppInfo("Startup mode detected: normal.");
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 await RunNormalStartupAsync();
             }
             catch (Exception ex)
             {
+                AppLogger.AppError("Unhandled startup exception.", ex);
+
                 MessageBox.Show(
                     $"PMG failed during startup.\n\n{ex.Message}",
                     "PMG Startup Error",
@@ -39,6 +48,81 @@ namespace PitmastersGrill
 
                 Shutdown();
             }
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try
+            {
+                AppLogger.AppInfo($"Application exit. exitCode={e.ApplicationExitCode}");
+                AppLogger.Shutdown();
+            }
+            catch
+            {
+                // best effort only
+            }
+
+            base.OnExit(e);
+        }
+
+        private void RegisterGlobalExceptionLogging()
+        {
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+            TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        }
+
+        private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            try
+            {
+                AppLogger.ErrorOnly("Dispatcher unhandled exception.", e.Exception);
+            }
+            catch
+            {
+                // best effort only
+            }
+
+            // Intentionally do not set e.Handled here.
+            // This step is for observability, not behavior masking.
+        }
+
+        private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            try
+            {
+                var exception = e.ExceptionObject as Exception;
+                var terminationText = $"AppDomain unhandled exception. isTerminating={e.IsTerminating}";
+
+                if (exception != null)
+                {
+                    AppLogger.ErrorOnly(terminationText, exception);
+                }
+                else
+                {
+                    AppLogger.ErrorOnly(
+                        $"{terminationText} exceptionObjectType={e.ExceptionObject?.GetType().FullName ?? "<null>"}");
+                }
+            }
+            catch
+            {
+                // best effort only
+            }
+        }
+
+        private void OnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            try
+            {
+                AppLogger.ErrorOnly("Unobserved task exception.", e.Exception);
+            }
+            catch
+            {
+                // best effort only
+            }
+
+            // Intentionally do not call SetObserved here.
+            // We want visibility without changing fault-handling behavior yet.
         }
 
         private static bool IsSeedBuildMode(string[] args)
@@ -92,6 +176,9 @@ namespace PitmastersGrill
                 window = seedWindowPolicyService.GetSixMonthSeedWindowUtc();
             }
 
+            AppLogger.AppInfo(
+                $"Seed build window selected. startDayUtc={window.StartDayUtc} endDayUtc={window.EndDayUtc} seedVersion={seedVersion}");
+
             var progressWindow = new Views.StartupSplashWindow();
             progressWindow.Show();
 
@@ -118,6 +205,9 @@ namespace PitmastersGrill
                 {
                     throw new InvalidOperationException(result.Error);
                 }
+
+                AppLogger.AppInfo(
+                    $"Seed build complete. seedVersion={result.SeedVersion} importedDays={result.ImportedDays} killmails={result.ImportedKillmailCount}");
 
                 MessageBox.Show(
                     $"Seed build complete.\n\n" +
@@ -180,12 +270,15 @@ namespace PitmastersGrill
                 mainWindow.Show();
                 splash.Close();
 
+                AppLogger.AppInfo("Main window shown. Starting background intel update service if needed.");
                 backgroundIntelUpdateService.StartIfNeeded();
 
                 await Task.CompletedTask;
             }
             catch (Exception ex)
             {
+                AppLogger.AppError("Normal startup failed.", ex);
+
                 try
                 {
                     await splash.Dispatcher.InvokeAsync(() =>

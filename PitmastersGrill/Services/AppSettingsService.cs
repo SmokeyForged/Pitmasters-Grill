@@ -72,7 +72,14 @@ namespace PitmastersGrill.Services
 
         private static AppSettings Sanitize(AppSettings settings)
         {
-            settings.MaxKillmailAgeDays = KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(settings.MaxKillmailAgeDays);
+            settings.MaxKillmailAgeDays =
+                KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(settings.MaxKillmailAgeDays);
+
+            if (!Enum.IsDefined(typeof(AppLogLevel), settings.LogLevel))
+            {
+                settings.LogLevel = AppLogLevel.Normal;
+            }
+
             return settings;
         }
     }
