@@ -8,6 +8,7 @@ namespace PitmastersGrill.Models
     {
         private string _characterName = "";
         private string _characterId = "";
+        private string _allianceId = "";
         private string _allianceName = "";
         private string _allianceTicker = "";
         private string _corpName = "";
@@ -47,6 +48,12 @@ namespace PitmastersGrill.Models
         {
             get => _characterId;
             set => SetField(ref _characterId, value);
+        }
+
+        public string AllianceId
+        {
+            get => _allianceId;
+            set => SetField(ref _allianceId, value);
         }
 
         public string AllianceName

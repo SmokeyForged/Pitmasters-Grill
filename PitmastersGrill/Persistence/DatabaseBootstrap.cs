@@ -38,6 +38,7 @@ namespace PitmastersGrill.Persistence
                 CREATE TABLE IF NOT EXISTS resolver_cache (
                     character_name TEXT PRIMARY KEY,
                     character_id TEXT NOT NULL DEFAULT '',
+                    alliance_id TEXT NOT NULL DEFAULT '',
                     alliance_name TEXT NOT NULL DEFAULT '',
                     alliance_ticker TEXT NOT NULL DEFAULT '',
                     corp_name TEXT NOT NULL DEFAULT '',
@@ -78,6 +79,12 @@ namespace PitmastersGrill.Persistence
             EnsureColumnExists(
                 connection,
                 "resolver_cache",
+                "alliance_id",
+                "TEXT NOT NULL DEFAULT ''");
+
+            EnsureColumnExists(
+                connection,
+                "resolver_cache",
                 "affiliation_checked_at_utc",
                 "TEXT NOT NULL DEFAULT ''");
 
@@ -98,7 +105,7 @@ namespace PitmastersGrill.Persistence
                 metadataCommand.CommandText =
                 @"
                 INSERT OR REPLACE INTO app_metadata (key, value)
-                VALUES ('schema_version', '8');
+                VALUES ('schema_version', '9');
                 ";
                 metadataCommand.ExecuteNonQuery();
             }

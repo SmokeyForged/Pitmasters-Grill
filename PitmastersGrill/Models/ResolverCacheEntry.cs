@@ -5,6 +5,7 @@
         public string CharacterName { get; set; } = "";
         public string CharacterId { get; set; } = "";
 
+        public string AllianceId { get; set; } = "";
         public string AllianceName { get; set; } = "";
         public string AllianceTicker { get; set; } = "";
 

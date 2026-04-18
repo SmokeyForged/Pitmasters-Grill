@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PitmastersGrill"
+        xmlns:views="clr-namespace:PitmastersGrill.Views"
         mc:Ignorable="d"
         Title="Pitmasters Grill"
         Height="430"
@@ -147,6 +148,48 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+
+        <Style x:Key="CompactActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="MinWidth" Value="118"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RootBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RootBorder" Property="BorderBrush" Value="#606060"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="RootBorder" Property="Background" Value="#2A2A2A"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -181,7 +224,6 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0"
@@ -198,7 +240,6 @@
                             x:Name="IntelUpdateBanner"
                             Background="#155724"
                             Padding="10,8"
-                            Margin="0,0,20,0"
                             BorderBrush="{DynamicResource PanelBorderBrush}"
                             BorderThickness="1"
                             VerticalAlignment="Center">
@@ -215,35 +256,6 @@
                                        Text="Current through latest published archive"/>
                         </StackPanel>
                     </Border>
-
-                    <Grid Grid.Column="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0"
-                                    Orientation="Vertical"
-                                    HorizontalAlignment="Right"
-                                    Margin="0,0,12,0">
-                            <TextBlock x:Name="BoardPopulationStatusText"
-                                       HorizontalAlignment="Right"
-                                       Foreground="{DynamicResource MutedTextBrush}"
-                                       Text="Board population idle"/>
-                            <TextBlock x:Name="LastRefreshedText"
-                                       Margin="0,4,0,0"
-                                       HorizontalAlignment="Right"
-                                       Foreground="{DynamicResource MutedTextBrush}"
-                                       Text="Last Refreshed: --"/>
-                        </StackPanel>
-
-                        <Button Grid.Column="1"
-                                x:Name="ClearBoardButton"
-                                Padding="14,6"
-                                MinWidth="90"
-                                Content="Clear"
-                                Click="ClearBoardButton_Click" Margin="0,0,0,26"/>
-                    </Grid>
                 </Grid>
 
                 <Border Grid.Row="1"
@@ -296,10 +308,35 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" Margin="0,0,0,6">
-                <ToggleButton x:Name="CompactModeToggleButton"
-                              Style="{StaticResource CompactModeToggleStyle}"
-                              HorizontalAlignment="Right"
-                              VerticalAlignment="Top"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Orientation="Vertical"
+                            VerticalAlignment="Center"
+                            Margin="0,0,16,0">
+                    <TextBlock x:Name="BoardPopulationStatusText"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="Board population idle"/>
+                    <TextBlock x:Name="LastRefreshedText"
+                               Margin="0,4,0,0"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="Last Refreshed: --"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        x:Name="ClearBoardButton"
+                        Style="{StaticResource CompactActionButtonStyle}"
+                        Margin="0,0,8,0"
+                        Content="Clear"
+                        Click="ClearBoardButton_Click"/>
+
+                <ToggleButton Grid.Column="2"
+                              x:Name="CompactModeToggleButton"
+                              Style="{StaticResource CompactModeToggleStyle}"/>
             </Grid>
 
             <TabControl x:Name="MainTabControl"
@@ -495,12 +532,20 @@
                                                  VerticalScrollBarVisibility="Auto"
                                                  MinHeight="100"/>
 
-                                        <Button Grid.Row="1"
-                                                x:Name="OpenZkillButton"
-                                                Padding="12,6"
-                                                HorizontalAlignment="Right"
-                                                Content="Open zKill"
-                                                Click="OpenZkillButton_Click"/>
+                                        <StackPanel Grid.Row="1"
+                                                    Orientation="Horizontal"
+                                                    HorizontalAlignment="Right">
+                                            <Button x:Name="IgnoreAllianceButton"
+                                                    Padding="12,6"
+                                                    Margin="0,0,8,0"
+                                                    Content="Ignore Alliance"
+                                                    Click="IgnoreAllianceButton_Click"/>
+
+                                            <Button x:Name="OpenZkillButton"
+                                                    Padding="12,6"
+                                                    Content="Open zKill"
+                                                    Click="OpenZkillButton_Click"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Grid>
                             </Border>
@@ -509,222 +554,266 @@
                 </TabItem>
 
                 <TabItem Header="Settings">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  Background="{DynamicResource WindowBackgroundBrush}">
-                        <StackPanel Margin="16">
-                            <Border Background="{DynamicResource SurfaceAltBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    Padding="16"
-                                    Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="Appearance"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource HeaderTextBrush}"
-                                               Margin="0,0,0,12"/>
+                    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+                        <TabControl Margin="0,0,0,0"
+                                    Background="{DynamicResource WindowBackgroundBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}">
+                            <TabItem Header="General">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Padding="12">
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Appearance"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
 
-                                    <CheckBox x:Name="DarkModeCheckBox"
-                                              Content="Enable Dark Mode"
-                                              Foreground="{DynamicResource BodyTextBrush}"
-                                              Margin="0,0,0,10"
-                                              Checked="DarkModeCheckBox_Changed"
-                                              Unchecked="DarkModeCheckBox_Changed"/>
+                                            <CheckBox x:Name="DarkModeCheckBox"
+                                                      Content="Enable Dark Mode"
+                                                      Foreground="{DynamicResource BodyTextBrush}"
+                                                      Margin="0,0,0,10"
+                                                      Checked="DarkModeCheckBox_Changed"
+                                                      Unchecked="DarkModeCheckBox_Changed"/>
 
-                                    <CheckBox x:Name="AlwaysOnTopCheckBox"
-                                              Content="Always On Top"
-                                              Foreground="{DynamicResource BodyTextBrush}"
-                                              Margin="0,0,0,14"
-                                              Checked="AlwaysOnTopCheckBox_Changed"
-                                              Unchecked="AlwaysOnTopCheckBox_Changed"/>
+                                            <CheckBox x:Name="AlwaysOnTopCheckBox"
+                                                      Content="Always On Top"
+                                                      Foreground="{DynamicResource BodyTextBrush}"
+                                                      Margin="0,0,0,14"
+                                                      Checked="AlwaysOnTopCheckBox_Changed"
+                                                      Unchecked="AlwaysOnTopCheckBox_Changed"/>
 
-                                    <TextBlock Text="Window Surface Opacity"
-                                               Foreground="{DynamicResource BodyTextBrush}"
-                                               Margin="0,0,0,6"/>
+                                            <TextBlock Text="Window Surface Opacity"
+                                                       Foreground="{DynamicResource BodyTextBrush}"
+                                                       Margin="0,0,0,6"/>
 
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                        <Slider Grid.Column="0"
-                                                x:Name="WindowOpacitySlider"
-                                                Minimum="35"
-                                                Maximum="100"
-                                                TickFrequency="5"
-                                                IsSnapToTickEnabled="False"
-                                                ValueChanged="WindowOpacitySlider_ValueChanged"/>
+                                                <Slider Grid.Column="0"
+                                                        x:Name="WindowOpacitySlider"
+                                                        Minimum="35"
+                                                        Maximum="100"
+                                                        TickFrequency="5"
+                                                        IsSnapToTickEnabled="False"
+                                                        ValueChanged="WindowOpacitySlider_ValueChanged"/>
 
-                                        <TextBlock Grid.Column="1"
-                                                   x:Name="WindowOpacityValueText"
-                                                   Margin="12,0,0,0"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="100%"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
+                                                <TextBlock Grid.Column="1"
+                                                           x:Name="WindowOpacityValueText"
+                                                           Margin="12,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource BodyTextBrush}"
+                                                           Text="100%"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </ScrollViewer>
+                            </TabItem>
 
-                            <Border Background="{DynamicResource SurfaceAltBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    Padding="16"
-                                    Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="Version Information"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource HeaderTextBrush}"
-                                               Margin="0,0,0,12"/>
+                            <TabItem Header="Version">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Padding="12">
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Version Information"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Technical Preview-v0.8.2"/>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Text="Technical Preview-v0.8.3"/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,4,0,0"
-                                               Text="SmokeyLabs"/>
-                                </StackPanel>
-                            </Border>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       Text="SmokeyLabs"/>
 
-                            <Border Background="{DynamicResource SurfaceAltBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    Padding="16">
-                                <StackPanel>
-                                    <TextBlock Text="Diagnostics"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource HeaderTextBrush}"
-                                               Margin="0,0,0,12"/>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,12,0,0">
+                                                <Run Text="For more information, visit the GitHub repo: "/>
+                                                <Hyperlink NavigateUri="https://github.com/SmokeyForged/Pitmasters-Grill"
+                                                           RequestNavigate="GitHubRepoLink_RequestNavigate">
+                                                    <Run Text="https://github.com/SmokeyForged/Pitmasters-Grill"/>
+                                                </Hyperlink>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+                                </ScrollViewer>
+                            </TabItem>
 
-                                    <TextBlock Text="Max Killmail Age (days)"
-                                               FontSize="16"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource HeaderTextBrush}"
-                                               Margin="0,0,0,8"/>
+                            <TabItem Header="Diagnostics">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Padding="12">
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Diagnostics"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
 
-                                    <TextBlock x:Name="EffectiveMaxKillmailAgeText"
-                                               Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Effective max killmail age: 30 days"/>
+                                            <WrapPanel Margin="0,4,0,0">
+                                                <Button x:Name="OpenLogsButton"
+                                                        Width="120"
+                                                        Padding="14,6"
+                                                        HorizontalAlignment="Left"
+                                                        Margin="0,0,10,0"
+                                                        Content="Logs"
+                                                        Click="OpenLogsButton_Click"/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,6,0,4"
-                                               Text="Controls the seed window used when you run Enable KillMail DB Pull. Changes apply the next time you trigger a fresh bootstrap."/>
+                                                <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,8,0"
+                                                           Text="Log Level"/>
 
-                                    <TextBox x:Name="MaxKillmailAgeDaysTextBox"
-                                             Margin="0,0,0,10"
-                                             Width="140"
-                                             HorizontalAlignment="Left"/>
+                                                <ComboBox x:Name="LogLevelComboBox"
+                                                          Width="140"
+                                                          VerticalAlignment="Center"
+                                                          SelectionChanged="LogLevelComboBox_SelectionChanged">
+                                                    <ComboBoxItem Content="Normal"/>
+                                                    <ComboBoxItem Content="Debug"/>
+                                                </ComboBox>
+                                            </WrapPanel>
 
-                                    <WrapPanel Margin="0,0,0,10">
-                                        <Button x:Name="SaveMaxKillmailAgeButton"
-                                                Width="120"
-                                                Padding="14,6"
-                                                Margin="0,0,10,0"
-                                                Content="Save Age"
-                                                Click="SaveMaxKillmailAgeButton_Click"/>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,10,0,0"
+                                                       Text="Open the PMG logs folder for startup, UI, clipboard, import, database, and error diagnostics."/>
 
-                                        <Button x:Name="UseDefaultMaxKillmailAgeButton"
-                                                Width="120"
-                                                Padding="14,6"
-                                                Margin="0,0,10,0"
-                                                Content="Use Default"
-                                                Click="UseDefaultMaxKillmailAgeButton_Click"/>
-                                    </WrapPanel>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,6,0,0"
+                                                       Text="Use Debug only while investigating freezes or ingest issues. Normal keeps log volume lower."/>
+                                        </StackPanel>
+                                    </Border>
+                                </ScrollViewer>
+                            </TabItem>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Enable local killmail DB pull from the configured max-age seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
+                            <TabItem Header="Intel Config">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Padding="12">
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Killmail Intel Configuration"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
 
-                                    <WrapPanel Margin="0,4,0,0">
-                                        <Button x:Name="EnableKillmailDbPullButton"
-                                                Width="180"
-                                                Padding="14,6"
-                                                Margin="0,0,10,0"
-                                                HorizontalAlignment="Left"
-                                                Content="Enable KillMail DB Pull"
-                                                Click="EnableKillmailDbPullButton_Click"/>
+                                            <TextBlock Text="Max Killmail Age (days)"
+                                                       FontSize="16"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,8"/>
 
-                                        <Button x:Name="OpenLogsButton"
-                                                Width="120"
-                                                Padding="14,6"
-                                                HorizontalAlignment="Left"
-                                                Margin="0,0,10,0"
-                                                Content="Logs"
-                                                Click="OpenLogsButton_Click"/>
+                                            <TextBlock x:Name="EffectiveMaxKillmailAgeText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Text="Effective max killmail age: 30 days"/>
 
-                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,8,0"
-                                                   Text="Log Level"/>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,6,0,4"
+                                                       Text="Controls the seed window used when you run Enable KillMail DB Pull. Changes apply the next time you trigger a fresh bootstrap."/>
 
-                                        <ComboBox x:Name="LogLevelComboBox"
-                                                  Width="140"
-                                                  VerticalAlignment="Center"
-                                                  SelectionChanged="LogLevelComboBox_SelectionChanged">
-                                            <ComboBoxItem Content="Normal"/>
-                                            <ComboBoxItem Content="Debug"/>
-                                        </ComboBox>
-                                    </WrapPanel>
+                                            <TextBox x:Name="MaxKillmailAgeDaysTextBox"
+                                                     Margin="0,0,0,10"
+                                                     Width="140"
+                                                     HorizontalAlignment="Left"/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,10,0,0"
-                                               Text="Open the PMG logs folder for startup, UI, clipboard, import, database, and error diagnostics."/>
+                                            <WrapPanel Margin="0,0,0,12">
+                                                <Button x:Name="SaveMaxKillmailAgeButton"
+                                                        Width="120"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Save Age"
+                                                        Click="SaveMaxKillmailAgeButton_Click"/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,6,0,0"
-                                               Text="Use Debug only while investigating freezes or ingest issues. Normal keeps log volume lower."/>
+                                                <Button x:Name="UseDefaultMaxKillmailAgeButton"
+                                                        Width="120"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Use Default"
+                                                        Click="UseDefaultMaxKillmailAgeButton_Click"/>
+                                            </WrapPanel>
 
-                                    <Separator Margin="0,8,0,14"/>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Text="Enable local killmail DB pull from the configured max-age seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
 
-                                    <TextBlock Text="Killmail Data Location"
-                                               FontSize="16"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource HeaderTextBrush}"
-                                               Margin="0,0,0,8"/>
+                                            <WrapPanel Margin="0,4,0,14">
+                                                <Button x:Name="EnableKillmailDbPullButton"
+                                                        Width="180"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        HorizontalAlignment="Left"
+                                                        Content="Enable KillMail DB Pull"
+                                                        Click="EnableKillmailDbPullButton_Click"/>
+                                            </WrapPanel>
 
-                                    <TextBlock x:Name="KillmailDataPathModeText"
-                                               Style="{StaticResource SettingsLabelStyle}"
-                                               Text="Using default LocalAppData path."/>
+                                            <TextBlock Text="Killmail Data Location"
+                                                       FontSize="16"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,8"/>
 
-                                    <TextBlock x:Name="EffectiveKillmailDataPathText"
-                                               Style="{StaticResource SettingsLabelStyle}"
-                                               TextWrapping="Wrap"
-                                               Text="Effective path: --"/>
+                                            <TextBlock x:Name="KillmailDataPathModeText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Text="Using default LocalAppData path."/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,6,0,4"
-                                               Text="Set a custom killmail data root for Proton or non-standard storage layouts. Leave blank or click Use Default to return to PMG's default LocalAppData location."/>
+                                            <TextBlock x:Name="EffectiveKillmailDataPathText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       TextWrapping="Wrap"
+                                                       Text="Effective path: --"/>
 
-                                    <TextBox x:Name="KillmailDataRootPathTextBox"
-                                             Margin="0,0,0,10"
-                                             MinWidth="420"
-                                             TextWrapping="Wrap"
-                                             VerticalScrollBarVisibility="Auto"/>
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,6,0,4"
+                                                       Text="Set a custom killmail data root for Proton or non-standard storage layouts. Leave blank or click Use Default to return to PMG's default LocalAppData location."/>
 
-                                    <WrapPanel>
-                                        <Button x:Name="SaveKillmailPathButton"
-                                                Width="120"
-                                                Padding="14,6"
-                                                Margin="0,0,10,0"
-                                                Content="Save Path"
-                                                Click="SaveKillmailPathButton_Click"/>
+                                            <TextBox x:Name="KillmailDataRootPathTextBox"
+                                                     Margin="0,0,0,10"
+                                                     MinWidth="420"
+                                                     TextWrapping="Wrap"
+                                                     VerticalScrollBarVisibility="Auto"/>
 
-                                        <Button x:Name="UseDefaultKillmailPathButton"
-                                                Width="120"
-                                                Padding="14,6"
-                                                Margin="0,0,10,0"
-                                                Content="Use Default"
-                                                Click="UseDefaultKillmailPathButton_Click"/>
-                                    </WrapPanel>
+                                            <WrapPanel>
+                                                <Button x:Name="SaveKillmailPathButton"
+                                                        Width="120"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Save Path"
+                                                        Click="SaveKillmailPathButton_Click"/>
 
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,10,0,0"
-                                               Text="Restart PMG after changing the killmail data path. Path changes do not migrate existing killmail data automatically."/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                                                <Button x:Name="UseDefaultKillmailPathButton"
+                                                        Width="120"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Use Default"
+                                                        Click="UseDefaultKillmailPathButton_Click"/>
+                                            </WrapPanel>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,10,0,0"
+                                                       Text="Restart PMG after changing the killmail data path. Path changes do not migrate existing killmail data automatically."/>
+                                        </StackPanel>
+                                    </Border>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Ignore List">
+                    <views:IgnoreAllianceListView x:Name="IgnoreAllianceListViewControl"/>
                 </TabItem>
             </TabControl>
         </Grid>

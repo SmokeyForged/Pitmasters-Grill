@@ -80,6 +80,8 @@ namespace PitmastersGrill.Services
                 settings.LogLevel = AppLogLevel.Normal;
             }
 
+            settings.PanelModeEnabled = settings.PanelModeEnabled;
+
             return settings;
         }
     }

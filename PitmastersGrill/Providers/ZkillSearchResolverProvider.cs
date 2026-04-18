@@ -102,6 +102,7 @@ namespace PitmastersGrill.Providers
                     {
                         CharacterName = trimmedName,
                         CharacterId = characterId,
+                        AllianceId = "",
                         AllianceName = "",
                         AllianceTicker = "",
                         CorpName = "",

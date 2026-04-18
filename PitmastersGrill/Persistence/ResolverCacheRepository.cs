@@ -42,6 +42,7 @@ namespace PitmastersGrill.Persistence
                 SELECT
                     character_name,
                     character_id,
+                    alliance_id,
                     alliance_name,
                     alliance_ticker,
                     corp_name,
@@ -67,14 +68,15 @@ namespace PitmastersGrill.Persistence
                 {
                     CharacterName = reader.GetString(0),
                     CharacterId = reader.GetString(1),
-                    AllianceName = reader.GetString(2),
-                    AllianceTicker = reader.GetString(3),
-                    CorpName = reader.GetString(4),
-                    CorpTicker = reader.GetString(5),
-                    ResolverConfidence = reader.GetString(6),
-                    ResolvedAtUtc = reader.GetString(7),
-                    ExpiresAtUtc = reader.GetString(8),
-                    AffiliationCheckedAtUtc = reader.GetString(9)
+                    AllianceId = reader.GetString(2),
+                    AllianceName = reader.GetString(3),
+                    AllianceTicker = reader.GetString(4),
+                    CorpName = reader.GetString(5),
+                    CorpTicker = reader.GetString(6),
+                    ResolverConfidence = reader.GetString(7),
+                    ResolvedAtUtc = reader.GetString(8),
+                    ExpiresAtUtc = reader.GetString(9),
+                    AffiliationCheckedAtUtc = reader.GetString(10)
                 };
 
                 if (!DateTime.TryParse(entry.ExpiresAtUtc, out var expiresAtUtc))
@@ -106,6 +108,7 @@ namespace PitmastersGrill.Persistence
             INSERT INTO resolver_cache (
                 character_name,
                 character_id,
+                alliance_id,
                 alliance_name,
                 alliance_ticker,
                 corp_name,
@@ -118,6 +121,7 @@ namespace PitmastersGrill.Persistence
             VALUES (
                 $characterName,
                 $characterId,
+                $allianceId,
                 $allianceName,
                 $allianceTicker,
                 $corpName,
@@ -129,6 +133,7 @@ namespace PitmastersGrill.Persistence
             )
             ON CONFLICT(character_name) DO UPDATE SET
                 character_id = excluded.character_id,
+                alliance_id = excluded.alliance_id,
                 alliance_name = excluded.alliance_name,
                 alliance_ticker = excluded.alliance_ticker,
                 corp_name = excluded.corp_name,
@@ -141,6 +146,7 @@ namespace PitmastersGrill.Persistence
 
             command.Parameters.AddWithValue("$characterName", entry.CharacterName);
             command.Parameters.AddWithValue("$characterId", entry.CharacterId);
+            command.Parameters.AddWithValue("$allianceId", entry.AllianceId);
             command.Parameters.AddWithValue("$allianceName", entry.AllianceName);
             command.Parameters.AddWithValue("$allianceTicker", entry.AllianceTicker);
             command.Parameters.AddWithValue("$corpName", entry.CorpName);

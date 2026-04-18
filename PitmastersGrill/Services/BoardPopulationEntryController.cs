@@ -1,0 +1,292 @@
+﻿using PitmastersGrill.Diagnostics;
+using PitmastersGrill.Models;
+using PitmastersGrill.Persistence;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace PitmastersGrill.Services
+{
+    public sealed class BoardPopulationEntryController
+    {
+        private readonly ClipboardIngestService _clipboardIngestService;
+        private readonly ResolverService _resolverService;
+        private readonly StatsService _statsService;
+        private readonly MainWindowDiagnostics _diagnostics;
+        private readonly BoardPopulationRetryController _boardPopulationRetryController;
+
+        private string _lastProcessedClipboardText = string.Empty;
+        private bool _isClipboardProcessing;
+        private List<string> _activeBoardNames = new();
+
+        public BoardPopulationEntryController(
+            ClipboardIngestService clipboardIngestService,
+            ResolverService resolverService,
+            StatsService statsService,
+            MainWindowDiagnostics diagnostics,
+            BoardPopulationRetryController boardPopulationRetryController)
+        {
+            _clipboardIngestService = clipboardIngestService ?? throw new ArgumentNullException(nameof(clipboardIngestService));
+            _resolverService = resolverService ?? throw new ArgumentNullException(nameof(resolverService));
+            _statsService = statsService ?? throw new ArgumentNullException(nameof(statsService));
+            _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+            _boardPopulationRetryController = boardPopulationRetryController ?? throw new ArgumentNullException(nameof(boardPopulationRetryController));
+        }
+
+        public IReadOnlyList<string> ActiveBoardNames => _activeBoardNames;
+        public bool IsClipboardProcessing => _isClipboardProcessing;
+
+        public void InvalidateLastProcessedClipboard()
+        {
+            _lastProcessedClipboardText = string.Empty;
+        }
+
+        public void ResetTracking(bool preserveLastProcessedClipboardText = false)
+        {
+            _activeBoardNames = new List<string>();
+
+            if (!preserveLastProcessedClipboardText)
+            {
+                _lastProcessedClipboardText = string.Empty;
+            }
+        }
+
+        public async Task ProcessClipboardIfValidAsync(
+            Func<bool> clipboardContainsText,
+            Func<string> clipboardGetText,
+            Action<bool> setBoardButtonsEnabled,
+            Func<IDisposable> beginForegroundPriority,
+            Action cancelBoardPopulationRetry,
+            Action<bool> resetBoardPopulationTracking,
+            Func<List<string>, bool, Task> processNamesAsync)
+        {
+            if (_isClipboardProcessing)
+            {
+                return;
+            }
+
+            if (clipboardContainsText == null)
+            {
+                throw new ArgumentNullException(nameof(clipboardContainsText));
+            }
+
+            if (clipboardGetText == null)
+            {
+                throw new ArgumentNullException(nameof(clipboardGetText));
+            }
+
+            if (setBoardButtonsEnabled == null)
+            {
+                throw new ArgumentNullException(nameof(setBoardButtonsEnabled));
+            }
+
+            if (beginForegroundPriority == null)
+            {
+                throw new ArgumentNullException(nameof(beginForegroundPriority));
+            }
+
+            if (cancelBoardPopulationRetry == null)
+            {
+                throw new ArgumentNullException(nameof(cancelBoardPopulationRetry));
+            }
+
+            if (resetBoardPopulationTracking == null)
+            {
+                throw new ArgumentNullException(nameof(resetBoardPopulationTracking));
+            }
+
+            if (processNamesAsync == null)
+            {
+                throw new ArgumentNullException(nameof(processNamesAsync));
+            }
+
+            _diagnostics.ClipboardProcessStart();
+
+            _isClipboardProcessing = true;
+            setBoardButtonsEnabled(false);
+
+            using var foregroundPriority = beginForegroundPriority();
+
+            try
+            {
+                string? rawClipboardText;
+
+                try
+                {
+                    if (!clipboardContainsText())
+                    {
+                        _diagnostics.ClipboardNoText();
+                        return;
+                    }
+
+                    rawClipboardText = clipboardGetText();
+                    _diagnostics.ClipboardTextRead(rawClipboardText);
+                }
+                catch (Exception ex)
+                {
+                    _diagnostics.ClipboardReadFailed(ex.Message);
+                    AppLogger.ClipboardWarn($"Clipboard read failed. message={ex.Message}");
+                    return;
+                }
+
+                var comparisonText = _boardPopulationRetryController.GetClipboardComparisonText(_lastProcessedClipboardText);
+                var result = _clipboardIngestService.Process(rawClipboardText, comparisonText);
+
+                if (!result.ShouldProcess)
+                {
+                    _diagnostics.ClipboardIntakeIgnored(result.IgnoreReason);
+                    AppLogger.ClipboardInfo($"Ignored clipboard board. reason={result.IgnoreReason}");
+                    return;
+                }
+
+                _lastProcessedClipboardText = result.AcceptedClipboardText;
+                cancelBoardPopulationRetry();
+                resetBoardPopulationTracking(true);
+                _lastProcessedClipboardText = result.AcceptedClipboardText;
+
+                _diagnostics.ClipboardIntakeAccepted(result.ParsedNames.Count, true);
+
+                AppLogger.ClipboardInfo(
+                    $"Accepted clipboard board. parsedNames={result.ParsedNames.Count} retryReset=true");
+
+                await processNamesAsync(result.ParsedNames, false);
+            }
+            finally
+            {
+                setBoardButtonsEnabled(true);
+                _isClipboardProcessing = false;
+                _diagnostics.ClipboardProcessEnd();
+            }
+        }
+
+        public async Task ProcessNamesAsync(
+            List<string> characterNames,
+            bool isRetryPass,
+            Action saveCurrentNotesAndTags,
+            Action<List<string>, Dictionary<string, ResolverCacheEntry>, Dictionary<string, StatsCacheEntry>> buildInitialBoard,
+            Func<int> beginProcessingGeneration,
+            Func<int> getCurrentGeneration,
+            Func<int> getCurrentRowCount,
+            Func<int, Task> processCurrentRowsAsync,
+            Action<string, BoardPopulationStatusKind> updateBoardPopulationStatus,
+            Action updateLastRefreshed,
+            Action<int> finalizeBoardPopulationPass)
+        {
+            if (saveCurrentNotesAndTags == null)
+            {
+                throw new ArgumentNullException(nameof(saveCurrentNotesAndTags));
+            }
+
+            if (buildInitialBoard == null)
+            {
+                throw new ArgumentNullException(nameof(buildInitialBoard));
+            }
+
+            if (beginProcessingGeneration == null)
+            {
+                throw new ArgumentNullException(nameof(beginProcessingGeneration));
+            }
+
+            if (getCurrentGeneration == null)
+            {
+                throw new ArgumentNullException(nameof(getCurrentGeneration));
+            }
+
+            if (getCurrentRowCount == null)
+            {
+                throw new ArgumentNullException(nameof(getCurrentRowCount));
+            }
+
+            if (processCurrentRowsAsync == null)
+            {
+                throw new ArgumentNullException(nameof(processCurrentRowsAsync));
+            }
+
+            if (updateBoardPopulationStatus == null)
+            {
+                throw new ArgumentNullException(nameof(updateBoardPopulationStatus));
+            }
+
+            if (updateLastRefreshed == null)
+            {
+                throw new ArgumentNullException(nameof(updateLastRefreshed));
+            }
+
+            if (finalizeBoardPopulationPass == null)
+            {
+                throw new ArgumentNullException(nameof(finalizeBoardPopulationPass));
+            }
+
+            saveCurrentNotesAndTags();
+
+            _diagnostics.BoardProcessRequested(isRetryPass, characterNames?.Count ?? 0);
+
+            var cleanedNames = characterNames
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (cleanedNames.Count == 0)
+            {
+                _diagnostics.BoardProcessAbortedNoCleanNames();
+                updateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
+                return;
+            }
+
+            if (!isRetryPass)
+            {
+                _activeBoardNames = new List<string>(cleanedNames);
+            }
+
+            var cacheStopwatch = Stopwatch.StartNew();
+            var cachedIdentities = _resolverService.GetCached(cleanedNames);
+            var cachedStats = _statsService.GetCachedForResolvedRows(cachedIdentities);
+            cacheStopwatch.Stop();
+
+            _diagnostics.CacheHydrateComplete(
+                isRetryPass,
+                cleanedNames.Count,
+                cachedIdentities.Count,
+                cachedStats.Count,
+                cacheStopwatch.ElapsedMilliseconds);
+
+            buildInitialBoard(cleanedNames, cachedIdentities, cachedStats);
+
+            var generation = beginProcessingGeneration();
+            var boardStopwatch = Stopwatch.StartNew();
+
+            updateBoardPopulationStatus(
+                isRetryPass ? "Board population retrying unresolved rows" : "Board population in progress",
+                isRetryPass ? BoardPopulationStatusKind.Warning : BoardPopulationStatusKind.Neutral);
+
+            _diagnostics.BoardProcessStart(generation, getCurrentRowCount(), isRetryPass);
+
+            DebugTraceWriter.WriteLine(
+                $"board process start: generation={generation}, rowCount={getCurrentRowCount()}, retryPass={isRetryPass}");
+
+            await processCurrentRowsAsync(generation);
+
+            boardStopwatch.Stop();
+
+            if (generation == getCurrentGeneration())
+            {
+                _diagnostics.BoardProcessSettled(generation, boardStopwatch.ElapsedMilliseconds);
+
+                DebugTraceWriter.WriteLine(
+                    $"board process settled: generation={generation}, elapsedMs={boardStopwatch.ElapsedMilliseconds}");
+            }
+            else
+            {
+                _diagnostics.BoardProcessSuperseded(generation, boardStopwatch.ElapsedMilliseconds);
+
+                DebugTraceWriter.WriteLine(
+                    $"board process superseded: generation={generation}, elapsedMs={boardStopwatch.ElapsedMilliseconds}");
+            }
+
+            updateLastRefreshed();
+            finalizeBoardPopulationPass(generation);
+        }
+    }
+}

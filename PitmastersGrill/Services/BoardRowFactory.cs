@@ -23,6 +23,7 @@ namespace PitmastersGrill.Services
                     {
                         CharacterName = cachedIdentity.CharacterName,
                         CharacterId = cachedIdentity.CharacterId,
+                        AllianceId = cachedIdentity.AllianceId,
                         AllianceName = cachedIdentity.AllianceName,
                         AllianceTicker = cachedIdentity.AllianceTicker,
                         CorpName = cachedIdentity.CorpName,
@@ -56,6 +57,7 @@ namespace PitmastersGrill.Services
                 {
                     CharacterName = name,
                     CharacterId = "",
+                    AllianceId = "",
                     AllianceName = "",
                     AllianceTicker = "",
                     CorpName = "",

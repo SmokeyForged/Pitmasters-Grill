@@ -7,8 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -18,6 +16,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Navigation;
+using PitmastersGrill.Views;
 
 namespace PitmastersGrill
 {
@@ -26,98 +26,79 @@ namespace PitmastersGrill
         private const int WmClipboardUpdate = 0x031D;
         private const int DefaultBoardPopulationRetryDelaySeconds = 12;
         private const int MaxBoardPopulationRetryAttempts = 5;
-        private const int DwMWaUseImmersiveDarkMode = 20;
 
         private readonly BackgroundIntelUpdateService _backgroundIntelUpdateService;
-        private readonly AppSettingsService _appSettingsService;
         private AppSettings _appSettings = new();
 
-        private readonly LocalListParser _localListParser;
-        private readonly ClipboardPayloadInspector _clipboardPayloadInspector;
-        private readonly ClipboardIngestService _clipboardIngestService;
         private readonly BoardRowFactory _boardRowFactory;
-        private readonly DatabaseBootstrap _databaseBootstrap;
+        private readonly DetailPaneController _detailPaneController;
+        private readonly MainWindowAppearanceController _mainWindowAppearanceController;
+        private readonly BoardPopulationStatusController _boardPopulationStatusController;
+        private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
+        private readonly BoardPopulationPassController _boardPopulationPassController;
+        private readonly BoardPopulationRetryController _boardPopulationRetryController;
+        private readonly BoardPopulationEntryController _boardPopulationEntryController;
         private readonly NotesRepository _notesRepository;
-        private readonly ResolverCacheRepository _resolverCacheRepository;
-        private readonly StatsCacheRepository _statsCacheRepository;
-        private readonly ZkillSearchResolverProvider _zkillSearchResolverProvider;
-        private readonly EsiExactNameResolverProvider _esiExactNameResolverProvider;
-        private readonly EsiPublicAffiliationProvider _esiPublicAffiliationProvider;
-        private readonly ZkillStatsProvider _zkillStatsProvider;
-        private readonly ResolverService _resolverService;
-        private readonly StatsService _statsService;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
         private readonly MainWindowDiagnostics _diagnostics;
+        private readonly IntelUpdateBannerController _intelUpdateBannerController;
+        private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
+        private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
+        private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
+        private IgnoreAllianceListView? _ignoreAllianceListView;
 
-        private readonly object _timingMarkerSync = new();
 
-        private string _lastProcessedClipboardText = string.Empty;
         private readonly ObservableCollection<PilotBoardRow> _currentRows = new();
-        private string _activeDetailCharacterName = string.Empty;
-        private bool _isClipboardProcessing;
         private bool _isApplyingSettings;
-        private bool _isApplyingDetailPaneState;
         private int _processingGeneration;
-
-        private bool _activeBoardPopulationIncomplete;
-        private bool _activeBoardPopulationRetryScheduled;
-        private int _activeBoardPopulationRetryAttempt;
-        private CancellationTokenSource? _boardPopulationRetryCts;
-        private List<string> _activeBoardNames = new();
-
-        private BoardPopulationStatusKind _currentBoardPopulationStatusKind = BoardPopulationStatusKind.Neutral;
-
-        private int _firstResolverLoggedGeneration = -1;
-        private int _firstIdentityUiLoggedGeneration = -1;
-        private int _firstAffiliationLoggedGeneration = -1;
-        private int _firstStatsLoggedGeneration = -1;
 
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
             _backgroundIntelUpdateService = backgroundIntelUpdateService;
             _backgroundIntelUpdateService.StatusChanged += OnIntelUpdateStatusChanged;
 
-            _appSettingsService = new AppSettingsService();
+            var appSettingsService = new AppSettingsService();
+            _mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
+            _boardPopulationStatusController = new BoardPopulationStatusController();
 
             _isApplyingSettings = true;
             InitializeComponent();
 
             _diagnostics = new MainWindowDiagnostics(Dispatcher);
+            _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
+            _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
 
-            _localListParser = new LocalListParser();
-            _clipboardPayloadInspector = new ClipboardPayloadInspector();
-            _clipboardIngestService = new ClipboardIngestService(_localListParser, _clipboardPayloadInspector);
-            _boardRowFactory = new BoardRowFactory();
+            var composed = MainWindowCompositionRoot.Compose(
+                _diagnostics,
+                appSettingsService,
+                _mainWindowAppearanceController,
+                _boardPopulationStatusController,
+                DefaultBoardPopulationRetryDelaySeconds);
 
-            var databasePath = AppPaths.GetDatabasePath();
+            _boardRowFactory = composed.BoardRowFactory;
+            _notesRepository = composed.NotesRepository;
+            _detailPaneController = composed.DetailPaneController;
+            _boardPopulationRowProcessor = composed.BoardPopulationRowProcessor;
+            _boardPopulationPassController = composed.BoardPopulationPassController;
+            _boardPopulationRetryController = composed.BoardPopulationRetryController;
+            _boardPopulationEntryController = composed.BoardPopulationEntryController;
+            _ignoreAllianceCoordinator = composed.IgnoreAllianceCoordinator;
+            _ignoreAllianceBoardController = composed.IgnoreAllianceBoardController;
+            _zkillUrlBuilder = composed.ZkillUrlBuilder;
+            _browserLauncher = composed.BrowserLauncher;
 
-            _databaseBootstrap = new DatabaseBootstrap(databasePath);
-            _notesRepository = new NotesRepository(databasePath);
-            _resolverCacheRepository = new ResolverCacheRepository(databasePath);
-            _statsCacheRepository = new StatsCacheRepository(databasePath);
-            _zkillSearchResolverProvider = new ZkillSearchResolverProvider();
-            _esiExactNameResolverProvider = new EsiExactNameResolverProvider();
-            _esiPublicAffiliationProvider = new EsiPublicAffiliationProvider();
-            _zkillStatsProvider = new ZkillStatsProvider();
-            _resolverService = new ResolverService(
-                _resolverCacheRepository,
-                _zkillSearchResolverProvider,
-                _esiExactNameResolverProvider,
-                _esiPublicAffiliationProvider);
-            _statsService = new StatsService(
-                _statsCacheRepository,
-                _zkillStatsProvider);
-            _zkillUrlBuilder = new ZkillUrlBuilder();
-            _browserLauncher = new BrowserLauncher();
+            _ignoreAllianceListView = IgnoreAllianceListViewControl;
+            _ignoreAllianceListView.Initialize(_ignoreAllianceCoordinator);
+            _ignoreAllianceListView.IgnoreListChanged += IgnoreAllianceListView_IgnoreListChanged;
 
             try
             {
-                _databaseBootstrap.Initialize();
+                composed.DatabaseBootstrap.Initialize();
                 DebugTraceWriter.Clear();
-                AppLogger.DatabaseInfo($"MainWindow local database initialized. path={databasePath}");
+                AppLogger.DatabaseInfo($"MainWindow local database initialized. path={composed.DatabasePath}");
             }
             catch (Exception ex)
             {
@@ -133,23 +114,27 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings = _appSettingsService.Load();
+            _appSettings = appSettingsService.Load();
 
-            DarkModeCheckBox.IsChecked = _appSettings.DarkModeEnabled;
-            AlwaysOnTopCheckBox.IsChecked = _appSettings.AlwaysOnTopEnabled;
-            WindowOpacitySlider.Value = CoerceOpacityPercent(_appSettings.WindowOpacityPercent);
-            MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
-            KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
-            ApplyLogLevelSelection();
+            _mainWindowAppearanceController.InitializeSettingsUi(
+                _appSettings,
+                DarkModeCheckBox,
+                AlwaysOnTopCheckBox,
+                WindowOpacitySlider,
+                WindowOpacityValueText,
+                MaxKillmailAgeDaysTextBox,
+                EffectiveMaxKillmailAgeText,
+                KillmailDataRootPathTextBox,
+                KillmailDataPathModeText,
+                EffectiveKillmailDataPathText,
+                LogLevelComboBox);
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
 
             _isApplyingSettings = false;
 
-            ApplyTheme(_appSettings.DarkModeEnabled);
-            ApplyWindowSettings();
-            UpdateMaxKillmailAgeUi();
-            UpdateKillmailPathUi();
+            _mainWindowAppearanceController.ApplyTheme(Resources, _appSettings, this, ApplyBoardPopulationStatusVisual);
+            _mainWindowAppearanceController.ApplyWindowSettings(this, _appSettings, WindowOpacityValueText, Resources);
 
             PilotBoard.ItemsSource = _currentRows;
             UpdateLastRefreshed();
@@ -161,7 +146,7 @@ namespace PitmastersGrill
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
 
             AppLogger.UiInfo(
-                $"MainWindow ready. darkMode={_appSettings.DarkModeEnabled} alwaysOnTop={_appSettings.AlwaysOnTopEnabled} opacityPercent={CoerceOpacityPercent(_appSettings.WindowOpacityPercent):0} logLevel={_appSettings.LogLevel}");
+                $"MainWindow ready. darkMode={_appSettings.DarkModeEnabled} alwaysOnTop={_appSettings.AlwaysOnTopEnabled} opacityPercent={_mainWindowAppearanceController.CoerceOpacityPercent(_appSettings.WindowOpacityPercent):0} logLevel={_appSettings.LogLevel}");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -174,7 +159,7 @@ namespace PitmastersGrill
             var source = HwndSource.FromHwnd(hwnd);
             source?.AddHook(WndProc);
 
-            ApplyTitleBarTheme();
+            _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
 
             AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
         }
@@ -185,6 +170,10 @@ namespace PitmastersGrill
 
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
+            if (_ignoreAllianceListView != null)
+            {
+                _ignoreAllianceListView.IgnoreListChanged -= IgnoreAllianceListView_IgnoreListChanged;
+            }
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
             _diagnostics.Dispose();
 
@@ -203,11 +192,12 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.DarkModeEnabled = DarkModeCheckBox.IsChecked == true;
-            _appSettingsService.Save(_appSettings);
-            ApplyTheme(_appSettings.DarkModeEnabled);
-
-            AppLogger.UiInfo($"Dark mode changed. enabled={_appSettings.DarkModeEnabled}");
+            _mainWindowAppearanceController.HandleDarkModeChanged(
+                _appSettings,
+                DarkModeCheckBox.IsChecked == true,
+                Resources,
+                this,
+                ApplyBoardPopulationStatusVisual);
         }
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -217,16 +207,22 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.AlwaysOnTopEnabled = AlwaysOnTopCheckBox.IsChecked == true;
-            _appSettingsService.Save(_appSettings);
-            ApplyWindowSettings();
-
-            AppLogger.UiInfo($"Always on top changed. enabled={_appSettings.AlwaysOnTopEnabled}");
+            _mainWindowAppearanceController.HandleAlwaysOnTopChanged(
+                _appSettings,
+                AlwaysOnTopCheckBox.IsChecked == true,
+                this,
+                WindowOpacityValueText,
+                Resources);
         }
 
         private void WindowOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            var opacityPercent = CoerceOpacityPercent(WindowOpacitySlider.Value);
+            if (_mainWindowAppearanceController == null)
+            {
+                return;
+            }
+
+            var opacityPercent = _mainWindowAppearanceController.CoerceOpacityPercent(WindowOpacitySlider.Value);
 
             if (WindowOpacityValueText != null)
             {
@@ -238,11 +234,12 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.WindowOpacityPercent = opacityPercent;
-            _appSettingsService.Save(_appSettings);
-            ApplyWindowSettings();
-
-            AppLogger.UiInfo($"Window opacity changed. opacityPercent={opacityPercent:0}");
+            _mainWindowAppearanceController.HandleWindowOpacityChanged(
+                _appSettings,
+                WindowOpacitySlider.Value,
+                this,
+                WindowOpacityValueText,
+                Resources);
         }
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -252,38 +249,20 @@ namespace PitmastersGrill
                 return;
             }
 
-            var selectedLogLevel = GetSelectedLogLevel();
-
-            if (_appSettings.LogLevel == selectedLogLevel)
-            {
-                return;
-            }
-
-            _appSettings.LogLevel = selectedLogLevel;
-            _appSettingsService.Save(_appSettings);
-            AppLogger.ConfigureLogLevel(selectedLogLevel);
-
-            AppLogger.AppInfo($"Log level changed. level={selectedLogLevel}");
+            _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, LogLevelComboBox);
         }
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingDetailPaneState)
+            var selectedRow = PilotBoard.SelectedItem as PilotBoardRow;
+            var applied = _detailPaneController.TryApplyKnownCynoOverrideChange(
+                KnownCynoOverrideCheckBox.IsChecked == true,
+                NotesTagsBox.Text,
+                BaitOverrideCheckBox.IsChecked == true,
+                selectedRow);
+
+            if (applied && selectedRow != null)
             {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(_activeDetailCharacterName))
-            {
-                return;
-            }
-
-            SaveCurrentNotesAndTags();
-
-            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
-            {
-                selectedRow.KnownCynoOverride = KnownCynoOverrideCheckBox.IsChecked == true;
-
                 AppLogger.UiInfo(
                     $"Known cyno override changed. character='{selectedRow.CharacterName}' enabled={selectedRow.KnownCynoOverride}");
             }
@@ -291,173 +270,36 @@ namespace PitmastersGrill
 
         private void BaitOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingDetailPaneState)
+            var selectedRow = PilotBoard.SelectedItem as PilotBoardRow;
+            var applied = _detailPaneController.TryApplyBaitOverrideChange(
+                KnownCynoOverrideCheckBox.IsChecked == true,
+                NotesTagsBox.Text,
+                BaitOverrideCheckBox.IsChecked == true,
+                selectedRow);
+
+            if (applied && selectedRow != null)
             {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(_activeDetailCharacterName))
-            {
-                return;
-            }
-
-            SaveCurrentNotesAndTags();
-
-            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
-            {
-                selectedRow.BaitOverride = BaitOverrideCheckBox.IsChecked == true;
-
                 AppLogger.UiInfo(
                     $"Bait override changed. character='{selectedRow.CharacterName}' enabled={selectedRow.BaitOverride}");
             }
         }
 
-        private void ApplyTheme(bool darkModeEnabled)
-        {
-            if (darkModeEnabled)
-            {
-                SetBrushResource("HeaderTextBrush", "#FFFFFF");
-                SetBrushResource("BodyTextBrush", "#F3F3F3");
-                SetBrushResource("MutedTextBrush", "#DDDDDD");
-                SetBrushResource("GridLineBrush", "#4A4A4A");
-                SetBrushResource("PanelBorderBrush", "#3A3A3A");
-            }
-            else
-            {
-                SetBrushResource("HeaderTextBrush", "#111111");
-                SetBrushResource("BodyTextBrush", "#222222");
-                SetBrushResource("MutedTextBrush", "#444444");
-                SetBrushResource("GridLineBrush", "#CFCFCF");
-                SetBrushResource("PanelBorderBrush", "#D0D0D0");
-            }
-
-            ApplySurfaceOpacity();
-            ApplyBoardPopulationStatusVisual();
-            ApplyTitleBarTheme();
-        }
-
-        private void ApplyWindowSettings()
-        {
-            Topmost = _appSettings.AlwaysOnTopEnabled;
-            ApplySurfaceOpacity();
-
-            var opacityPercent = CoerceOpacityPercent(_appSettings.WindowOpacityPercent);
-            if (WindowOpacityValueText != null)
-            {
-                WindowOpacityValueText.Text = $"{opacityPercent:0}%";
-            }
-        }
-
-        private static double CoerceOpacityPercent(double value)
-        {
-            if (value < 35)
-            {
-                return 35;
-            }
-
-            if (value > 100)
-            {
-                return 100;
-            }
-
-            return Math.Round(value, 0);
-        }
-
-        private void ApplySurfaceOpacity()
-        {
-            var alpha = (byte)Math.Round(255 * (CoerceOpacityPercent(_appSettings.WindowOpacityPercent) / 100.0));
-
-            if (_appSettings.DarkModeEnabled)
-            {
-                SetBrushResource("WindowBackgroundBrush", "#1E1E1E", alpha);
-                SetBrushResource("SurfaceBrush", "#1F1F1F", alpha);
-                SetBrushResource("SurfaceAltBrush", "#252525", alpha);
-                SetBrushResource("GridBackgroundBrush", "#2B2B2B", alpha);
-                SetBrushResource("GridAlternateBrush", "#323232", alpha);
-                SetBrushResource("GridHeaderBrush", "#202020", alpha);
-            }
-            else
-            {
-                SetBrushResource("WindowBackgroundBrush", "#F5F5F5", alpha);
-                SetBrushResource("SurfaceBrush", "#FFFFFF", alpha);
-                SetBrushResource("SurfaceAltBrush", "#FAFAFA", alpha);
-                SetBrushResource("GridBackgroundBrush", "#FFFFFF", alpha);
-                SetBrushResource("GridAlternateBrush", "#F2F2F2", alpha);
-                SetBrushResource("GridHeaderBrush", "#E8E8E8", alpha);
-            }
-        }
-
-        private void SetBrushResource(string resourceKey, string hexColor)
-        {
-            var color = (Color)ColorConverter.ConvertFromString(hexColor);
-            Resources[resourceKey] = new SolidColorBrush(color);
-        }
-
-        private void SetBrushResource(string resourceKey, string hexColor, byte alpha)
-        {
-            var baseColor = (Color)ColorConverter.ConvertFromString(hexColor);
-            Resources[resourceKey] = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
-        }
-
-        private void ApplyTitleBarTheme()
-        {
-            var hwnd = new WindowInteropHelper(this).Handle;
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            var useDarkMode = _appSettings.DarkModeEnabled ? 1 : 0;
-            try
-            {
-                DwmSetWindowAttribute(hwnd, DwMWaUseImmersiveDarkMode, ref useDarkMode, sizeof(int));
-            }
-            catch
-            {
-            }
-        }
-
         private void OnIntelUpdateStatusChanged(IntelUpdateStatusSnapshot snapshot)
         {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.Invoke(() => ApplyIntelUpdateSnapshot(snapshot));
-                return;
-            }
-
-            ApplyIntelUpdateSnapshot(snapshot);
+            _intelUpdateBannerController.HandleStatusChanged(
+                snapshot,
+                IntelUpdateBanner,
+                IntelUpdateStatusText,
+                IntelUpdateDetailText);
         }
 
         private void ApplyIntelUpdateSnapshot(IntelUpdateStatusSnapshot snapshot)
         {
-            IntelUpdateStatusText.Text = NormalizeKillmailIntelText(snapshot.StatusText);
-            IntelUpdateDetailText.Text = NormalizeKillmailIntelText(snapshot.DetailText);
-
-            if (snapshot.HasError)
-            {
-                IntelUpdateBanner.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6E1111"));
-                return;
-            }
-
-            if (snapshot.IsRunning || !snapshot.IsCurrentThroughYesterday)
-            {
-                IntelUpdateBanner.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5A1111"));
-                return;
-            }
-
-            IntelUpdateBanner.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#155724"));
-        }
-
-        private static string NormalizeKillmailIntelText(string input)
-        {
-            if (string.IsNullOrWhiteSpace(input))
-            {
-                return input ?? "";
-            }
-
-            return input
-                .Replace("LOCAL INTEL", "KILLMAIL INTEL", StringComparison.OrdinalIgnoreCase)
-                .Replace("Local intel", "Killmail intel", StringComparison.OrdinalIgnoreCase);
+            _intelUpdateBannerController.ApplySnapshot(
+                snapshot,
+                IntelUpdateBanner,
+                IntelUpdateStatusText,
+                IntelUpdateDetailText);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -470,155 +312,44 @@ namespace PitmastersGrill
             return IntPtr.Zero;
         }
 
-        private async Task ProcessClipboardIfValidAsync()
+        private Task ProcessClipboardIfValidAsync()
         {
-            if (_isClipboardProcessing)
-            {
-                return;
-            }
-
-            _diagnostics.ClipboardProcessStart();
-
-            _isClipboardProcessing = true;
-            EnableKillmailDbPullButton.IsEnabled = false;
-            ClearBoardButton.IsEnabled = false;
-
-            using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
-
-            try
-            {
-                string? rawClipboardText;
-
-                try
+            return _boardPopulationEntryController.ProcessClipboardIfValidAsync(
+                clipboardContainsText: () => Clipboard.ContainsText(),
+                clipboardGetText: () => Clipboard.GetText(),
+                setBoardButtonsEnabled: enabled =>
                 {
-                    if (!Clipboard.ContainsText())
-                    {
-                        _diagnostics.ClipboardNoText();
-                        return;
-                    }
-
-                    rawClipboardText = Clipboard.GetText();
-                    _diagnostics.ClipboardTextRead(rawClipboardText);
-                }
-                catch (Exception ex)
-                {
-                    _diagnostics.ClipboardReadFailed(ex.Message);
-                    AppLogger.ClipboardWarn($"Clipboard read failed. message={ex.Message}");
-                    return;
-                }
-
-                var comparisonText = _activeBoardPopulationIncomplete ? string.Empty : _lastProcessedClipboardText;
-
-                var result = _clipboardIngestService.Process(rawClipboardText, comparisonText);
-
-                if (!result.ShouldProcess)
-                {
-                    _diagnostics.ClipboardIntakeIgnored(result.IgnoreReason);
-                    AppLogger.ClipboardInfo($"Ignored clipboard board. reason={result.IgnoreReason}");
-                    return;
-                }
-
-                _lastProcessedClipboardText = result.AcceptedClipboardText;
-                CancelBoardPopulationRetry();
-                ResetBoardPopulationTracking();
-
-                _diagnostics.ClipboardIntakeAccepted(result.ParsedNames.Count, true);
-
-                AppLogger.ClipboardInfo(
-                    $"Accepted clipboard board. parsedNames={result.ParsedNames.Count} retryReset=true");
-
-                await ProcessNamesAsync(result.ParsedNames, false);
-            }
-            finally
-            {
-                EnableKillmailDbPullButton.IsEnabled = true;
-                ClearBoardButton.IsEnabled = true;
-                _isClipboardProcessing = false;
-                _diagnostics.ClipboardProcessEnd();
-            }
+                    EnableKillmailDbPullButton.IsEnabled = enabled;
+                    ClearBoardButton.IsEnabled = enabled;
+                },
+                beginForegroundPriority: () => _backgroundIntelUpdateService.BeginForegroundPriority(),
+                cancelBoardPopulationRetry: CancelBoardPopulationRetry,
+                resetBoardPopulationTracking: preserveLastProcessedClipboardText => ResetBoardPopulationTracking(preserveLastProcessedClipboardText),
+                processNamesAsync: ProcessNamesAsync);
         }
 
-        private async Task ProcessNamesAsync(List<string> characterNames, bool isRetryPass)
+        private Task ProcessNamesAsync(List<string> characterNames, bool isRetryPass)
         {
-            SaveCurrentNotesAndTags();
-
-            _diagnostics.BoardProcessRequested(isRetryPass, characterNames?.Count ?? 0);
-
-            var cleanedNames = characterNames
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (cleanedNames.Count == 0)
-            {
-                _diagnostics.BoardProcessAbortedNoCleanNames();
-                UpdateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
-                return;
-            }
-
-            if (!isRetryPass)
-            {
-                _activeBoardNames = new List<string>(cleanedNames);
-            }
-
-            var cacheStopwatch = Stopwatch.StartNew();
-            var cachedIdentities = _resolverService.GetCached(cleanedNames);
-            var cachedStats = _statsService.GetCachedForResolvedRows(cachedIdentities);
-            cacheStopwatch.Stop();
-
-            _diagnostics.CacheHydrateComplete(
+            return _boardPopulationEntryController.ProcessNamesAsync(
+                characterNames,
                 isRetryPass,
-                cleanedNames.Count,
-                cachedIdentities.Count,
-                cachedStats.Count,
-                cacheStopwatch.ElapsedMilliseconds);
-
-            BuildInitialBoard(cleanedNames, cachedIdentities, cachedStats);
-
-            var generation = ++_processingGeneration;
-            var boardStopwatch = Stopwatch.StartNew();
-
-            UpdateBoardPopulationStatus(
-                isRetryPass ? "Board population retrying unresolved rows" : "Board population in progress",
-                isRetryPass ? BoardPopulationStatusKind.Warning : BoardPopulationStatusKind.Neutral);
-
-            _diagnostics.BoardProcessStart(generation, _currentRows.Count, isRetryPass);
-
-            DebugTraceWriter.WriteLine(
-                $"board process start: generation={generation}, rowCount={_currentRows.Count}, retryPass={isRetryPass}");
-
-            await ProcessRowBatchAsync(_currentRows.ToList(), generation);
-
-            boardStopwatch.Stop();
-
-            if (generation == _processingGeneration)
-            {
-                _diagnostics.BoardProcessSettled(generation, boardStopwatch.ElapsedMilliseconds);
-
-                DebugTraceWriter.WriteLine(
-                    $"board process settled: generation={generation}, elapsedMs={boardStopwatch.ElapsedMilliseconds}");
-            }
-            else
-            {
-                _diagnostics.BoardProcessSuperseded(generation, boardStopwatch.ElapsedMilliseconds);
-
-                DebugTraceWriter.WriteLine(
-                    $"board process superseded: generation={generation}, elapsedMs={boardStopwatch.ElapsedMilliseconds}");
-            }
-
-            UpdateLastRefreshed();
-            FinalizeBoardPopulationPass(generation);
+                SaveCurrentNotesAndTags,
+                BuildInitialBoard,
+                beginProcessingGeneration: () => ++_processingGeneration,
+                getCurrentGeneration: () => _processingGeneration,
+                getCurrentRowCount: () => _currentRows.Count,
+                processCurrentRowsAsync: generation => ProcessRowBatchAsync(_currentRows.ToList(), generation),
+                updateBoardPopulationStatus: UpdateBoardPopulationStatus,
+                updateLastRefreshed: UpdateLastRefreshed,
+                finalizeBoardPopulationPass: FinalizeBoardPopulationPass);
         }
 
-        private async Task ProcessRowBatchAsync(List<PilotBoardRow> rows, int generation)
+        private Task ProcessRowBatchAsync(List<PilotBoardRow> rows, int generation)
         {
-            using var semaphore = new SemaphoreSlim(6);
-
-            var tasks = rows
-                .Select(row => ProcessSingleRowAsync(row, semaphore, generation))
-                .ToList();
-
-            await Task.WhenAll(tasks);
+            return _boardPopulationPassController.ProcessRowBatchAsync(
+                rows,
+                generation,
+                ProcessSingleRowAsync);
         }
 
         private void FinalizeBoardPopulationPass(int generation)
@@ -629,281 +360,105 @@ namespace PitmastersGrill
                 return;
             }
 
-            var retryableCount = CountRowsNeedingRetry();
-            var completeCount = _currentRows.Count(IsCompleteRow);
-            var partialCount = _currentRows.Count(IsPartialRow);
+            var decision = _boardPopulationPassController.BuildFinalizeDecision(
+                _currentRows,
+                _boardPopulationRetryController.RetryAttempt,
+                MaxBoardPopulationRetryAttempts);
 
-            if (retryableCount <= 0)
+            if (decision.IsComplete)
             {
-                _activeBoardPopulationIncomplete = false;
-                _activeBoardPopulationRetryScheduled = false;
-                _activeBoardPopulationRetryAttempt = 0;
+                _boardPopulationRetryController.MarkComplete();
 
-                var completionText = partialCount > 0
-                    ? $"Board population complete ({completeCount} complete, {partialCount} partial)"
-                    : "Board population complete";
+                _diagnostics.BoardProcessFinalizedComplete(
+                    generation,
+                    decision.CompleteCount,
+                    decision.PartialCount,
+                    decision.RetryableCount);
 
-                _diagnostics.BoardProcessFinalizedComplete(generation, completeCount, partialCount, retryableCount);
-
-                UpdateBoardPopulationStatus(completionText, BoardPopulationStatusKind.Success);
+                UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
                 return;
             }
 
-            _activeBoardPopulationIncomplete = true;
-            _lastProcessedClipboardText = string.Empty;
+            _boardPopulationRetryController.MarkIncomplete();
+            _boardPopulationEntryController.InvalidateLastProcessedClipboard();
 
-            if (_activeBoardPopulationRetryAttempt >= MaxBoardPopulationRetryAttempts)
+            if (decision.RetryLimitReached)
             {
                 _diagnostics.BoardProcessRetryLimitReached(
                     generation,
-                    retryableCount,
-                    partialCount,
-                    _activeBoardPopulationRetryAttempt);
+                    decision.RetryableCount,
+                    decision.PartialCount,
+                    _boardPopulationRetryController.RetryAttempt);
 
-                UpdateBoardPopulationStatus(
-                    $"Board population incomplete — retry limit reached ({retryableCount} retryable, {partialCount} partial)",
-                    BoardPopulationStatusKind.Error);
+                UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
                 return;
             }
 
             _diagnostics.BoardProcessRequiresRetry(
                 generation,
-                retryableCount,
-                partialCount,
-                _activeBoardPopulationRetryAttempt);
+                decision.RetryableCount,
+                decision.PartialCount,
+                _boardPopulationRetryController.RetryAttempt);
 
-            UpdateBoardPopulationStatus(
-                $"Board population delayed by source throttling or temporary failures ({retryableCount} retryable, {partialCount} partial)",
-                BoardPopulationStatusKind.Warning);
+            UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
 
-            ScheduleBoardPopulationRetry();
-        }
-
-        private int CountRowsNeedingRetry()
-        {
-            return _currentRows.Count(HasRetryableStage);
-        }
-
-        private static bool HasRetryableStage(PilotBoardRow row)
-        {
-            if (row == null)
+            if (decision.ShouldScheduleRetry)
             {
-                return false;
+                ScheduleBoardPopulationRetry();
             }
-
-            return IsRetryableStage(row.IdentityStage)
-                || IsRetryableStage(row.AffiliationStage)
-                || IsRetryableStage(row.StatsStage);
-        }
-
-        private static bool IsRetryableStage(EnrichmentStageState stage)
-        {
-            return stage == EnrichmentStageState.Throttled || stage == EnrichmentStageState.TemporaryFailure;
-        }
-
-        private static bool IsRetryReady(PilotBoardRow row, DateTime nowUtc)
-        {
-            if (!HasRetryableStage(row))
-            {
-                return false;
-            }
-
-            return !row.NextRetryAtUtc.HasValue || row.NextRetryAtUtc.Value <= nowUtc;
-        }
-
-        private static bool IsCompleteRow(PilotBoardRow row)
-        {
-            if (row == null)
-            {
-                return false;
-            }
-
-            return row.IdentityStage == EnrichmentStageState.Success
-                && row.AffiliationStage == EnrichmentStageState.Success
-                && row.StatsStage == EnrichmentStageState.Success;
-        }
-
-        private static bool IsPartialRow(PilotBoardRow row)
-        {
-            if (row == null)
-            {
-                return false;
-            }
-
-            if (IsCompleteRow(row) || HasRetryableStage(row))
-            {
-                return false;
-            }
-
-            return row.IdentityStage == EnrichmentStageState.Success
-                || row.AffiliationStage == EnrichmentStageState.Success
-                || row.StatsStage == EnrichmentStageState.Success
-                || row.IdentityStage == EnrichmentStageState.NotFound;
         }
 
         private void ScheduleBoardPopulationRetry()
         {
-            if (_activeBoardPopulationRetryScheduled)
-            {
-                _diagnostics.RetryScheduleIgnoredAlreadyScheduled();
-                return;
-            }
-
-            var retryableRows = _currentRows.Where(HasRetryableStage).ToList();
-            if (retryableRows.Count == 0)
-            {
-                _diagnostics.RetryScheduleIgnoredNoRows();
-                return;
-            }
-
-            _activeBoardPopulationRetryScheduled = true;
-            _activeBoardPopulationRetryAttempt++;
-
-            var nowUtc = DateTime.UtcNow;
-            var earliestRetryAtUtc = retryableRows
-                .Select(row => row.NextRetryAtUtc ?? nowUtc.AddSeconds(DefaultBoardPopulationRetryDelaySeconds))
-                .OrderBy(value => value)
-                .First();
-
-            var delay = earliestRetryAtUtc - nowUtc;
-            if (delay < TimeSpan.Zero)
-            {
-                delay = TimeSpan.Zero;
-            }
-
-            _boardPopulationRetryCts?.Cancel();
-            _boardPopulationRetryCts = new CancellationTokenSource();
-            var retryToken = _boardPopulationRetryCts.Token;
-
-            _diagnostics.RetryScheduled(
-                _activeBoardPopulationRetryAttempt,
-                (int)delay.TotalMilliseconds,
-                retryableRows.Count);
-
-            DebugTraceWriter.WriteLine(
-                $"board population retry scheduled: attempt={_activeBoardPopulationRetryAttempt}, delayMs={(int)delay.TotalMilliseconds}, rowCount={retryableRows.Count}");
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(delay, retryToken);
-
-                    if (retryToken.IsCancellationRequested)
-                    {
-                        _diagnostics.RetryDelayCancelledBeforeDispatch();
-                        return;
-                    }
-
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        if (retryToken.IsCancellationRequested)
-                        {
-                            _diagnostics.RetryDispatchSkippedBecauseCancelled();
-                            return;
-                        }
-
-                        _diagnostics.RetryDispatchFired(_activeBoardPopulationRetryAttempt);
-
-                        UpdateBoardPopulationStatus(
-                            "Board population retrying delayed rows",
-                            BoardPopulationStatusKind.Warning);
-
-                        _ = ProcessRetryPassAsync();
-                    });
-                }
-                catch (OperationCanceledException)
-                {
-                    _diagnostics.RetryDelayTaskCanceled();
-                }
-                finally
-                {
-                    _activeBoardPopulationRetryScheduled = false;
-                }
-            });
+            _boardPopulationRetryController.ScheduleRetry(
+                _currentRows,
+                Dispatcher,
+                UpdateBoardPopulationStatus,
+                ProcessRetryPassAsync);
         }
 
-        private async Task ProcessRetryPassAsync()
+        private Task ProcessRetryPassAsync()
         {
-            using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
-
-            var generation = _processingGeneration;
-            var nowUtc = DateTime.UtcNow;
-            var retryRows = _currentRows.Where(row => IsRetryReady(row, nowUtc)).ToList();
-
-            if (retryRows.Count == 0)
-            {
-                _diagnostics.RetryPassSkipped(generation, 0);
-
-                FinalizeBoardPopulationPass(generation);
-                return;
-            }
-
-            _diagnostics.RetryPassStart(generation, retryRows.Count);
-
-            DebugTraceWriter.WriteLine(
-                $"board retry pass start: generation={generation}, rowCount={retryRows.Count}");
-
-            var retryStopwatch = Stopwatch.StartNew();
-            await ProcessRowBatchAsync(retryRows, generation);
-            retryStopwatch.Stop();
-
-            _diagnostics.RetryPassComplete(generation, retryRows.Count, retryStopwatch.ElapsedMilliseconds);
-
-            UpdateLastRefreshed();
-            FinalizeBoardPopulationPass(generation);
+            return _boardPopulationRetryController.ProcessRetryPassAsync(
+                _currentRows,
+                () => _backgroundIntelUpdateService.BeginForegroundPriority(),
+                (rows, generation) => ProcessRowBatchAsync(rows.ToList(), generation),
+                () => _processingGeneration,
+                UpdateLastRefreshed,
+                FinalizeBoardPopulationPass);
         }
 
         private void CancelBoardPopulationRetry()
         {
-            try
-            {
-                _boardPopulationRetryCts?.Cancel();
-                _diagnostics.RetryCancellationRequested();
-            }
-            catch
-            {
-            }
-
-            _activeBoardPopulationRetryScheduled = false;
+            _boardPopulationRetryController.CancelRetry();
         }
 
-        private void ResetBoardPopulationTracking()
+        private void ResetBoardPopulationTracking(bool preserveLastProcessedClipboardText = false)
         {
-            _activeBoardPopulationIncomplete = false;
-            _activeBoardPopulationRetryScheduled = false;
-            _activeBoardPopulationRetryAttempt = 0;
-            _activeBoardNames = new List<string>();
-            _lastProcessedClipboardText = string.Empty;
-            _diagnostics.BoardPopulationTrackingReset();
+            ResetEntryAndRetryTracking(preserveLastProcessedClipboardText);
             UpdateBoardPopulationStatus("Board population in progress", BoardPopulationStatusKind.Neutral);
+        }
+
+        private void ResetEntryAndRetryTracking(bool preserveLastProcessedClipboardText = false)
+        {
+            _boardPopulationEntryController.ResetTracking(preserveLastProcessedClipboardText);
+            _boardPopulationRetryController.ResetTracking();
         }
 
         private void UpdateBoardPopulationStatus(string statusText, BoardPopulationStatusKind kind)
         {
-            BoardPopulationStatusText.Text = statusText;
-            _currentBoardPopulationStatusKind = kind;
-            ApplyBoardPopulationStatusVisual();
+            _boardPopulationStatusController.UpdateStatus(
+                statusText,
+                kind,
+                BoardPopulationStatusText,
+                Resources);
         }
 
         private void ApplyBoardPopulationStatusVisual()
         {
-            Brush brush = Resources["MutedTextBrush"] as Brush ?? Brushes.LightGray;
-
-            switch (_currentBoardPopulationStatusKind)
-            {
-                case BoardPopulationStatusKind.Success:
-                    brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#16A34A"));
-                    break;
-                case BoardPopulationStatusKind.Warning:
-                    brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B"));
-                    break;
-                case BoardPopulationStatusKind.Error:
-                    brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626"));
-                    break;
-            }
-
-            BoardPopulationStatusText.Foreground = brush;
+            _boardPopulationStatusController.ApplyStatusVisual(
+                BoardPopulationStatusText,
+                Resources);
         }
 
         private async Task ProcessSingleRowAsync(PilotBoardRow row, SemaphoreSlim semaphore, int generation)
@@ -912,71 +467,24 @@ namespace PitmastersGrill
 
             try
             {
-                if (generation != _processingGeneration)
-                {
-                    return;
-                }
-
-                var rowStopwatch = Stopwatch.StartNew();
-                DebugTraceWriter.WriteLine(
-                    $"row process start: generation={generation}, name='{row.CharacterName}'");
-
-                ResolverCacheEntry? existingIdentity = null;
-
-                if (!string.IsNullOrWhiteSpace(row.CharacterId) ||
-                    string.Equals(row.ResolverConfidence, "not_found", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(row.ResolverConfidence, "esi_exact_fallback", StringComparison.OrdinalIgnoreCase))
-                {
-                    existingIdentity = new ResolverCacheEntry
+                await _boardPopulationRowProcessor.ProcessAsync(
+                    row,
+                    generation,
+                    () => _processingGeneration,
+                    action => Dispatcher.InvokeAsync(() =>
                     {
-                        CharacterName = row.CharacterName,
-                        CharacterId = row.CharacterId,
-                        AllianceName = row.AllianceName,
-                        AllianceTicker = row.AllianceTicker,
-                        CorpName = row.CorpName,
-                        CorpTicker = row.CorpTicker,
-                        ResolverConfidence = row.ResolverConfidence,
-                        ResolvedAtUtc = row.ResolvedAtUtc,
-                        ExpiresAtUtc = DateTime.UtcNow.AddDays(30).ToString("o"),
-                        AffiliationCheckedAtUtc = row.AffiliationCheckedAtUtc
-                    };
-                }
+                        if (generation != _processingGeneration)
+                        {
+                            return;
+                        }
 
-                var identityOutcome = await _resolverService.ResolveCharacterAsync(row.CharacterName, existingIdentity);
+                        action();
+                    }).Task,
+                    RefreshDetailPaneIfSelected,
+                    UpdateLastRefreshed,
+                    (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message));
 
-                if (generation != _processingGeneration)
-                {
-                    return;
-                }
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (generation != _processingGeneration)
-                    {
-                        return;
-                    }
-
-                    ApplyIdentityOutcomeToRow(row, identityOutcome);
-                });
-
-                if (identityOutcome.Value != null)
-                {
-                    TryWriteFirstGenerationMarker(
-                        ref _firstResolverLoggedGeneration,
-                        generation,
-                        $"first resolver value: generation={generation}, name='{row.CharacterName}', outcome={identityOutcome.Kind}, elapsedMs={rowStopwatch.ElapsedMilliseconds}");
-
-                    TryWriteFirstGenerationMarker(
-                        ref _firstIdentityUiLoggedGeneration,
-                        generation,
-                        $"first identity UI update: generation={generation}, name='{row.CharacterName}', outcome={identityOutcome.Kind}, elapsedMs={rowStopwatch.ElapsedMilliseconds}");
-                }
-
-                var effectiveIdentity = identityOutcome.Value;
-
-                if (identityOutcome.Kind == ProviderOutcomeKind.NotFound ||
-                    effectiveIdentity == null ||
-                    string.IsNullOrWhiteSpace(effectiveIdentity.CharacterId))
+                if (_ignoreAllianceBoardController.ShouldRemoveResolvedRow(row))
                 {
                     await Dispatcher.InvokeAsync(() =>
                     {
@@ -985,103 +493,19 @@ namespace PitmastersGrill
                             return;
                         }
 
-                        RecalculateRetryMetadata(row);
-                        RefreshDetailPaneIfSelected(row);
-                        UpdateLastRefreshed();
+                        RemoveIgnoredAllianceRowFromCurrentBoard(row);
                     });
-                    return;
-                }
-
-                var affiliationOutcome = await _resolverService.EnrichAffiliationIfNeededAsync(effectiveIdentity);
-
-                if (generation != _processingGeneration)
-                {
-                    return;
-                }
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (generation != _processingGeneration)
-                    {
-                        return;
-                    }
-
-                    ApplyAffiliationOutcomeToRow(row, affiliationOutcome);
-                });
-
-                if (affiliationOutcome.Value != null && HasIdentityStageChange(effectiveIdentity, affiliationOutcome.Value))
-                {
-                    TryWriteFirstGenerationMarker(
-                        ref _firstAffiliationLoggedGeneration,
-                        generation,
-                        $"first affiliation UI update: generation={generation}, name='{row.CharacterName}', outcome={affiliationOutcome.Kind}, elapsedMs={rowStopwatch.ElapsedMilliseconds}");
-                }
-
-                var statsIdentity = affiliationOutcome.Value ?? effectiveIdentity;
-
-                if (statsIdentity == null || string.IsNullOrWhiteSpace(statsIdentity.CharacterId))
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        if (generation != _processingGeneration)
-                        {
-                            return;
-                        }
-
-                        RecalculateRetryMetadata(row);
-                        RefreshDetailPaneIfSelected(row);
-                        UpdateLastRefreshed();
-                    });
-                    return;
-                }
-
-                StatsCacheEntry? existingStats = null;
-
-                if (row.KillCount.HasValue || row.LossCount.HasValue)
-                {
-                    existingStats = new StatsCacheEntry
-                    {
-                        CharacterId = statsIdentity.CharacterId,
-                        KillCount = row.KillCount ?? 0,
-                        LossCount = row.LossCount ?? 0,
-                        AvgAttackersWhenAttacking = row.AvgAttackersWhenAttacking ?? 0,
-                        LastPublicCynoCapableHull = row.LastPublicCynoCapableHull ?? "",
-                        LastShipSeenName = row.LastShipSeenName ?? "",
-                        LastShipSeenAtUtc = row.LastShipSeenAtUtc ?? "",
-                        RefreshedAtUtc = DateTime.UtcNow.ToString("o"),
-                        ExpiresAtUtc = DateTime.UtcNow.AddHours(12).ToString("o")
-                    };
-                }
-
-                var statsOutcome = await _statsService.ResolveSingleAsync(statsIdentity.CharacterId, existingStats);
-
-                if (generation != _processingGeneration)
-                {
-                    return;
-                }
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (generation != _processingGeneration)
-                    {
-                        return;
-                    }
-
-                    ApplyStatsOutcomeToRow(row, statsOutcome);
-                });
-
-                if (statsOutcome.Value != null)
-                {
-                    TryWriteFirstGenerationMarker(
-                        ref _firstStatsLoggedGeneration,
-                        generation,
-                        $"first stats UI update: generation={generation}, name='{row.CharacterName}', outcome={statsOutcome.Kind}, elapsedMs={rowStopwatch.ElapsedMilliseconds}");
                 }
             }
             finally
             {
                 semaphore.Release();
             }
+        }
+
+        private void HandleRowProcessorMarker(BoardRowProcessMarkerKind markerKind, int generation, string message)
+        {
+            _boardPopulationTimingMarkerTracker.HandleMarker(markerKind, generation, message);
         }
 
         private void BuildInitialBoard(
@@ -1103,6 +527,8 @@ namespace PitmastersGrill
                 _currentRows.Add(row);
             }
 
+            ApplyIgnoredAllianceRowsToCurrentBoard();
+
             PilotBoard.SelectedItem = null;
             HideDetailPane();
             UpdateLastRefreshed();
@@ -1111,140 +537,71 @@ namespace PitmastersGrill
             _diagnostics.InitialBoardBuildComplete(_currentRows.Count, buildStopwatch.ElapsedMilliseconds);
         }
 
-        private void ApplyIdentityToRow(PilotBoardRow row, ResolverCacheEntry identity)
+
+        private void RemoveIgnoredAllianceRowFromCurrentBoard(PilotBoardRow row)
         {
-            row.CharacterId = identity.CharacterId;
-            row.AllianceName = identity.AllianceName;
-            row.AllianceTicker = identity.AllianceTicker;
-            row.CorpName = identity.CorpName;
-            row.CorpTicker = identity.CorpTicker;
-            row.IsResolved = !string.IsNullOrWhiteSpace(identity.CharacterId);
-            row.ResolverConfidence = identity.ResolverConfidence;
-            row.ResolvedAtUtc = identity.ResolvedAtUtc;
-            row.AffiliationCheckedAtUtc = identity.AffiliationCheckedAtUtc;
+            if (row == null)
+            {
+                return;
+            }
+
+            var removed = _currentRows.Remove(row);
+            if (!removed)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(PilotBoard.SelectedItem, row))
+            {
+                PilotBoard.SelectedItem = null;
+                HideDetailPane();
+            }
+
+            AppLogger.UiInfo($"Ignored alliance filter removed a resolved row from current board. character='{row.CharacterName}' allianceId='{row.AllianceId}'");
         }
 
-        private void ApplyStatsToRow(PilotBoardRow row, StatsCacheEntry stats)
+        private void ApplyIgnoredAllianceRowsToCurrentBoard()
         {
-            row.KillCount = stats.KillCount;
-            row.LossCount = stats.LossCount;
-            row.AvgAttackersWhenAttacking = stats.AvgAttackersWhenAttacking > 0
-                ? Math.Round(stats.AvgAttackersWhenAttacking, 0, MidpointRounding.AwayFromZero)
-                : null;
-            row.LastPublicCynoCapableHull = stats.LastPublicCynoCapableHull;
-            row.LastShipSeenName = stats.LastShipSeenName;
-            row.LastShipSeenAtUtc = stats.LastShipSeenAtUtc;
-            row.LastShipSeenDateDisplay = FormatLastSeenDate(stats.LastShipSeenAtUtc);
-        }
+            var selectedRow = PilotBoard.SelectedItem as PilotBoardRow;
+            var applyResult = _ignoreAllianceBoardController.ApplyToCurrentRows(_currentRows, selectedRow);
 
-        private static string FormatLastSeenDate(string utcValue)
-        {
-            if (string.IsNullOrWhiteSpace(utcValue))
+            if (applyResult.RemovedCount == 0)
             {
-                return "";
+                return;
             }
 
-            if (!DateTime.TryParse(
-                    utcValue,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsed))
+            foreach (var removedRow in applyResult.RemovedRows)
             {
-                return "";
+                _currentRows.Remove(removedRow);
             }
 
-            return parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        }
-
-        private void ApplyIdentityOutcomeToRow(PilotBoardRow row, ProviderOutcome<ResolverCacheEntry> outcome)
-        {
-            if (outcome.Value != null)
+            if (applyResult.SelectedRowRemoved)
             {
-                ApplyIdentityToRow(row, outcome.Value);
+                PilotBoard.SelectedItem = null;
+                HideDetailPane();
+            }
+            else
+            {
+                UpdateIgnoreAllianceButtonState(PilotBoard.SelectedItem as PilotBoardRow);
             }
 
-            row.IdentityStage = MapOutcomeToStageState(outcome.Kind);
-            row.IdentityStatusDetail = BuildOutcomeDetail(outcome, "identity");
-            row.IdentityRetryAtUtc = GetRetryAtUtc(outcome);
-
-            if (outcome.Kind == ProviderOutcomeKind.Throttled)
-            {
-                row.LastThrottleProvider = outcome.ProviderName;
-            }
-
-            if (outcome.Kind == ProviderOutcomeKind.NotFound)
-            {
-                row.AffiliationStage = EnrichmentStageState.Skipped;
-                row.AffiliationStatusDetail = "Affiliation skipped after terminal miss";
-                row.AffiliationRetryAtUtc = null;
-                row.StatsStage = EnrichmentStageState.Skipped;
-                row.StatsStatusDetail = "Stats skipped after terminal miss";
-                row.StatsRetryAtUtc = null;
-            }
-
-            RecalculateRetryMetadata(row);
-            RefreshDetailPaneIfSelected(row);
-            UpdateLastRefreshed();
-        }
-
-        private void ApplyAffiliationOutcomeToRow(PilotBoardRow row, ProviderOutcome<ResolverCacheEntry> outcome)
-        {
-            if (outcome.Value != null)
-            {
-                ApplyIdentityToRow(row, outcome.Value);
-            }
-
-            row.AffiliationStage = MapOutcomeToStageState(outcome.Kind);
-            row.AffiliationStatusDetail = BuildOutcomeDetail(outcome, "affiliation");
-            row.AffiliationRetryAtUtc = GetRetryAtUtc(outcome);
-
-            if (outcome.Kind == ProviderOutcomeKind.Throttled)
-            {
-                row.LastThrottleProvider = outcome.ProviderName;
-            }
-
-            RecalculateRetryMetadata(row);
-            RefreshDetailPaneIfSelected(row);
-            UpdateLastRefreshed();
-        }
-
-        private void ApplyStatsOutcomeToRow(PilotBoardRow row, ProviderOutcome<StatsCacheEntry> outcome)
-        {
-            if (outcome.Value != null)
-            {
-                ApplyStatsToRow(row, outcome.Value);
-            }
-
-            row.StatsStage = MapOutcomeToStageState(outcome.Kind);
-            row.StatsStatusDetail = BuildOutcomeDetail(outcome, "stats");
-            row.StatsRetryAtUtc = GetRetryAtUtc(outcome);
-
-            if (outcome.Kind == ProviderOutcomeKind.Throttled)
-            {
-                row.LastThrottleProvider = outcome.ProviderName;
-            }
-
-            RecalculateRetryMetadata(row);
-            RefreshDetailPaneIfSelected(row);
-            UpdateLastRefreshed();
+            AppLogger.UiInfo($"Ignored alliance filter removed rows from current board. removedRows={applyResult.RemovedCount}");
         }
 
         private void RefreshDetailPaneIfSelected(PilotBoardRow row)
         {
-            if (DetailPane.Visibility != Visibility.Visible)
-            {
-                return;
-            }
+            _detailPaneController.RefreshDetailPaneIfSelected(
+                row,
+                DetailPane.Visibility,
+                SelectedCharacterText,
+                FullCorpText,
+                FullAllianceText,
+                FreshnessText);
 
-            if (!string.Equals(_activeDetailCharacterName, row.CharacterName, StringComparison.OrdinalIgnoreCase))
+            if (PilotBoard.SelectedItem == row)
             {
-                return;
+                UpdateIgnoreAllianceButtonState(row);
             }
-
-            SelectedCharacterText.Text = row.CharacterName;
-            FullCorpText.Text = GetCorpDisplayText(row);
-            FullAllianceText.Text = GetAllianceDisplayText(row);
-            FreshnessText.Text = GetFreshnessDisplayText(row);
         }
 
         private void PilotBoard_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1292,11 +649,7 @@ namespace PitmastersGrill
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             _processingGeneration++;
-            _activeBoardPopulationIncomplete = false;
-            _activeBoardPopulationRetryScheduled = false;
-            _activeBoardPopulationRetryAttempt = 0;
-            _activeBoardNames = new List<string>();
-            _lastProcessedClipboardText = string.Empty;
+            ResetEntryAndRetryTracking();
 
             PilotBoard.SelectedItem = null;
             _currentRows.Clear();
@@ -1349,227 +702,36 @@ namespace PitmastersGrill
 
         private void SaveMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var rawValue = MaxKillmailAgeDaysTextBox.Text?.Trim() ?? string.Empty;
-
-                if (!int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedDays))
-                {
-                    MessageBox.Show(
-                        $"Enter a whole number between {KillmailDatasetFreshnessService.MinimumMaxKillmailAgeDays} and {KillmailDatasetFreshnessService.MaximumMaxKillmailAgeDays}.",
-                        "PMG Max Killmail Age",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-
-                    MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
-                    return;
-                }
-
-                var normalizedDays = KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(parsedDays);
-                _appSettings.MaxKillmailAgeDays = normalizedDays;
-                _appSettingsService.Save(_appSettings);
-                MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
-                UpdateMaxKillmailAgeUi();
-
-                AppLogger.UiInfo($"Max killmail age saved. days={normalizedDays}");
-
-                MessageBox.Show(
-                    $"Max killmail age saved as {normalizedDays} day{(normalizedDays == 1 ? "" : "s")}. The new value will apply the next time you use Enable KillMail DB Pull.",
-                    "PMG Max Killmail Age",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to save max killmail age.", ex);
-
-                MessageBox.Show(
-                    $"Failed to save max killmail age.\n\n{ex.Message}",
-                    "PMG Max Killmail Age Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            _mainWindowAppearanceController.SaveMaxKillmailAge(
+                _appSettings,
+                MaxKillmailAgeDaysTextBox,
+                EffectiveMaxKillmailAgeText);
         }
 
         private void UseDefaultMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                _appSettings.MaxKillmailAgeDays = KillmailDatasetFreshnessService.DefaultMaxKillmailAgeDays;
-                _appSettingsService.Save(_appSettings);
-                MaxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText();
-                UpdateMaxKillmailAgeUi();
-
-                AppLogger.UiInfo($"Max killmail age reset to default. days={_appSettings.MaxKillmailAgeDays}");
-
-                MessageBox.Show(
-                    $"Max killmail age reset to the default of {_appSettings.MaxKillmailAgeDays} days.",
-                    "PMG Max Killmail Age",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to reset max killmail age to default.", ex);
-
-                MessageBox.Show(
-                    $"Failed to reset max killmail age.\n\n{ex.Message}",
-                    "PMG Max Killmail Age Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private void ApplyLogLevelSelection()
-        {
-            if (LogLevelComboBox == null)
-            {
-                return;
-            }
-
-            LogLevelComboBox.SelectedIndex = _appSettings.LogLevel == AppLogLevel.Debug ? 1 : 0;
-        }
-
-        private AppLogLevel GetSelectedLogLevel()
-        {
-            if (LogLevelComboBox == null)
-            {
-                return AppLogLevel.Normal;
-            }
-
-            return LogLevelComboBox.SelectedIndex == 1
-                ? AppLogLevel.Debug
-                : AppLogLevel.Normal;
-        }
-
-        private int GetMaxKillmailAgeDaysSettingValue()
-        {
-            return KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(_appSettings.MaxKillmailAgeDays);
-        }
-
-        private string GetMaxKillmailAgeTextBoxText()
-        {
-            return GetMaxKillmailAgeDaysSettingValue().ToString(CultureInfo.InvariantCulture);
-        }
-
-        private void UpdateMaxKillmailAgeUi()
-        {
-            var days = GetMaxKillmailAgeDaysSettingValue();
-            var suffix = days == 1 ? "day" : "days";
-
-            EffectiveMaxKillmailAgeText.Text = $"Effective max killmail age: {days} {suffix}";
+            _mainWindowAppearanceController.ResetMaxKillmailAgeToDefault(
+                _appSettings,
+                MaxKillmailAgeDaysTextBox,
+                EffectiveMaxKillmailAgeText);
         }
 
         private void SaveKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var rawValue = KillmailDataRootPathTextBox.Text?.Trim() ?? string.Empty;
-                var normalizedDefaultPath = KillmailPaths.NormalizeForComparison(KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath());
-
-                if (string.IsNullOrWhiteSpace(rawValue))
-                {
-                    _appSettings.KillmailDataRootPath = string.Empty;
-                    _appSettingsService.Save(_appSettings);
-                    KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
-                    UpdateKillmailPathUi();
-
-                    AppLogger.UiInfo("Killmail data path override cleared via blank save. Restart required.");
-
-                    MessageBox.Show(
-                        "Killmail data path reset to the default %LOCALAPPDATA% location. Restart PMG to apply the new path fully.",
-                        "PMG Killmail Data Path",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-
-                    return;
-                }
-
-                var normalizedPath = KillmailPaths.NormalizeForComparison(rawValue);
-
-                if (string.Equals(normalizedPath, normalizedDefaultPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    _appSettings.KillmailDataRootPath = string.Empty;
-                }
-                else
-                {
-                    var expandedPath = KillmailPaths.ExpandPathTokens(rawValue);
-                    Directory.CreateDirectory(expandedPath);
-
-                    _appSettings.KillmailDataRootPath = rawValue;
-                }
-
-                _appSettingsService.Save(_appSettings);
-                KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
-                UpdateKillmailPathUi();
-
-                AppLogger.UiInfo(
-                    $"Killmail data path saved. configuredValue='{_appSettings.KillmailDataRootPath ?? string.Empty}' displayPath='{KillmailPaths.GetKillmailDataDirectoryDisplayPath()}' source={KillmailPaths.GetKillmailDataDirectorySourceDescription()} restartRequired=true");
-
-                MessageBox.Show(
-                    "Killmail data path saved. Restart PMG to apply the new path fully. Existing killmail data is not migrated automatically.",
-                    "PMG Killmail Data Path",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to save killmail data path.", ex);
-
-                MessageBox.Show(
-                    $"Failed to save killmail data path.\n\n{ex.Message}",
-                    "PMG Killmail Data Path Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            _mainWindowAppearanceController.SaveKillmailPath(
+                _appSettings,
+                KillmailDataRootPathTextBox,
+                KillmailDataPathModeText,
+                EffectiveKillmailDataPathText);
         }
 
         private void UseDefaultKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                _appSettings.KillmailDataRootPath = string.Empty;
-                _appSettingsService.Save(_appSettings);
-                KillmailDataRootPathTextBox.Text = GetKillmailPathEditorText();
-                UpdateKillmailPathUi();
-
-                AppLogger.UiInfo("Killmail data path reset to default %LOCALAPPDATA% location. Restart required.");
-
-                MessageBox.Show(
-                    "Killmail data path reset to the default %LOCALAPPDATA% location. Restart PMG to apply the new path fully.",
-                    "PMG Killmail Data Path",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to reset killmail data path to default.", ex);
-
-                MessageBox.Show(
-                    $"Failed to reset killmail data path.\n\n{ex.Message}",
-                    "PMG Killmail Data Path Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private void UpdateKillmailPathUi()
-        {
-            var displayPath = KillmailPaths.GetKillmailDataDirectoryDisplayPath();
-            var sourceDescription = KillmailPaths.GetKillmailDataDirectorySourceDescription();
-
-            KillmailDataPathModeText.Text = $"Source: {sourceDescription}";
-            EffectiveKillmailDataPathText.Text = $"Effective path: {displayPath}";
-        }
-
-        private string GetKillmailPathEditorText()
-        {
-            if (!string.IsNullOrWhiteSpace(_appSettings.KillmailDataRootPath))
-            {
-                return _appSettings.KillmailDataRootPath;
-            }
-
-            return KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath();
+            _mainWindowAppearanceController.ResetKillmailPathToDefault(
+                _appSettings,
+                KillmailDataRootPathTextBox,
+                KillmailDataPathModeText,
+                EffectiveKillmailDataPathText);
         }
 
         private void OpenZkillForRow(PilotBoardRow selectedRow)
@@ -1615,243 +777,153 @@ namespace PitmastersGrill
 
         private void ShowDetailPane(PilotBoardRow row)
         {
-            _activeDetailCharacterName = row.CharacterName;
-            SelectedCharacterText.Text = row.CharacterName;
-            FullCorpText.Text = GetCorpDisplayText(row);
-            FullAllianceText.Text = GetAllianceDisplayText(row);
-            FreshnessText.Text = GetFreshnessDisplayText(row);
+            _detailPaneController.ShowDetailPane(
+                row,
+                DetailPane,
+                SelectedCharacterText,
+                FullCorpText,
+                FullAllianceText,
+                FreshnessText,
+                NotesTagsBox,
+                KnownCynoOverrideCheckBox,
+                BaitOverrideCheckBox);
 
-            _isApplyingDetailPaneState = true;
-            NotesTagsBox.Text = _notesRepository.GetNotes(row.CharacterName);
-            KnownCynoOverrideCheckBox.IsChecked = row.KnownCynoOverride;
-            BaitOverrideCheckBox.IsChecked = row.BaitOverride;
-            _isApplyingDetailPaneState = false;
-
-            DetailPane.Visibility = Visibility.Visible;
-        }
-
-        private string GetCorpDisplayText(PilotBoardRow row)
-        {
-            if (row.IdentityStage == EnrichmentStageState.NotFound)
-            {
-                return "Full Corp: not found on zKill or ESI exact match";
-            }
-
-            if (!string.IsNullOrWhiteSpace(row.CorpName))
-            {
-                return $"Full Corp: {row.CorpName}";
-            }
-
-            if (row.AffiliationStage == EnrichmentStageState.Success || row.AffiliationStage == EnrichmentStageState.NotFound)
-            {
-                return "Full Corp: unavailable after affiliation check";
-            }
-
-            if (row.AffiliationStage == EnrichmentStageState.Throttled || row.AffiliationStage == EnrichmentStageState.TemporaryFailure)
-            {
-                return $"Full Corp: delayed ({row.AffiliationStatusDetail})";
-            }
-
-            if (row.AffiliationStage == EnrichmentStageState.PermanentFailure)
-            {
-                return $"Full Corp: unavailable ({row.AffiliationStatusDetail})";
-            }
-
-            if (!string.IsNullOrWhiteSpace(row.CharacterId))
-            {
-                return "Full Corp: resolved, enrichment pending";
-            }
-
-            return "Full Corp: unresolved";
-        }
-
-        private string GetAllianceDisplayText(PilotBoardRow row)
-        {
-            if (row.IdentityStage == EnrichmentStageState.NotFound)
-            {
-                return "Full Alliance: not found on zKill or ESI exact match";
-            }
-
-            if (!string.IsNullOrWhiteSpace(row.AllianceName))
-            {
-                return $"Full Alliance: {row.AllianceName}";
-            }
-
-            if (row.AffiliationStage == EnrichmentStageState.Success || row.AffiliationStage == EnrichmentStageState.NotFound)
-            {
-                return "Full Alliance: none";
-            }
-
-            if (row.AffiliationStage == EnrichmentStageState.Throttled || row.AffiliationStage == EnrichmentStageState.TemporaryFailure)
-            {
-                return $"Full Alliance: delayed ({row.AffiliationStatusDetail})";
-            }
-
-            if (row.AffiliationStage == EnrichmentStageState.PermanentFailure)
-            {
-                return $"Full Alliance: unavailable ({row.AffiliationStatusDetail})";
-            }
-
-            if (!string.IsNullOrWhiteSpace(row.CharacterId))
-            {
-                return "Full Alliance: resolved, enrichment pending";
-            }
-
-            return "Full Alliance: unresolved";
-        }
-
-        private string GetFreshnessDisplayText(PilotBoardRow row)
-        {
-            if (row.KnownCynoOverride)
-            {
-                return "Freshness: known-cyno override applied";
-            }
-
-            if (row.BaitOverride)
-            {
-                return "Freshness: bait override applied";
-            }
-
-            if (row.IdentityStage == EnrichmentStageState.NotFound)
-            {
-                return "Freshness: terminal miss cached";
-            }
-
-            if (HasRetryableStage(row) && row.NextRetryAtUtc.HasValue)
-            {
-                return $"Freshness: retry scheduled for {row.NextRetryAtUtc.Value:O}";
-            }
-
-            if (string.Equals(row.ResolverConfidence, "esi_exact_fallback", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!string.IsNullOrWhiteSpace(row.ResolvedAtUtc))
-                {
-                    return $"Freshness: resolved by ESI exact fallback at {row.ResolvedAtUtc}";
-                }
-
-                return "Freshness: resolved by ESI exact fallback";
-            }
-
-            if (row.StatsStage == EnrichmentStageState.NotFound)
-            {
-                return "Freshness: identity resolved; stats unavailable from current sources";
-            }
-
-            if (!string.IsNullOrWhiteSpace(row.ResolvedAtUtc))
-            {
-                return $"Freshness: {row.ResolvedAtUtc}";
-            }
-
-            return "Freshness: unresolved";
+            UpdateIgnoreAllianceButtonState(row);
         }
 
         private void HideDetailPane()
         {
-            _activeDetailCharacterName = string.Empty;
-            _isApplyingDetailPaneState = true;
-            NotesTagsBox.Text = string.Empty;
-            KnownCynoOverrideCheckBox.IsChecked = false;
-            BaitOverrideCheckBox.IsChecked = false;
-            _isApplyingDetailPaneState = false;
-            DetailPane.Visibility = Visibility.Collapsed;
+            _detailPaneController.HideDetailPane(
+                DetailPane,
+                NotesTagsBox,
+                KnownCynoOverrideCheckBox,
+                BaitOverrideCheckBox);
+
+            UpdateIgnoreAllianceButtonState(null);
         }
 
         private void SaveCurrentNotesAndTags()
         {
-            if (string.IsNullOrWhiteSpace(_activeDetailCharacterName))
+            _detailPaneController.SaveCurrentNotesAndTags(
+                NotesTagsBox.Text,
+                KnownCynoOverrideCheckBox.IsChecked == true,
+                BaitOverrideCheckBox.IsChecked == true,
+                PilotBoard.SelectedItem as PilotBoardRow);
+        }
+
+        private void IgnoreAllianceListView_IgnoreListChanged(object? sender, EventArgs e)
+        {
+            ApplyIgnoredAllianceRowsToCurrentBoard();
+        }
+
+        private void IgnoreAllianceButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (PilotBoard.SelectedItem is not PilotBoardRow selectedRow)
+            {
+                AppLogger.UiWarn("Ignore alliance requested with no selected row.");
+                return;
+            }
+
+            var allianceId = TryGetAllianceId(selectedRow.AllianceId);
+            if (!allianceId.HasValue)
+            {
+                AppLogger.UiWarn($"Ignore alliance requested without a valid alliance ID. character='{selectedRow.CharacterName}' allianceId='{selectedRow.AllianceId ?? ""}'");
+                return;
+            }
+
+            var added = _ignoreAllianceCoordinator.AddAllianceIdAndPersist(allianceId.Value);
+            if (!added)
+            {
+                AppLogger.UiInfo($"Ignore alliance requested for existing entry. character='{selectedRow.CharacterName}' allianceId='{allianceId.Value}'");
+                UpdateIgnoreAllianceButtonState(selectedRow);
+                _ignoreAllianceListView?.RefreshFromCoordinator();
+                return;
+            }
+
+            AppLogger.UiInfo($"Alliance added to ignore list from detail pane. character='{selectedRow.CharacterName}' allianceId='{allianceId.Value}'");
+
+            _ignoreAllianceListView?.RefreshFromCoordinator();
+            ApplyIgnoredAllianceRowsToCurrentBoard();
+        }
+
+        private void UpdateIgnoreAllianceButtonState(PilotBoardRow? row)
+        {
+            if (IgnoreAllianceButton == null)
             {
                 return;
             }
 
-            var knownCynoOverride = KnownCynoOverrideCheckBox.IsChecked == true;
-            var baitOverride = BaitOverrideCheckBox.IsChecked == true;
-
-            _notesRepository.SaveNotesAndTags(
-                _activeDetailCharacterName,
-                NotesTagsBox.Text,
-                knownCynoOverride,
-                baitOverride);
-
-            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow &&
-                string.Equals(selectedRow.CharacterName, _activeDetailCharacterName, StringComparison.OrdinalIgnoreCase))
+            if (row == null)
             {
-                selectedRow.KnownCynoOverride = knownCynoOverride;
-                selectedRow.BaitOverride = baitOverride;
+                IgnoreAllianceButton.IsEnabled = false;
+                IgnoreAllianceButton.ToolTip = "Select a pilot to ignore their alliance.";
+                return;
+            }
+
+            var allianceId = TryGetAllianceId(row.AllianceId);
+            if (!allianceId.HasValue)
+            {
+                IgnoreAllianceButton.IsEnabled = false;
+                IgnoreAllianceButton.ToolTip = "Selected pilot does not have a known alliance ID yet.";
+                return;
+            }
+
+            if (_ignoreAllianceCoordinator.ContainsAllianceId(allianceId.Value))
+            {
+                IgnoreAllianceButton.IsEnabled = false;
+                IgnoreAllianceButton.ToolTip = "This alliance is already on the ignore list.";
+                return;
+            }
+
+            IgnoreAllianceButton.IsEnabled = true;
+            IgnoreAllianceButton.ToolTip = string.IsNullOrWhiteSpace(row.AllianceName)
+                ? $"Ignore alliance ID {allianceId.Value}."
+                : $"Ignore alliance '{row.AllianceName}' ({allianceId.Value}).";
+        }
+
+        private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            try
+            {
+                var url = e.Uri?.AbsoluteUri ?? "https://github.com/SmokeyForged/Pitmasters-Grill";
+
+                AppLogger.UiInfo($"Opening GitHub repo. url='{url}'");
+
+                _browserLauncher.OpenUrl(url);
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Failed to open GitHub repo link.", ex);
+
+                MessageBox.Show(
+                    $"Failed to open browser.\n\n{ex.Message}",
+                    "PMG Browser Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                e.Handled = true;
             }
         }
 
-        private static EnrichmentStageState MapOutcomeToStageState(ProviderOutcomeKind outcomeKind)
+        private static long? TryGetAllianceId(string? allianceIdText)
         {
-            return outcomeKind switch
+            if (string.IsNullOrWhiteSpace(allianceIdText))
             {
-                ProviderOutcomeKind.Success => EnrichmentStageState.Success,
-                ProviderOutcomeKind.NotFound => EnrichmentStageState.NotFound,
-                ProviderOutcomeKind.Throttled => EnrichmentStageState.Throttled,
-                ProviderOutcomeKind.TemporaryFailure => EnrichmentStageState.TemporaryFailure,
-                ProviderOutcomeKind.PermanentFailure => EnrichmentStageState.PermanentFailure,
-                ProviderOutcomeKind.Skipped => EnrichmentStageState.Skipped,
-                _ => EnrichmentStageState.NotStarted
-            };
-        }
-
-        private static DateTime? GetRetryAtUtc<T>(ProviderOutcome<T> outcome)
-        {
-            if (outcome.Kind == ProviderOutcomeKind.Throttled)
-            {
-                return outcome.RetryAfterUtc ?? DateTime.UtcNow.AddSeconds(DefaultBoardPopulationRetryDelaySeconds);
+                return null;
             }
 
-            if (outcome.Kind == ProviderOutcomeKind.TemporaryFailure)
+            if (!long.TryParse(allianceIdText.Trim(), out var allianceId))
             {
-                return outcome.RetryAfterUtc ?? DateTime.UtcNow.AddSeconds(DefaultBoardPopulationRetryDelaySeconds);
+                return null;
             }
 
-            return null;
-        }
-
-        private static string BuildOutcomeDetail<T>(ProviderOutcome<T> outcome, string stageName)
-        {
-            if (!string.IsNullOrWhiteSpace(outcome.Detail))
+            if (allianceId <= 0)
             {
-                return outcome.Detail;
+                return null;
             }
 
-            return outcome.Kind switch
-            {
-                ProviderOutcomeKind.Success => $"{stageName} succeeded",
-                ProviderOutcomeKind.NotFound => $"{stageName} returned not found",
-                ProviderOutcomeKind.Throttled => $"{stageName} delayed by throttling",
-                ProviderOutcomeKind.TemporaryFailure => $"{stageName} temporarily failed",
-                ProviderOutcomeKind.PermanentFailure => $"{stageName} permanently failed",
-                ProviderOutcomeKind.Skipped => $"{stageName} skipped",
-                _ => $"{stageName} not started"
-            };
-        }
-
-        private static DateTime? GetEarlierRetryAtUtc(params DateTime?[] retryAtCandidates)
-        {
-            return retryAtCandidates
-                .Where(candidate => candidate.HasValue)
-                .Select(candidate => candidate!.Value)
-                .OrderBy(candidate => candidate)
-                .Cast<DateTime?>()
-                .FirstOrDefault();
-        }
-
-        private void RecalculateRetryMetadata(PilotBoardRow row)
-        {
-            row.NextRetryAtUtc = GetEarlierRetryAtUtc(row.IdentityRetryAtUtc, row.AffiliationRetryAtUtc, row.StatsRetryAtUtc);
-
-            if (!HasRetryableStage(row))
-            {
-                row.NextRetryAtUtc = null;
-                if (row.IdentityStage != EnrichmentStageState.Throttled &&
-                    row.AffiliationStage != EnrichmentStageState.Throttled &&
-                    row.StatsStage != EnrichmentStageState.Throttled)
-                {
-                    row.LastThrottleProvider = string.Empty;
-                }
-            }
+            return allianceId;
         }
 
         private void UpdateLastRefreshed()
@@ -1865,7 +937,7 @@ namespace PitmastersGrill
             {
                 EnableKillmailDbPullButton.IsEnabled = false;
 
-                var seedDays = GetMaxKillmailAgeDaysSettingValue();
+                var seedDays = _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings);
 
                 AppLogger.UiInfo(
                     $"Enable KillMail DB Pull requested. seedDays={seedDays} displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
@@ -1890,30 +962,6 @@ namespace PitmastersGrill
             }
         }
 
-        private void TryWriteFirstGenerationMarker(ref int markerField, int generation, string message)
-        {
-            lock (_timingMarkerSync)
-            {
-                if (markerField == generation)
-                {
-                    return;
-                }
-
-                markerField = generation;
-                DebugTraceWriter.WriteLine(message);
-            }
-        }
-
-        private static bool HasIdentityStageChange(ResolverCacheEntry before, ResolverCacheEntry after)
-        {
-            return !string.Equals(before.CharacterId, after.CharacterId, StringComparison.Ordinal)
-                || !string.Equals(before.CorpName, after.CorpName, StringComparison.Ordinal)
-                || !string.Equals(before.CorpTicker, after.CorpTicker, StringComparison.Ordinal)
-                || !string.Equals(before.AllianceName, after.AllianceName, StringComparison.Ordinal)
-                || !string.Equals(before.AllianceTicker, after.AllianceTicker, StringComparison.Ordinal)
-                || !string.Equals(before.ResolverConfidence, after.ResolverConfidence, StringComparison.Ordinal)
-                || !string.Equals(before.AffiliationCheckedAtUtc, after.AffiliationCheckedAtUtc, StringComparison.Ordinal);
-        }
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool AddClipboardFormatListener(IntPtr hwnd);
@@ -1921,15 +969,5 @@ namespace PitmastersGrill
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
-        [DllImport("dwmapi.dll", PreserveSig = true)]
-        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
-
-        private enum BoardPopulationStatusKind
-        {
-            Neutral,
-            Success,
-            Warning,
-            Error
-        }
     }
 }

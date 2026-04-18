@@ -8,6 +8,8 @@
 
         public double WindowOpacityPercent { get; set; } = 100;
 
+        public bool PanelModeEnabled { get; set; } = false;
+
         public int MaxKillmailAgeDays { get; set; } = 30;
 
         public string KillmailDataRootPath { get; set; } = string.Empty;

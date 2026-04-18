@@ -165,6 +165,7 @@ namespace PitmastersGrill.Services
                 {
                     CharacterName = trimmedName,
                     CharacterId = "",
+                    AllianceId = "",
                     AllianceName = "",
                     AllianceTicker = "",
                     CorpName = "",
@@ -360,6 +361,7 @@ namespace PitmastersGrill.Services
                     ? resolvedCharacter.CharacterName
                     : affiliation.CharacterName,
                 CharacterId = resolvedCharacter.CharacterId,
+                AllianceId = affiliation.AllianceId,
                 AllianceName = affiliation.AllianceName,
                 AllianceTicker = affiliation.AllianceTicker,
                 CorpName = affiliation.CorpName,
@@ -386,6 +388,11 @@ namespace PitmastersGrill.Services
             if (string.IsNullOrWhiteSpace(enriched.CorpTicker))
             {
                 enriched.CorpTicker = resolvedCharacter.CorpTicker;
+            }
+
+            if (string.IsNullOrWhiteSpace(enriched.AllianceId))
+            {
+                enriched.AllianceId = resolvedCharacter.AllianceId;
             }
 
             if (string.IsNullOrWhiteSpace(enriched.AllianceName))
@@ -443,6 +450,7 @@ namespace PitmastersGrill.Services
             {
                 CharacterName = characterName,
                 CharacterId = exactOutcome.Value,
+                AllianceId = "",
                 AllianceName = "",
                 AllianceTicker = "",
                 CorpName = "",
