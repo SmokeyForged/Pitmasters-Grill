@@ -631,7 +631,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="Technical Preview-v0.8.3"/>
+                                                       Text="Technical Preview-v0.9.0"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"
