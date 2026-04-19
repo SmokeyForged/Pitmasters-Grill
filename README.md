@@ -57,6 +57,12 @@ The emphasis is speed, clarity, and practical value.
 <img width="813" height="635" alt="image" src="https://github.com/user-attachments/assets/1b76eb73-1c01-4315-9757-6adf568f89c3" />
 
 
+
+### Settomgs / Ingore List
+
+<img width="947" height="613" alt="image" src="https://github.com/user-attachments/assets/26ef4131-12ad-4ee3-ad9e-09168d6569fe" />
+
+
 ---
 
 ## Why PMG exists
