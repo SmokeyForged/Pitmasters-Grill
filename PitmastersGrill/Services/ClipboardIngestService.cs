@@ -32,17 +32,33 @@ namespace PitmastersGrill.Services
 
             if (!inspection.IsPlausibleLocalList)
             {
-                return ClipboardProcessResult.Ignored(inspection.IgnoreReason);
+                return ClipboardProcessResult.Ignored(
+                    inspection.IgnoreReason,
+                    inspection.CharacterCount,
+                    inspection.NonEmptyLineCount,
+                    inspection.PlausibleNameCount,
+                    inspection.SuspiciousLineCount);
             }
 
             var parsedNames = _parser.Parse(rawClipboardText);
 
             if (parsedNames.Count < 2)
             {
-                return ClipboardProcessResult.Ignored("Clipboard did not contain enough parsed pilot names.");
+                return ClipboardProcessResult.Ignored(
+                    "Clipboard did not contain enough parsed pilot names after filtering.",
+                    inspection.CharacterCount,
+                    inspection.NonEmptyLineCount,
+                    inspection.PlausibleNameCount,
+                    inspection.SuspiciousLineCount);
             }
 
-            return ClipboardProcessResult.Accepted(rawClipboardText, parsedNames);
+            return ClipboardProcessResult.Accepted(
+                rawClipboardText,
+                parsedNames,
+                inspection.CharacterCount,
+                inspection.NonEmptyLineCount,
+                inspection.PlausibleNameCount,
+                inspection.SuspiciousLineCount);
         }
     }
 
@@ -52,23 +68,46 @@ namespace PitmastersGrill.Services
         public string AcceptedClipboardText { get; private set; } = string.Empty;
         public List<string> ParsedNames { get; private set; } = new();
         public string IgnoreReason { get; private set; } = string.Empty;
+        public int CharacterCount { get; private set; }
+        public int NonEmptyLineCount { get; private set; }
+        public int PlausibleNameCount { get; private set; }
+        public int SuspiciousLineCount { get; private set; }
 
-        public static ClipboardProcessResult Ignored(string? reason = null)
+        public static ClipboardProcessResult Ignored(
+            string? reason = null,
+            int characterCount = 0,
+            int nonEmptyLineCount = 0,
+            int plausibleNameCount = 0,
+            int suspiciousLineCount = 0)
         {
             return new ClipboardProcessResult
             {
                 ShouldProcess = false,
-                IgnoreReason = reason ?? string.Empty
+                IgnoreReason = reason ?? string.Empty,
+                CharacterCount = characterCount,
+                NonEmptyLineCount = nonEmptyLineCount,
+                PlausibleNameCount = plausibleNameCount,
+                SuspiciousLineCount = suspiciousLineCount
             };
         }
 
-        public static ClipboardProcessResult Accepted(string acceptedClipboardText, List<string> parsedNames)
+        public static ClipboardProcessResult Accepted(
+            string acceptedClipboardText,
+            List<string> parsedNames,
+            int characterCount,
+            int nonEmptyLineCount,
+            int plausibleNameCount,
+            int suspiciousLineCount)
         {
             return new ClipboardProcessResult
             {
                 ShouldProcess = true,
                 AcceptedClipboardText = acceptedClipboardText ?? string.Empty,
-                ParsedNames = parsedNames ?? new List<string>()
+                ParsedNames = parsedNames ?? new List<string>(),
+                CharacterCount = characterCount,
+                NonEmptyLineCount = nonEmptyLineCount,
+                PlausibleNameCount = plausibleNameCount,
+                SuspiciousLineCount = suspiciousLineCount
             };
         }
     }

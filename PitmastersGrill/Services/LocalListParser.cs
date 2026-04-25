@@ -7,7 +7,7 @@ namespace PitmastersGrill.Services
     {
         public List<string> Parse(string rawClipboardText)
         {
-            var seen = new HashSet<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var results = new List<string>();
 
             if (string.IsNullOrWhiteSpace(rawClipboardText))
@@ -21,7 +21,7 @@ namespace PitmastersGrill.Services
             {
                 var trimmed = line.Trim();
 
-                if (string.IsNullOrWhiteSpace(trimmed))
+                if (!ClipboardPilotNameHeuristics.IsPlausiblePilotName(trimmed))
                 {
                     continue;
                 }

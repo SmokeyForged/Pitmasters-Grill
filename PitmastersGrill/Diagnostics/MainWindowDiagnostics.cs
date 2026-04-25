@@ -27,6 +27,12 @@ namespace PitmastersGrill.Diagnostics
             _uiHeartbeatTimer.Tick -= OnHeartbeatTick;
         }
 
+        public void ClipboardChangeDebounced(int debounceMs) =>
+            Debug($"Clipboard change observed. debounceMs={debounceMs}");
+
+        public void ClipboardDebounceElapsed() =>
+            Debug("Clipboard debounce elapsed. Starting clipboard processing.");
+
         public void ClipboardProcessStart() => Debug("Clipboard handler start.");
 
         public void ClipboardNoText() => Debug("Clipboard handler aborted. Clipboard contains no text.");
@@ -49,6 +55,9 @@ namespace PitmastersGrill.Diagnostics
 
         public void ClipboardReadFailed(string? message) =>
             Debug($"Clipboard read failed. message={Sanitize(message)}");
+
+        public void ClipboardUnhandledException(string? message) =>
+            Debug($"Clipboard processing exception. message={Sanitize(message)}");
 
         public void ClipboardIntakeIgnored(string? reason) =>
             Debug($"Clipboard intake ignored. reason={Sanitize(reason)}");

@@ -4,6 +4,7 @@ using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -60,6 +61,7 @@ namespace PitmastersGrill.Services
             Func<IDisposable> beginForegroundPriority,
             Action cancelBoardPopulationRetry,
             Action<bool> resetBoardPopulationTracking,
+            Action<string, BoardPopulationStatusKind> updateClipboardStatus,
             Func<List<string>, bool, Task> processNamesAsync)
         {
             if (_isClipboardProcessing)
@@ -95,6 +97,11 @@ namespace PitmastersGrill.Services
             if (resetBoardPopulationTracking == null)
             {
                 throw new ArgumentNullException(nameof(resetBoardPopulationTracking));
+            }
+
+            if (updateClipboardStatus == null)
+            {
+                throw new ArgumentNullException(nameof(updateClipboardStatus));
             }
 
             if (processNamesAsync == null)
@@ -137,7 +144,16 @@ namespace PitmastersGrill.Services
                 if (!result.ShouldProcess)
                 {
                     _diagnostics.ClipboardIntakeIgnored(result.IgnoreReason);
-                    AppLogger.ClipboardInfo($"Ignored clipboard board. reason={result.IgnoreReason}");
+                    AppLogger.ClipboardInfo(
+                        $"Ignored clipboard board. reason={result.IgnoreReason} charCount={result.CharacterCount} nonEmptyLines={result.NonEmptyLineCount} plausibleNames={result.PlausibleNameCount} suspiciousLines={result.SuspiciousLineCount}");
+
+                    if (ShouldSurfaceClipboardIgnore(result.IgnoreReason))
+                    {
+                        updateClipboardStatus(
+                            $"Clipboard ignored: {result.IgnoreReason}",
+                            BoardPopulationStatusKind.Warning);
+                    }
+
                     return;
                 }
 
@@ -149,9 +165,26 @@ namespace PitmastersGrill.Services
                 _diagnostics.ClipboardIntakeAccepted(result.ParsedNames.Count, true);
 
                 AppLogger.ClipboardInfo(
-                    $"Accepted clipboard board. parsedNames={result.ParsedNames.Count} retryReset=true");
+                    $"Accepted clipboard board. parsedNames={result.ParsedNames.Count} nonEmptyLines={result.NonEmptyLineCount} plausibleNames={result.PlausibleNameCount} suspiciousLines={result.SuspiciousLineCount} retryReset=true");
 
                 await processNamesAsync(result.ParsedNames, false);
+            }
+            catch (Exception ex)
+            {
+                _diagnostics.ClipboardUnhandledException(ex.Message);
+                AppLogger.ClipboardError("Clipboard processing failed.", ex);
+
+                var diagnosticBundlePath = DiagnosticBundleService.TryCreateBundle(
+                    "clipboard-processing-failed",
+                    ex);
+
+                var diagnosticFileName = string.IsNullOrWhiteSpace(diagnosticBundlePath)
+                    ? "diagnostic bundle unavailable"
+                    : Path.GetFileName(diagnosticBundlePath);
+
+                updateClipboardStatus(
+                    $"Clipboard processing failed. {diagnosticFileName}",
+                    BoardPopulationStatusKind.Error);
             }
             finally
             {
@@ -159,6 +192,23 @@ namespace PitmastersGrill.Services
                 _isClipboardProcessing = false;
                 _diagnostics.ClipboardProcessEnd();
             }
+        }
+
+        private static bool ShouldSurfaceClipboardIgnore(string? reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return false;
+            }
+
+            if (reason.Contains("last processed payload", StringComparison.OrdinalIgnoreCase) ||
+                reason.Contains("Clipboard was empty", StringComparison.OrdinalIgnoreCase) ||
+                reason.Contains("not contain enough non-empty lines", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         public async Task ProcessNamesAsync(

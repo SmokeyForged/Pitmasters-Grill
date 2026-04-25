@@ -18,7 +18,7 @@ namespace PitmastersGrill
             base.OnStartup(e);
 
             RegisterGlobalExceptionLogging();
-            AppLogger.Initialize("Technical Preview-v0.9.0", e.Args);
+            AppLogger.Initialize("Technical Preview-v0.9.2", e.Args);
             AppLogger.AppInfo("Application startup invoked.");
 
             try
@@ -39,9 +39,10 @@ namespace PitmastersGrill
             catch (Exception ex)
             {
                 AppLogger.AppError("Unhandled startup exception.", ex);
+                var diagnosticBundlePath = DiagnosticBundleService.TryCreateBundle("startup-unhandled-exception", ex);
 
                 MessageBox.Show(
-                    $"PMG failed during startup.\n\n{ex.Message}",
+                    BuildStartupErrorMessage(ex, diagnosticBundlePath),
                     "PMG Startup Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
@@ -77,6 +78,7 @@ namespace PitmastersGrill
             try
             {
                 AppLogger.ErrorOnly("Dispatcher unhandled exception.", e.Exception);
+                DiagnosticBundleService.TryCreateBundle("dispatcher-unhandled-exception", e.Exception);
             }
             catch
             {
@@ -97,11 +99,13 @@ namespace PitmastersGrill
                 if (exception != null)
                 {
                     AppLogger.ErrorOnly(terminationText, exception);
+                    DiagnosticBundleService.TryCreateBundle("appdomain-unhandled-exception", exception);
                 }
                 else
                 {
                     AppLogger.ErrorOnly(
                         $"{terminationText} exceptionObjectType={e.ExceptionObject?.GetType().FullName ?? "<null>"}");
+                    DiagnosticBundleService.TryCreateBundle("appdomain-unhandled-exception");
                 }
             }
             catch
@@ -115,6 +119,7 @@ namespace PitmastersGrill
             try
             {
                 AppLogger.ErrorOnly("Unobserved task exception.", e.Exception);
+                DiagnosticBundleService.TryCreateBundle("unobserved-task-exception", e.Exception);
             }
             catch
             {
@@ -123,6 +128,18 @@ namespace PitmastersGrill
 
             // Intentionally do not call SetObserved here.
             // We want visibility without changing fault-handling behavior yet.
+        }
+
+        private static string BuildStartupErrorMessage(Exception ex, string? diagnosticBundlePath)
+        {
+            var message = $"PMG failed during startup.\n\n{ex.Message}";
+
+            if (!string.IsNullOrWhiteSpace(diagnosticBundlePath))
+            {
+                message += $"\n\nDiagnostic bundle created:\n{diagnosticBundlePath}";
+            }
+
+            return message;
         }
 
         private static bool IsSeedBuildMode(string[] args)
@@ -278,6 +295,7 @@ namespace PitmastersGrill
             catch (Exception ex)
             {
                 AppLogger.AppError("Normal startup failed.", ex);
+                var diagnosticBundlePath = DiagnosticBundleService.TryCreateBundle("normal-startup-failed", ex);
 
                 try
                 {
@@ -298,7 +316,7 @@ namespace PitmastersGrill
                 }
 
                 MessageBox.Show(
-                    $"PMG failed during startup.\n\n{ex.Message}",
+                    BuildStartupErrorMessage(ex, diagnosticBundlePath),
                     "PMG Startup Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);

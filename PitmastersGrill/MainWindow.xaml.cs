@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,6 +18,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Navigation;
+using System.Windows.Threading;
 using PitmastersGrill.Views;
 
 namespace PitmastersGrill
@@ -24,6 +26,7 @@ namespace PitmastersGrill
     public partial class MainWindow : Window
     {
         private const int WmClipboardUpdate = 0x031D;
+        private const int ClipboardDebounceMilliseconds = 250;
         private const int DefaultBoardPopulationRetryDelaySeconds = 12;
         private const int MaxBoardPopulationRetryAttempts = 5;
 
@@ -46,6 +49,7 @@ namespace PitmastersGrill
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
+        private readonly DispatcherTimer _clipboardDebounceTimer;
         private IgnoreAllianceListView? _ignoreAllianceListView;
 
 
@@ -66,6 +70,11 @@ namespace PitmastersGrill
             InitializeComponent();
 
             _diagnostics = new MainWindowDiagnostics(Dispatcher);
+            _clipboardDebounceTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(ClipboardDebounceMilliseconds)
+            };
+            _clipboardDebounceTimer.Tick += ClipboardDebounceTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
@@ -177,6 +186,8 @@ namespace PitmastersGrill
                 _ignoreAllianceListView.IgnoreListChanged -= IgnoreAllianceListView_IgnoreListChanged;
             }
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
+            _clipboardDebounceTimer.Stop();
+            _clipboardDebounceTimer.Tick -= ClipboardDebounceTimer_Tick;
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
@@ -432,10 +443,24 @@ namespace PitmastersGrill
         {
             if (msg == WmClipboardUpdate)
             {
-                _ = ProcessClipboardIfValidAsync();
+                ScheduleClipboardProcessing();
             }
 
             return IntPtr.Zero;
+        }
+
+        private void ScheduleClipboardProcessing()
+        {
+            _clipboardDebounceTimer.Stop();
+            _clipboardDebounceTimer.Start();
+            _diagnostics.ClipboardChangeDebounced(ClipboardDebounceMilliseconds);
+        }
+
+        private void ClipboardDebounceTimer_Tick(object? sender, EventArgs e)
+        {
+            _clipboardDebounceTimer.Stop();
+            _diagnostics.ClipboardDebounceElapsed();
+            _ = ProcessClipboardIfValidAsync();
         }
 
         private Task ProcessClipboardIfValidAsync()
@@ -451,6 +476,7 @@ namespace PitmastersGrill
                 beginForegroundPriority: () => _backgroundIntelUpdateService.BeginForegroundPriority(),
                 cancelBoardPopulationRetry: CancelBoardPopulationRetry,
                 resetBoardPopulationTracking: preserveLastProcessedClipboardText => ResetBoardPopulationTracking(preserveLastProcessedClipboardText),
+                updateClipboardStatus: UpdateBoardPopulationStatus,
                 processNamesAsync: ProcessNamesAsync);
         }
 
@@ -812,11 +838,13 @@ namespace PitmastersGrill
                 var logsRootPath = AppPaths.GetLogsRootDirectory();
 
                 AppLogger.UiInfo($"Open logs requested. path={logsRootPath}");
+                SetDiagnosticsStatus("Opening logs folder.");
                 _browserLauncher.OpenPath(logsRootPath);
             }
             catch (Exception ex)
             {
                 AppLogger.UiError("Open logs failed.", ex);
+                SetDiagnosticsStatus("Failed to open logs folder.");
 
                 MessageBox.Show(
                     $"Failed to open logs folder.\n\n{ex.Message}",
@@ -824,6 +852,81 @@ namespace PitmastersGrill
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+        }
+
+        private void PackageDiagnosticsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var bundlePath = DiagnosticBundleService.TryCreateBundle("manual-diagnostics-package");
+
+                if (string.IsNullOrWhiteSpace(bundlePath))
+                {
+                    SetDiagnosticsStatus("Diagnostic package failed.");
+                    MessageBox.Show(
+                        "PMG could not create a diagnostic package. Check the active logs for details.",
+                        "PMG Diagnostics",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                var bundleFileName = Path.GetFileName(bundlePath);
+                SetDiagnosticsStatus($"Created diagnostic package: {bundleFileName}");
+                AppLogger.UiInfo($"Manual diagnostic package created. path={bundlePath}");
+
+                var diagnosticsDirectory = Path.GetDirectoryName(bundlePath);
+                if (!string.IsNullOrWhiteSpace(diagnosticsDirectory))
+                {
+                    _browserLauncher.OpenPath(diagnosticsDirectory);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Manual diagnostic package failed.", ex);
+                SetDiagnosticsStatus("Diagnostic package failed.");
+
+                MessageBox.Show(
+                    $"Failed to create diagnostic package.\n\n{ex.Message}",
+                    "PMG Diagnostics Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenDiagnosticsFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var diagnosticsDirectory = DiagnosticBundleService.GetDiagnosticsDirectory();
+
+                AppLogger.UiInfo($"Open diagnostics folder requested. path={diagnosticsDirectory}");
+                SetDiagnosticsStatus("Opening diagnostics folder.");
+                _browserLauncher.OpenPath(diagnosticsDirectory);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Open diagnostics folder failed.", ex);
+                SetDiagnosticsStatus("Failed to open diagnostics folder.");
+
+                MessageBox.Show(
+                    $"Failed to open diagnostics folder.\n\n{ex.Message}",
+                    "PMG Diagnostics Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void SetDiagnosticsStatus(string message)
+        {
+            if (DiagnosticsStatusText == null)
+            {
+                return;
+            }
+
+            DiagnosticsStatusText.Text = string.IsNullOrWhiteSpace(message)
+                ? "Diagnostics ready."
+                : message.Trim();
         }
 
 
