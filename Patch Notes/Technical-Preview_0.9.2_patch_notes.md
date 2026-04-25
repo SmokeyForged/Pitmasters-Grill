@@ -14,13 +14,15 @@ PMG now classifies clipboard text before treating it as an EVE local list.
 
 Clipboard content that looks like code, shell output, XML/XAML, markdown, logs, stack traces, commands, filesystem paths, or oversized text is rejected safely instead of being sent into the resolver/board population pipeline.
 
-This helps prevent hangs when copying non-EVE content from sources such as ChatGPT, PowerShell, editors, logs, or documentation.
+This helps prevent hangs when copying non-EVE content from sources such as web browsers, PowerShell, editors, logs, or documentation.
 
 ### Safer Local List Parsing
 
 Local-list parsing now applies stricter pilot-name plausibility checks.
 
-Candidate pilot names are filtered before processing, and duplicate names are removed case-insensitively.
+Candidate pilot names are filtered before processing. Exact duplicate names are removed case-sensitively, while capitalization variants are preserved as distinct entries.
+
+This matters because EVE character names can differ by capitalization. For example, `Pilot Name`, `pilot name`, and `PILOT NAME` should not be collapsed into one row unless they are exact spelling-and-case duplicates.
 
 Valid EVE local lists should continue to process normally.
 
@@ -71,6 +73,8 @@ Validated locally before commit:
 - Valid EVE local-list clipboard input still processes normally.
 - Non-local-list clipboard content is rejected safely.
 - Clipboard rejection avoids UI hangs.
+- Exact duplicate pilot names are deduplicated only when spelling and capitalization match.
+- Case-variant pilot names remain separate rows.
 - Manual diagnostic package creation works.
 - Diagnostic bundle structure reviewed.
 - Diagnostic manifest redaction verified.
@@ -91,6 +95,7 @@ Expected areas touched include:
 
 - clipboard ingest/classification,
 - local-list parsing heuristics,
+- case-sensitive duplicate handling,
 - board population rejection handling,
 - diagnostics UI,
 - diagnostic bundle service,
