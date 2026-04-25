@@ -58,7 +58,7 @@ The emphasis is speed, clarity, and practical value.
 
 
 
-### Settomgs / Ingore List
+### Settings / Ingore List
 
 <img width="947" height="613" alt="image" src="https://github.com/user-attachments/assets/26ef4131-12ad-4ee3-ad9e-09168d6569fe" />
 
