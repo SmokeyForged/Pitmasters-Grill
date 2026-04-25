@@ -22,6 +22,11 @@ namespace PitmastersGrill.Services
             _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
         }
 
+        public void SaveSettings(AppSettings settings)
+        {
+            _appSettingsService.Save(settings);
+        }
+
         public void InitializeSettingsUi(
             AppSettings settings,
             CheckBox darkModeCheckBox,

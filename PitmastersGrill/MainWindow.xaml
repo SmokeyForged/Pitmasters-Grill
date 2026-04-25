@@ -9,8 +9,8 @@
         Title="Pitmasters Grill"
         Height="430"
         Width="760"
-        MinHeight="430"
-        MinWidth="760"
+        MinHeight="300"
+        MinWidth="420"
         Background="{DynamicResource WindowBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown">
 
@@ -29,6 +29,11 @@
         <SolidColorBrush x:Key="GridHeaderBrush" Color="#202020"/>
         <SolidColorBrush x:Key="GridLineBrush" Color="#4A4A4A"/>
         <SolidColorBrush x:Key="PanelBorderBrush" Color="#3A3A3A"/>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
+        </Style>
 
         <Style TargetType="DataGrid">
             <Setter Property="Background" Value="{DynamicResource GridBackgroundBrush}"/>
@@ -101,6 +106,8 @@
         <Style x:Key="SettingsLabelStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
         </Style>
 
         <Style x:Key="CompactModeToggleStyle" TargetType="ToggleButton">
@@ -358,6 +365,12 @@
                                       IsReadOnly="True"
                                       SelectionMode="Single"
                                       SelectionUnit="FullRow"
+                                      EnableRowVirtualization="True"
+                                      EnableColumnVirtualization="True"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       SelectionChanged="PilotBoard_SelectionChanged"
                                       MouseDoubleClick="PilotBoard_MouseDoubleClick" Grid.ColumnSpan="4">
                                 <DataGrid.Resources>
@@ -365,7 +378,7 @@
                                     <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
                                 </DataGrid.Resources>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn Header="Sig" Width="42">
+                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock HorizontalAlignment="Center"
@@ -403,17 +416,18 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
 
-                                    <DataGridTextColumn Header="Character" Binding="{Binding CharacterName}" Width="2*"/>
-                                    <DataGridTextColumn Header="Alliance" Binding="{Binding AllianceName}" Width="1.8*"/>
-                                    <DataGridTextColumn Header="Corp" Binding="{Binding CorpName}" Width="1.8*"/>
-                                    <DataGridTextColumn Header="Kills" Binding="{Binding KillCount}" Width="0.9*"/>
-                                    <DataGridTextColumn Header="Losses" Binding="{Binding LossCount}" Width="0.9*"/>
-                                    <DataGridTextColumn Header="Avg Fleet Size"
+                                    <DataGridTextColumn x:Name="CharacterColumn" Header="Character" Binding="{Binding CharacterName}" Width="2*"/>
+                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceName}" Width="1.8*"/>
+                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpName}" Width="1.8*"/>
+                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="0.9*"/>
+                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="0.9*"/>
+                                    <DataGridTextColumn x:Name="AvgFleetSizeColumn"
+                                                        Header="Avg Fleet Size"
                                                         Binding="{Binding AvgAttackersWhenAttacking, StringFormat={}{0:0}}"
                                                         Width="1.2*"/>
-                                    <DataGridTextColumn Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="1.8*"/>
-                                    <DataGridTextColumn Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" Width="1.2*"/>
-                                    <DataGridTextColumn Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="1.8*"/>
+                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="1.8*"/>
+                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" Width="1.2*"/>
+                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="1.8*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
 
@@ -452,7 +466,8 @@
                                                FontSize="18"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource HeaderTextBrush}"
-                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="None"
                                                Margin="0,0,12,0"/>
 
                                     <Button Grid.Row="0"
@@ -616,6 +631,112 @@
                                 </ScrollViewer>
                             </TabItem>
 
+                            <TabItem Header="Board Columns">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              Padding="12">
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Board Column Visibility"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Text="Choose which optional board columns are visible. The Character column always stays visible so rows remain identifiable."/>
+
+                                            <WrapPanel Margin="0,8,0,12">
+                                                <CheckBox x:Name="ShowSigColumnCheckBox"
+                                                          Content="Sig"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowAllianceColumnCheckBox"
+                                                          Content="Alliance"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowCorpColumnCheckBox"
+                                                          Content="Corp"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowKillsColumnCheckBox"
+                                                          Content="Kills"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowLossesColumnCheckBox"
+                                                          Content="Losses"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowAvgFleetSizeColumnCheckBox"
+                                                          Content="Avg Fleet Size"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowLastShipSeenColumnCheckBox"
+                                                          Content="Last Ship Seen"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowLastSeenColumnCheckBox"
+                                                          Content="Last Seen"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+
+                                                <CheckBox x:Name="ShowCynoHullSeenColumnCheckBox"
+                                                          Content="Cyno Hull Seen"
+                                                          Foreground="{DynamicResource BodyTextBrush}"
+                                                          Margin="0,0,18,8"
+                                                          Checked="BoardColumnVisibilityCheckBox_Changed"
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                            </WrapPanel>
+
+                                            <WrapPanel>
+                                                <Button x:Name="ShowAllBoardColumnsButton"
+                                                        Width="140"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Show All"
+                                                        Click="ShowAllBoardColumnsButton_Click"/>
+
+                                                <Button x:Name="ResetBoardColumnsButton"
+                                                        Width="140"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Reset Defaults"
+                                                        Click="ResetBoardColumnsButton_Click"/>
+                                            </WrapPanel>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,10,0,0"
+                                                       Text="Column choices are saved immediately and reused on the next PMG launch."/>
+                                        </StackPanel>
+                                    </Border>
+                                </ScrollViewer>
+                            </TabItem>
+
                             <TabItem Header="Version">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Padding="12">
@@ -631,7 +752,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="Technical Preview-v0.9.0"/>
+                                                       Text="Technical Preview-v0.9.1"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"
@@ -782,7 +903,8 @@
 
                                             <TextBox x:Name="KillmailDataRootPathTextBox"
                                                      Margin="0,0,0,10"
-                                                     MinWidth="420"
+                                                     MinWidth="220"
+                                                     HorizontalAlignment="Stretch"
                                                      TextWrapping="Wrap"
                                                      VerticalScrollBarVisibility="Auto"/>
 

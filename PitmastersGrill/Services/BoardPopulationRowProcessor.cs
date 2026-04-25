@@ -11,7 +11,8 @@ namespace PitmastersGrill.Services
         ResolverValueAvailable,
         IdentityUiUpdated,
         AffiliationUiUpdated,
-        StatsUiUpdated
+        StatsUiUpdated,
+        IgnoredAllianceStatsSkipped
     }
 
     public sealed class BoardPopulationRowProcessor
@@ -37,7 +38,8 @@ namespace PitmastersGrill.Services
             Func<Action, Task> runOnUiAsync,
             Action<PilotBoardRow> refreshDetailPaneIfSelected,
             Action updateLastRefreshed,
-            Action<BoardRowProcessMarkerKind, string> writeMarker)
+            Action<BoardRowProcessMarkerKind, string> writeMarker,
+            Func<PilotBoardRow, bool>? shouldStopAfterAffiliation = null)
         {
             if (!IsCurrentGeneration(generation, getCurrentGeneration))
             {
@@ -113,6 +115,25 @@ namespace PitmastersGrill.Services
             }
 
             var statsIdentity = affiliationOutcome.Value ?? effectiveIdentity;
+
+            if (shouldStopAfterAffiliation?.Invoke(row) == true)
+            {
+                await runOnUiAsync(() =>
+                {
+                    row.StatsStage = EnrichmentStageState.Skipped;
+                    row.StatsStatusDetail = "Stats skipped because alliance is ignored";
+                    row.StatsRetryAtUtc = null;
+                    _pilotBoardRowEnrichmentApplier.RecalculateRetryMetadata(row);
+                    refreshDetailPaneIfSelected(row);
+                    updateLastRefreshed();
+                });
+
+                writeMarker(
+                    BoardRowProcessMarkerKind.IgnoredAllianceStatsSkipped,
+                    $"ignored alliance skipped stats: generation={generation}, name='{row.CharacterName}', elapsedMs={rowStopwatch.ElapsedMilliseconds}");
+
+                return;
+            }
 
             if (statsIdentity == null || string.IsNullOrWhiteSpace(statsIdentity.CharacterId))
             {

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Data.Sqlite;
 using PitmastersGrill.Models;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace PitmastersGrill.Persistence
 {
@@ -53,19 +55,81 @@ namespace PitmastersGrill.Persistence
                 return null;
             }
 
-            return new StatsCacheEntry
-            {
-                CharacterId = reader.GetString(0),
-                KillCount = reader.GetInt32(1),
-                LossCount = reader.GetInt32(2),
-                AvgAttackersWhenAttacking = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
-                LastPublicCynoCapableHull = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                LastShipSeenName = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                LastShipSeenAtUtc = reader.IsDBNull(6) ? "" : reader.GetString(6),
-                RefreshedAtUtc = reader.IsDBNull(7) ? "" : reader.GetString(7),
-                ExpiresAtUtc = reader.IsDBNull(8) ? "" : reader.GetString(8)
-            };
+            return ReadStatsCacheEntry(reader);
         }
+
+        public Dictionary<string, StatsCacheEntry> GetByCharacterIds(IEnumerable<string> characterIds)
+        {
+            var results = new Dictionary<string, StatsCacheEntry>(StringComparer.OrdinalIgnoreCase);
+
+            if (characterIds == null)
+            {
+                return results;
+            }
+
+            var cleanedIds = new List<string>();
+
+            foreach (var characterId in characterIds)
+            {
+                if (string.IsNullOrWhiteSpace(characterId))
+                {
+                    continue;
+                }
+
+                var trimmedId = characterId.Trim();
+
+                if (!cleanedIds.Contains(trimmedId, StringComparer.OrdinalIgnoreCase))
+                {
+                    cleanedIds.Add(trimmedId);
+                }
+            }
+
+            if (cleanedIds.Count == 0)
+            {
+                return results;
+            }
+
+            var connectionString = $"Data Source={_databasePath}";
+
+            using var connection = new SqliteConnection(connectionString);
+            connection.Open();
+
+            EnsureTableExists(connection);
+
+            foreach (var characterId in cleanedIds)
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText =
+                @"
+                SELECT
+                    character_id,
+                    kill_count,
+                    loss_count,
+                    avg_attackers_when_attacking,
+                    last_public_cyno_capable_hull,
+                    last_ship_seen_name,
+                    last_ship_seen_at_utc,
+                    refreshed_at_utc,
+                    expires_at_utc
+                FROM stats_cache
+                WHERE character_id = $characterId
+                LIMIT 1;
+                ";
+                command.Parameters.AddWithValue("$characterId", characterId);
+
+                using var reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    continue;
+                }
+
+                results[characterId] = ReadStatsCacheEntry(reader);
+            }
+
+            return results;
+        }
+
 
         public void Upsert(StatsCacheEntry entry)
         {
@@ -128,6 +192,22 @@ namespace PitmastersGrill.Persistence
             command.Parameters.AddWithValue("$expiresAtUtc", entry.ExpiresAtUtc ?? "");
 
             command.ExecuteNonQuery();
+        }
+
+        private static StatsCacheEntry ReadStatsCacheEntry(SqliteDataReader reader)
+        {
+            return new StatsCacheEntry
+            {
+                CharacterId = reader.GetString(0),
+                KillCount = reader.GetInt32(1),
+                LossCount = reader.GetInt32(2),
+                AvgAttackersWhenAttacking = reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                LastPublicCynoCapableHull = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                LastShipSeenName = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                LastShipSeenAtUtc = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                RefreshedAtUtc = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                ExpiresAtUtc = reader.IsDBNull(8) ? "" : reader.GetString(8)
+            };
         }
 
         private static void EnsureTableExists(SqliteConnection connection)

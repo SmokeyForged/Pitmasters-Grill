@@ -129,6 +129,8 @@ namespace PitmastersGrill
                 EffectiveKillmailDataPathText,
                 LogLevelComboBox);
 
+            InitializeBoardColumnVisibilityUi();
+
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
 
             _isApplyingSettings = false;
@@ -250,6 +252,130 @@ namespace PitmastersGrill
             }
 
             _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, LogLevelComboBox);
+        }
+
+        private void InitializeBoardColumnVisibilityUi()
+        {
+            ApplyBoardColumnSettingsToCheckBoxes();
+            ApplyBoardColumnVisibility();
+        }
+
+        private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            SaveBoardColumnSettingsFromCheckBoxes();
+            ApplyBoardColumnVisibility();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo(
+                $"Board column visibility changed. sig={IsEnabled(ShowSigColumnCheckBox)} alliance={IsEnabled(ShowAllianceColumnCheckBox)} corp={IsEnabled(ShowCorpColumnCheckBox)} kills={IsEnabled(ShowKillsColumnCheckBox)} losses={IsEnabled(ShowLossesColumnCheckBox)} avgFleet={IsEnabled(ShowAvgFleetSizeColumnCheckBox)} lastShip={IsEnabled(ShowLastShipSeenColumnCheckBox)} lastSeen={IsEnabled(ShowLastSeenColumnCheckBox)} cynoHull={IsEnabled(ShowCynoHullSeenColumnCheckBox)}");
+        }
+
+        private void ShowAllBoardColumnsButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetAllOptionalBoardColumnSettings(true);
+            ApplyBoardColumnSettingsToCheckBoxes();
+            ApplyBoardColumnVisibility();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo("Board column visibility reset to show all optional columns.");
+        }
+
+        private void ResetBoardColumnsButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetAllOptionalBoardColumnSettings(true);
+            ApplyBoardColumnSettingsToCheckBoxes();
+            ApplyBoardColumnVisibility();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo("Board column visibility reset to defaults.");
+        }
+
+        private void ApplyBoardColumnSettingsToCheckBoxes()
+        {
+            if (ShowSigColumnCheckBox == null)
+            {
+                return;
+            }
+
+            var wasApplyingSettings = _isApplyingSettings;
+            _isApplyingSettings = true;
+
+            try
+            {
+                ShowSigColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowSigColumn);
+                ShowAllianceColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowAllianceColumn);
+                ShowCorpColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowCorpColumn);
+                ShowKillsColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowKillsColumn);
+                ShowLossesColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLossesColumn);
+                ShowAvgFleetSizeColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowAvgFleetSizeColumn);
+                ShowLastShipSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLastShipSeenColumn);
+                ShowLastSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLastSeenColumn);
+                ShowCynoHullSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowCynoHullSeenColumn);
+            }
+            finally
+            {
+                _isApplyingSettings = wasApplyingSettings;
+            }
+        }
+
+        private void SaveBoardColumnSettingsFromCheckBoxes()
+        {
+            _appSettings.ShowSigColumn = IsEnabled(ShowSigColumnCheckBox);
+            _appSettings.ShowAllianceColumn = IsEnabled(ShowAllianceColumnCheckBox);
+            _appSettings.ShowCorpColumn = IsEnabled(ShowCorpColumnCheckBox);
+            _appSettings.ShowKillsColumn = IsEnabled(ShowKillsColumnCheckBox);
+            _appSettings.ShowLossesColumn = IsEnabled(ShowLossesColumnCheckBox);
+            _appSettings.ShowAvgFleetSizeColumn = IsEnabled(ShowAvgFleetSizeColumnCheckBox);
+            _appSettings.ShowLastShipSeenColumn = IsEnabled(ShowLastShipSeenColumnCheckBox);
+            _appSettings.ShowLastSeenColumn = IsEnabled(ShowLastSeenColumnCheckBox);
+            _appSettings.ShowCynoHullSeenColumn = IsEnabled(ShowCynoHullSeenColumnCheckBox);
+        }
+
+        private void ApplyBoardColumnVisibility()
+        {
+            SetColumnVisibility(SigColumn, _appSettings.ShowSigColumn);
+            CharacterColumn.Visibility = Visibility.Visible;
+            SetColumnVisibility(AllianceColumn, _appSettings.ShowAllianceColumn);
+            SetColumnVisibility(CorpColumn, _appSettings.ShowCorpColumn);
+            SetColumnVisibility(KillsColumn, _appSettings.ShowKillsColumn);
+            SetColumnVisibility(LossesColumn, _appSettings.ShowLossesColumn);
+            SetColumnVisibility(AvgFleetSizeColumn, _appSettings.ShowAvgFleetSizeColumn);
+            SetColumnVisibility(LastShipSeenColumn, _appSettings.ShowLastShipSeenColumn);
+            SetColumnVisibility(LastSeenColumn, _appSettings.ShowLastSeenColumn);
+            SetColumnVisibility(CynoHullSeenColumn, _appSettings.ShowCynoHullSeenColumn);
+        }
+
+        private void SetAllOptionalBoardColumnSettings(bool isVisible)
+        {
+            _appSettings.ShowSigColumn = isVisible;
+            _appSettings.ShowAllianceColumn = isVisible;
+            _appSettings.ShowCorpColumn = isVisible;
+            _appSettings.ShowKillsColumn = isVisible;
+            _appSettings.ShowLossesColumn = isVisible;
+            _appSettings.ShowAvgFleetSizeColumn = isVisible;
+            _appSettings.ShowLastShipSeenColumn = isVisible;
+            _appSettings.ShowLastSeenColumn = isVisible;
+            _appSettings.ShowCynoHullSeenColumn = isVisible;
+        }
+
+        private static void SetColumnVisibility(DataGridColumn column, bool? isVisible)
+        {
+            column.Visibility = IsEnabled(isVisible) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static bool IsEnabled(CheckBox checkBox)
+        {
+            return checkBox.IsChecked == true;
+        }
+
+        private static bool IsEnabled(bool? value)
+        {
+            return value != false;
         }
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -482,7 +608,8 @@ namespace PitmastersGrill
                     }).Task,
                     RefreshDetailPaneIfSelected,
                     UpdateLastRefreshed,
-                    (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message));
+                    (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message),
+                    rowToEvaluate => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(rowToEvaluate));
 
                 if (_ignoreAllianceBoardController.ShouldRemoveResolvedRow(row))
                 {
@@ -598,7 +725,7 @@ namespace PitmastersGrill
                 FullAllianceText,
                 FreshnessText);
 
-            if (PilotBoard.SelectedItem == row)
+            if (IsRowDisplayedInDetailPane(row))
             {
                 UpdateIgnoreAllianceButtonState(row);
             }
@@ -818,9 +945,11 @@ namespace PitmastersGrill
 
         private void IgnoreAllianceButton_Click(object sender, RoutedEventArgs e)
         {
-            if (PilotBoard.SelectedItem is not PilotBoardRow selectedRow)
+            var selectedRow = GetSelectedOrDisplayedDetailRow();
+
+            if (selectedRow == null)
             {
-                AppLogger.UiWarn("Ignore alliance requested with no selected row.");
+                AppLogger.UiWarn("Ignore alliance requested with no selected or displayed detail row.");
                 return;
             }
 
@@ -844,6 +973,50 @@ namespace PitmastersGrill
 
             _ignoreAllianceListView?.RefreshFromCoordinator();
             ApplyIgnoredAllianceRowsToCurrentBoard();
+        }
+
+        private PilotBoardRow? GetSelectedOrDisplayedDetailRow()
+        {
+            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
+            {
+                return selectedRow;
+            }
+
+            if (DetailPane.Visibility != Visibility.Visible)
+            {
+                return null;
+            }
+
+            var displayedCharacterName = SelectedCharacterText.Text;
+
+            if (string.IsNullOrWhiteSpace(displayedCharacterName))
+            {
+                return null;
+            }
+
+            return _currentRows.FirstOrDefault(row =>
+                string.Equals(
+                    row.CharacterName,
+                    displayedCharacterName.Trim(),
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool IsRowDisplayedInDetailPane(PilotBoardRow row)
+        {
+            if (row == null || DetailPane.Visibility != Visibility.Visible)
+            {
+                return false;
+            }
+
+            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow && ReferenceEquals(selectedRow, row))
+            {
+                return true;
+            }
+
+            return string.Equals(
+                SelectedCharacterText.Text,
+                row.CharacterName,
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private void UpdateIgnoreAllianceButtonState(PilotBoardRow? row)

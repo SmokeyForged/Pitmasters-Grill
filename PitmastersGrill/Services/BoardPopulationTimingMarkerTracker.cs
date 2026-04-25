@@ -11,6 +11,7 @@ namespace PitmastersGrill.Services
         private int _firstIdentityUiLoggedGeneration = -1;
         private int _firstAffiliationLoggedGeneration = -1;
         private int _firstStatsLoggedGeneration = -1;
+        private int _firstIgnoredAllianceSkipLoggedGeneration = -1;
 
         public void HandleMarker(BoardRowProcessMarkerKind markerKind, int generation, string message)
         {
@@ -30,6 +31,10 @@ namespace PitmastersGrill.Services
 
                 case BoardRowProcessMarkerKind.StatsUiUpdated:
                     TryWriteMarker(ref _firstStatsLoggedGeneration, generation, message);
+                    break;
+
+                case BoardRowProcessMarkerKind.IgnoredAllianceStatsSkipped:
+                    TryWriteMarker(ref _firstIgnoredAllianceSkipLoggedGeneration, generation, message);
                     break;
             }
         }

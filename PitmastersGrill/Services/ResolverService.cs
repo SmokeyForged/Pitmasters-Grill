@@ -4,7 +4,7 @@ using PitmastersGrill.Providers;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Reflection;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,6 +38,8 @@ namespace PitmastersGrill.Services
                 return results;
             }
 
+            var cleanedNames = new List<string>();
+
             foreach (var characterName in characterNames)
             {
                 if (string.IsNullOrWhiteSpace(characterName))
@@ -46,18 +48,36 @@ namespace PitmastersGrill.Services
                 }
 
                 var trimmedName = characterName.Trim();
-                var cached = TryGetCachedByCharacterName(trimmedName);
-                if (cached == null)
-                {
-                    continue;
-                }
 
-                if (!IsFresh(cached.ExpiresAtUtc))
+                if (!cleanedNames.Contains(trimmedName, StringComparer.OrdinalIgnoreCase))
                 {
-                    continue;
+                    cleanedNames.Add(trimmedName);
                 }
+            }
 
-                results[trimmedName] = cached;
+            if (cleanedNames.Count == 0)
+            {
+                return results;
+            }
+
+            try
+            {
+                var cachedEntries = _resolverCacheRepository.GetByCharacterNames(cleanedNames);
+
+                foreach (var pair in cachedEntries)
+                {
+                    if (pair.Value == null || !IsFresh(pair.Value.ExpiresAtUtc))
+                    {
+                        continue;
+                    }
+
+                    results[pair.Key] = pair.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugTraceWriter.WriteLine(
+                    $"resolver cache bulk lookup exception: requestedNames={cleanedNames.Count}, error={ex.Message}");
             }
 
             return results;
@@ -467,31 +487,19 @@ namespace PitmastersGrill.Services
 
         private ResolverCacheEntry? TryGetCachedByCharacterName(string characterName)
         {
+            if (string.IsNullOrWhiteSpace(characterName))
+            {
+                return null;
+            }
+
             try
             {
-                var repositoryType = _resolverCacheRepository.GetType();
+                var cachedEntries = _resolverCacheRepository.GetByCharacterNames(
+                    new List<string> { characterName.Trim() });
 
-                foreach (var methodName in new[]
-                         {
-                             "GetByCharacterName",
-                             "GetByName",
-                             "FindByCharacterName"
-                         })
+                if (cachedEntries.TryGetValue(characterName.Trim(), out var cached))
                 {
-                    var method = repositoryType.GetMethod(
-                        methodName,
-                        BindingFlags.Instance | BindingFlags.Public,
-                        binder: null,
-                        types: new[] { typeof(string) },
-                        modifiers: null);
-
-                    if (method == null)
-                    {
-                        continue;
-                    }
-
-                    var result = method.Invoke(_resolverCacheRepository, new object[] { characterName });
-                    return result as ResolverCacheEntry;
+                    return cached;
                 }
             }
             catch (Exception ex)
@@ -507,14 +515,7 @@ namespace PitmastersGrill.Services
         {
             try
             {
-                var method = _resolverCacheRepository.GetType().GetMethod(
-                    "Upsert",
-                    BindingFlags.Instance | BindingFlags.Public,
-                    binder: null,
-                    types: new[] { typeof(ResolverCacheEntry) },
-                    modifiers: null);
-
-                method?.Invoke(_resolverCacheRepository, new object[] { entry });
+                _resolverCacheRepository.Upsert(entry);
             }
             catch (Exception ex)
             {

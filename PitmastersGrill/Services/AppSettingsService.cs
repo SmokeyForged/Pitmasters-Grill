@@ -82,6 +82,16 @@ namespace PitmastersGrill.Services
 
             settings.PanelModeEnabled = settings.PanelModeEnabled;
 
+            settings.ShowSigColumn ??= true;
+            settings.ShowAllianceColumn ??= true;
+            settings.ShowCorpColumn ??= true;
+            settings.ShowKillsColumn ??= true;
+            settings.ShowLossesColumn ??= true;
+            settings.ShowAvgFleetSizeColumn ??= true;
+            settings.ShowLastShipSeenColumn ??= true;
+            settings.ShowLastSeenColumn ??= true;
+            settings.ShowCynoHullSeenColumn ??= true;
+
             return settings;
         }
     }

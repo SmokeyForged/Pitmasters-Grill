@@ -60,6 +60,7 @@ namespace PitmastersGrill.Services
 
             var localFleetAggregates = _fleetObservationReadService.GetAggregatesByCharacterIds(characterIds);
             var localCynoAggregates = _pilotShipObservationDayRepository.GetLatestCynoByCharacterIds(characterIds);
+            var cachedStatsByCharacterId = _statsCacheRepository.GetByCharacterIds(characterIds);
 
             foreach (var pair in identities)
             {
@@ -70,9 +71,9 @@ namespace PitmastersGrill.Services
                     continue;
                 }
 
-                var cached = _statsCacheRepository.GetByCharacterId(identity.CharacterId);
-
-                if (cached == null || !IsFresh(cached.ExpiresAtUtc))
+                if (!cachedStatsByCharacterId.TryGetValue(identity.CharacterId, out var cached) ||
+                    cached == null ||
+                    !IsFresh(cached.ExpiresAtUtc))
                 {
                     continue;
                 }

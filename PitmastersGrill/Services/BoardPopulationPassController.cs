@@ -48,7 +48,10 @@ namespace PitmastersGrill.Services
             using var semaphore = new SemaphoreSlim(MaxConcurrentRowProcessors);
 
             var tasks = rows
-                .Select(row => processSingleRowAsync(row, semaphore, generation))
+                .Select(row => Task.Run(async () =>
+                {
+                    await processSingleRowAsync(row, semaphore, generation);
+                }))
                 .ToList();
 
             await Task.WhenAll(tasks);

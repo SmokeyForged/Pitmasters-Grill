@@ -240,17 +240,21 @@ namespace PitmastersGrill.Services
                 _activeBoardNames = new List<string>(cleanedNames);
             }
 
-            var cacheStopwatch = Stopwatch.StartNew();
-            var cachedIdentities = _resolverService.GetCached(cleanedNames);
-            var cachedStats = _statsService.GetCachedForResolvedRows(cachedIdentities);
-            cacheStopwatch.Stop();
+            // Keep initial board construction lightweight so the UI can show the copied names immediately.
+            // Cache/database hydration is intentionally deferred into the row processor path, which now
+            // runs on background workers and updates the UI one row/stage at a time.
+            var cachedIdentities = new Dictionary<string, ResolverCacheEntry>(StringComparer.OrdinalIgnoreCase);
+            var cachedStats = new Dictionary<string, StatsCacheEntry>(StringComparer.OrdinalIgnoreCase);
 
             _diagnostics.CacheHydrateComplete(
                 isRetryPass,
                 cleanedNames.Count,
                 cachedIdentities.Count,
                 cachedStats.Count,
-                cacheStopwatch.ElapsedMilliseconds);
+                0);
+
+            DebugTraceWriter.WriteLine(
+                $"initial board cache hydrate deferred: retryPass={isRetryPass}, names={cleanedNames.Count}");
 
             buildInitialBoard(cleanedNames, cachedIdentities, cachedStats);
 
