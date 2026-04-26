@@ -50,11 +50,13 @@ namespace PitmastersGrill
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
         private readonly DispatcherTimer _clipboardDebounceTimer;
+        private readonly CancellationTokenSource _windowShutdownCts = new();
         private IgnoreAllianceListView? _ignoreAllianceListView;
 
 
         private readonly ObservableCollection<PilotBoardRow> _currentRows = new();
         private bool _isApplyingSettings;
+        private bool _isShuttingDown;
         private int _processingGeneration;
 
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
@@ -124,11 +126,14 @@ namespace PitmastersGrill
             }
 
             _appSettings = appSettingsService.Load();
+            _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
 
             _mainWindowAppearanceController.InitializeSettingsUi(
                 _appSettings,
                 DarkModeCheckBox,
                 AlwaysOnTopCheckBox,
+                PanelModeCheckBox,
+                PanelModeRestartNoticeText,
                 WindowOpacitySlider,
                 WindowOpacityValueText,
                 MaxKillmailAgeDaysTextBox,
@@ -157,7 +162,7 @@ namespace PitmastersGrill
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
 
             AppLogger.UiInfo(
-                $"MainWindow ready. darkMode={_appSettings.DarkModeEnabled} alwaysOnTop={_appSettings.AlwaysOnTopEnabled} opacityPercent={_mainWindowAppearanceController.CoerceOpacityPercent(_appSettings.WindowOpacityPercent):0} logLevel={_appSettings.LogLevel}");
+                $"MainWindow ready. darkMode={_appSettings.DarkModeEnabled} alwaysOnTop={_appSettings.AlwaysOnTopEnabled} panelMode={_appSettings.PanelModeEnabled} opacityPercent={_mainWindowAppearanceController.CoerceOpacityPercent(_appSettings.WindowOpacityPercent):0} logLevel={_appSettings.LogLevel}");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -178,13 +183,17 @@ namespace PitmastersGrill
         protected override void OnClosed(EventArgs e)
         {
             AppLogger.UiInfo("MainWindow closing requested.");
+            _isShuttingDown = true;
 
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
+            RequestOwnedBackgroundWorkStop("MainWindow closed");
+
             if (_ignoreAllianceListView != null)
             {
                 _ignoreAllianceListView.IgnoreListChanged -= IgnoreAllianceListView_IgnoreListChanged;
             }
+
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
             _clipboardDebounceTimer.Stop();
             _clipboardDebounceTimer.Tick -= ClipboardDebounceTimer_Tick;
@@ -193,9 +202,73 @@ namespace PitmastersGrill
             var hwnd = new WindowInteropHelper(this).Handle;
             RemoveClipboardFormatListener(hwnd);
 
-            AppLogger.UiInfo("MainWindow closed. Clipboard listener removed and retry state cancelled.");
+            AppLogger.UiInfo("MainWindow closed. Clipboard listener removed, retry state cancelled, and background work stop requested.");
 
             base.OnClosed(e);
+        }
+
+        private void ExitApplicationButton_Click(object sender, RoutedEventArgs e)
+        {
+            RequestApplicationShutdown("Exit button");
+        }
+
+        private void RequestApplicationShutdown(string reason)
+        {
+            if (_isShuttingDown)
+            {
+                return;
+            }
+
+            _isShuttingDown = true;
+            AppLogger.UiInfo($"Application exit requested from MainWindow. reason='{reason}'");
+
+            if (ExitApplicationButton != null)
+            {
+                ExitApplicationButton.IsEnabled = false;
+                ExitApplicationButton.Content = "Exiting...";
+            }
+
+            RequestOwnedBackgroundWorkStop(reason);
+            Close();
+        }
+
+        private void RequestOwnedBackgroundWorkStop(string reason)
+        {
+            try
+            {
+                _windowShutdownCts.Cancel();
+                _backgroundIntelUpdateService.Stop();
+                AppLogger.UiInfo($"PMG-owned background work stop requested. reason='{reason}'");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Failed while requesting PMG-owned background work stop.", ex);
+            }
+        }
+
+        private void WindowDragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_appSettings.PanelModeEnabled || e.ButtonState != MouseButtonState.Pressed)
+            {
+                return;
+            }
+
+            try
+            {
+                if (e.ClickCount == 2)
+                {
+                    WindowState = WindowState == WindowState.Maximized
+                        ? WindowState.Normal
+                        : WindowState.Maximized;
+                    return;
+                }
+
+                DragMove();
+            }
+            catch (InvalidOperationException ex)
+            {
+                AppLogger.UiWarn($"Panel mode drag ignored. reason={ex.Message}");
+            }
         }
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -226,6 +299,19 @@ namespace PitmastersGrill
                 this,
                 WindowOpacityValueText,
                 Resources);
+        }
+
+        private void PanelModeCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            _mainWindowAppearanceController.HandlePanelModeChanged(
+                _appSettings,
+                PanelModeCheckBox.IsChecked == true,
+                PanelModeRestartNoticeText);
         }
 
         private void WindowOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1218,9 +1304,13 @@ namespace PitmastersGrill
                 AppLogger.UiInfo(
                     $"Enable KillMail DB Pull requested. seedDays={seedDays} displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
 
-                await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, CancellationToken.None);
+                await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, _windowShutdownCts.Token);
 
                 AppLogger.UiInfo($"Enable KillMail DB Pull completed successfully. seedDays={seedDays}");
+            }
+            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
+            {
+                AppLogger.UiInfo("Enable KillMail DB Pull cancelled during shutdown.");
             }
             catch (Exception ex)
             {
@@ -1234,7 +1324,10 @@ namespace PitmastersGrill
             }
             finally
             {
-                EnableKillmailDbPullButton.IsEnabled = true;
+                if (!_isShuttingDown)
+                {
+                    EnableKillmailDbPullButton.IsEnabled = true;
+                }
             }
         }
 

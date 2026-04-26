@@ -14,6 +14,8 @@ namespace PitmastersGrill.Services
     public class MainWindowAppearanceController
     {
         private const int DwMWaUseImmersiveDarkMode = 20;
+        private const double MinimumOpacityPercent = 35;
+        private const double MaximumOpacityPercent = 100;
 
         private readonly AppSettingsService _appSettingsService;
 
@@ -31,6 +33,8 @@ namespace PitmastersGrill.Services
             AppSettings settings,
             CheckBox darkModeCheckBox,
             CheckBox alwaysOnTopCheckBox,
+            CheckBox panelModeCheckBox,
+            TextBlock panelModeRestartNoticeText,
             Slider windowOpacitySlider,
             TextBlock windowOpacityValueText,
             TextBox maxKillmailAgeDaysTextBox,
@@ -54,6 +58,13 @@ namespace PitmastersGrill.Services
             {
                 alwaysOnTopCheckBox.IsChecked = settings.AlwaysOnTopEnabled;
             }
+
+            if (panelModeCheckBox != null)
+            {
+                panelModeCheckBox.IsChecked = settings.PanelModeEnabled;
+            }
+
+            UpdatePanelModeRestartNotice(panelModeRestartNoticeText, settings);
 
             var opacityPercent = CoerceOpacityPercent(settings.WindowOpacityPercent);
 
@@ -128,7 +139,72 @@ namespace PitmastersGrill.Services
             AppLogger.UiInfo($"Always on top changed. enabled={settings.AlwaysOnTopEnabled}");
         }
 
-        public double HandleWindowOpacityChanged(
+        public void HandlePanelModeChanged(
+            AppSettings settings,
+            bool panelModeEnabled,
+            TextBlock panelModeRestartNoticeText)
+        {
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            settings.PanelModeEnabled = panelModeEnabled;
+            _appSettingsService.Save(settings);
+            UpdatePanelModeRestartNotice(panelModeRestartNoticeText, settings);
+
+            AppLogger.UiInfo($"Panel mode changed. enabled={settings.PanelModeEnabled} restartRequired=true");
+
+            MessageBox.Show(
+                settings.PanelModeEnabled
+                    ? "Panel Mode has been enabled. Restart PMG to apply the transparent overlay shell."
+                    : "Panel Mode has been disabled. Restart PMG to return to the standard Windows shell.",
+                "PMG Panel Mode",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        public void ApplyPanelModeShell(
+            Window window,
+            AppSettings settings,
+            ResourceDictionary resources)
+        {
+            if (window == null)
+            {
+                throw new ArgumentNullException(nameof(window));
+            }
+
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            if (resources == null)
+            {
+                throw new ArgumentNullException(nameof(resources));
+            }
+
+            if (settings.PanelModeEnabled)
+            {
+                window.WindowStyle = WindowStyle.None;
+                window.ResizeMode = ResizeMode.CanResizeWithGrip;
+                window.AllowsTransparency = true;
+                window.Background = Brushes.Transparent;
+
+                AppLogger.UiInfo("Panel mode shell applied. windowStyle=None allowsTransparency=true resizeMode=CanResizeWithGrip");
+                return;
+            }
+
+            window.WindowStyle = WindowStyle.SingleBorderWindow;
+            window.ResizeMode = ResizeMode.CanResize;
+            window.AllowsTransparency = false;
+            window.SetResourceReference(Window.BackgroundProperty, "WindowBackgroundBrush");
+
+            AppLogger.UiInfo("Standard window shell applied. windowStyle=SingleBorderWindow allowsTransparency=false resizeMode=CanResize");
+        }
+
+        public double HandleWindowOpacityChanged
+(
             AppSettings settings,
             double sliderValue,
             Window window,
@@ -249,14 +325,14 @@ namespace PitmastersGrill.Services
 
         public double CoerceOpacityPercent(double value)
         {
-            if (value < 35)
+            if (value < MinimumOpacityPercent)
             {
-                return 35;
+                return MinimumOpacityPercent;
             }
 
-            if (value > 100)
+            if (value > MaximumOpacityPercent)
             {
-                return 100;
+                return MaximumOpacityPercent;
             }
 
             return Math.Round(value, 0);
@@ -620,7 +696,20 @@ namespace PitmastersGrill.Services
             return KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath();
         }
 
+        private void UpdatePanelModeRestartNotice(TextBlock panelModeRestartNoticeText, AppSettings settings)
+        {
+            if (panelModeRestartNoticeText == null || settings == null)
+            {
+                return;
+            }
+
+            panelModeRestartNoticeText.Text = settings.PanelModeEnabled
+                ? "Panel Mode is enabled. Restart PMG to apply the transparent overlay shell."
+                : "Panel Mode is disabled. Enable it to use the transparent overlay shell after restart.";
+        }
+
         private void ApplySurfaceOpacity(ResourceDictionary resources, AppSettings settings)
+
         {
             if (resources == null)
             {
