@@ -83,18 +83,19 @@ namespace PitmastersGrill.Services
                 return false;
             }
 
-            var hasLetter = false;
+            var hasNameCharacter = false;
 
             foreach (var ch in line)
             {
                 if (char.IsLetter(ch))
                 {
-                    hasLetter = true;
+                    hasNameCharacter = true;
                     continue;
                 }
 
                 if (char.IsDigit(ch))
                 {
+                    hasNameCharacter = true;
                     continue;
                 }
 
@@ -106,7 +107,7 @@ namespace PitmastersGrill.Services
                 return false;
             }
 
-            return hasLetter;
+            return hasNameCharacter;
         }
 
         public static bool ContainsCodeOrMarkupSignal(string? rawLine)
