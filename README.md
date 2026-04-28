@@ -33,6 +33,18 @@ The emphasis is speed, clarity, and practical value.
 
 ---
 
+## Quick Links
+
+- [Download the latest release](https://github.com/SmokeyForged/Pitmasters-Grill/releases)
+- [First-Time Use Guide](FIRST-TIME-USE.md)
+- [Current Feature Snapshot](PMG-FEATURES.md)
+- [EVE Policy / ToS Compliance Position](EVE-TOS-COMPLIANCE.md)
+- [Patch Notes](Patch%20Notes)
+
+* * *
+
+---
+
 ## Screenshot Gallery
 
 > Replace the placeholder paths below with your real screenshots when you are ready.
@@ -68,90 +80,195 @@ The emphasis is speed, clarity, and practical value.
 
 ---
 
+
 ## Why PMG exists
 
-When local spikes, the first question is usually not *"how many tabs can I open?"* It is:
+When local spikes, the first question is usually not "how many tabs can I open?"
+
+It is:
 
 > Who are these people, and which ones matter right now?
 
 PMG exists to shorten the distance between that question and a useful answer.
 
+The tool is built for the moment where you have names in local, limited attention, and a need for quick context. PMG turns a copied pilot list into a readable board, enriches what it can from public/local cached intel, and lets the player decide what matters.
+
 This project is inspired in part by the older spirit of community-made EVE tools that were practical, shared, and built because somebody cared enough to make something useful for other players.
 
----
+* * *
 
 ## Design Goals
 
-PMG is being shaped around a few working rules:
+PMG is being shaped around a few working rules.
 
 ### Fast enough to matter
+
 If intel shows up after the fight, it is garnish.
 
+PMG is designed to get from a pilot list to useful context quickly. Rows should appear, resolve, and improve progressively instead of forcing the user to wait for every lookup before seeing anything useful.
+
 ### Clear over clever
-The UI should help you make a decision, not demand your attention for its own sake.
 
-### Tools should support judgment
-PMG should help players think faster, not stop thinking for them.
+The UI should help you make a decision, not demand attention for its own sake.
 
-### Keep it useful
-If a feature adds noise, friction, or delay, it probably does not belong.
+The board is meant to be scanned under pressure. Details are available when needed, but the main grid should remain readable and practical.
 
----
+### Support judgment, do not replace it
+
+PMG is not a threat oracle.
+
+It does not know pilot intent, fleet context, voice comms, bait plans, or what is about to land on grid. It presents signals and context so a human player can think faster.
+
+### Keep the trust boundary obvious
+
+PMG should remain a companion tool, not gameplay automation.
+
+The player supplies the input, reads the output, and makes the decisions.
+
+* * *
+
+## What PMG does today
+
+PMG is currently a Windows technical-preview EVE local-intel companion.
+
+Current capabilities include:
+
+- processing copied pilot lists into a readable intel board
+- resolving pilot, corporation, and alliance context
+- showing kill/loss and activity context from public/local cached data
+- showing average fleet-size context
+- surfacing cyno-related evidence and signal states
+- distinguishing confirmed cyno module evidence from hull inference
+- opening a standalone pilot details window for focused review
+- linking selected pilots out to zKill for deeper manual review
+- supporting typed ignores for pilots, corporations, and alliances
+- maintaining local cache data for better repeat performance
+- providing diagnostics packages for troubleshooting
+- using clipboard guardrails to reject obvious non-EVE content
+- supporting compact/panel-style usage for monitor-constrained setups
+- offering accessibility/color-blind signal support
+
+For a deeper breakdown, see:
+
+[Current Feature Snapshot](PMG-FEATURES.md)
+
+* * *
 
 ## Current UI / Workflow Notes
 
-Recent UI work has focused on keeping the app practical during live use:
+Recent UI work has focused on making PMG more practical during live use.
 
-- compact mode remains available for tighter layouts
-- clear-board access remains visible during compact mode
-- board status and last-refresh information remain visible in the persistent top strip
-- settings have been broken into cleaner tabs for general controls, version info, diagnostics, and intel configuration
+The main board remains the fast triage surface. It is where users can scan pilots, affiliations, activity, signal state, and relevant quick-read context.
 
-These changes are aimed at keeping the app readable under pressure instead of merely looking organized in a static screenshot.
+The standalone details window is the slower confirmation layer. It is where users can inspect a selected pilot more closely, review signal evidence, open zKill, or ignore a pilot/corporation/alliance.
 
----
+Current workflow intent:
 
-## Feature Direction
+1. Copy a local pilot list.
+2. Let PMG populate the board.
+3. Scan the board for pilots or groups that matter.
+4. Open details only when deeper review is useful.
+5. Ignore known noise so future boards stay cleaner.
+6. Jump to zKill when manual review is needed.
 
-The exact long-term release scope may still shift, but PMG is being developed around a few core needs:
+The app is meant to reduce context switching, not create a second cockpit.
 
-- fast pilot list processing
-- readable pilot-intel presentation
-- corporation and alliance context
-- recent activity context from public sources
-- direct links to deeper source intel when needed
-- local caching to reduce redundant lookups and improve responsiveness
+* * *
 
-The priority is not to do everything at once. The priority is to do the useful things well.
+## Cyno Signal and Evidence Notes
 
----
+PMG includes cyno-related signal handling based on public/local cached intel.
+
+Current cyno signal behavior can include:
+
+- confirmed cyno module evidence from public loss victim item data
+- inferred cyno capability from known cyno-capable hull history
+- possible or weaker signal states where evidence is less certain
+- unknown/no-signal handling where evidence is absent
+
+Confirmed module evidence is treated differently from hull inference.
+
+A cyno-capable hull is not proof that a cyno was fit. PMG tries to preserve that distinction so the signal is useful without overstating certainty.
+
+* * *
+
+## Ignore List
+
+PMG supports typed ignore entries for:
+
+- pilots
+- corporations
+- alliances
+
+This is useful for removing known-friendly, known-alt, blue, test, or otherwise irrelevant rows from the board.
+
+Ignore entries are ID-based. Display names may resolve for readability, but the ignore behavior is designed around the underlying IDs.
+
+The details window can also be used to ignore a selected pilot, corporation, or alliance.
+
+* * *
 
 ## Installation
 
-> Update this section with the exact release download and install steps you want people to follow.
+1. Go to the [GitHub Releases page](https://github.com/SmokeyForged/Pitmasters-Grill/releases).
+2. Download the latest PMG release ZIP.
+3. Extract the ZIP into its own folder.
+4. Open the extracted folder.
+5. Run `PitmastersGrill.exe`.
 
-Suggested structure:
+Do not run PMG directly from inside the ZIP. Extract it first so the application can keep its files together correctly.
 
-1. Download the latest pre-release from the GitHub Releases page.
-2. Extract the release zip to a folder of your choice.
-3. Launch the application.
-4. Review any included release notes or known limitations before first use.
+For a more detailed first-run walkthrough, see:
 
----
+[First-Time Use Guide](FIRST-TIME-USE.md)
+
+* * *
 
 ## Basic Use
 
 A simple operating pattern for PMG is:
 
-1. Get a local list.
-2. Feed it into PMG.
-3. Let the board populate.
-4. Scan the board for the pilots that matter.
-5. Open deeper intel only when you actually need it.
+1. Launch PMG.
+2. Let startup/update work complete.
+3. Copy a local pilot list.
+4. Let PMG populate and enrich the board.
+5. Scan the board for pilots, groups, or signals that matter.
+6. Open details when a specific pilot needs closer review.
+7. Use ignore actions to remove known noise.
+8. Open zKill only when deeper manual investigation is needed.
 
-The app is meant to reduce context switching, not increase it.
+PMG is meant to make local intel easier to read, not to make decisions for the player.
 
----
+* * *
+
+## Policy / Trust Boundaries
+
+PMG is designed as a human-in-the-loop companion tool.
+
+PMG is not intended to:
+
+- modify the EVE client
+- automate gameplay
+- issue in-game commands
+- control ships
+- activate modules
+- perform navigation
+- automate market actions
+- act as a bot
+- scrape restricted client cache data
+- inspect packets
+- reverse-engineer the EVE client
+- replace player decision-making
+
+PMG uses user-provided input and public/local cached context to help a human player understand local faster.
+
+PMG is not affiliated with, endorsed by, sponsored by, or operated by CCP.
+
+For the longer policy position, see:
+
+[EVE Policy / ToS Compliance Position](EVE-TOS-COMPLIANCE.md)
+
+* * *
 
 ## Limitations / Expectations
 
@@ -159,22 +276,60 @@ PMG is still in technical preview.
 
 That means:
 
-- behavior may continue to improve between releases
-- some UX details may continue to shift
+- behavior may continue to change between releases
+- the UI may continue to evolve
+- public data may be incomplete, stale, delayed, or unavailable
+- inferred signals should not be treated as certainty
+- confirmed module evidence depends on available public loss data
+- PMG has no live fit visibility
+- PMG does not know pilot intent
+- diagnostics should be reviewed before public sharing
 - feedback from active use is still shaping the product
-- this is a practical tool in development, not a finished polished platform release yet
 
-That is normal for where the project currently is.
+This is normal for the current project stage.
 
----
+PMG should not be treated as:
 
-## Version Info
+- a finished General Release product
+- a perfect threat detector
+- a replacement for player judgment
+- an official CCP-approved tool
+- a guarantee that a pilot is dangerous or safe
+- a guarantee that public data is complete
 
-For release downloads, patch notes, and source updates, visit the GitHub repository:
+The goal right now is practical technical-preview usefulness with honest expectations.
 
-**https://github.com/SmokeyForged/Pitmasters-Grill**
+* * *
 
----
+## Feedback
+
+During tech preview, the most useful thing you can provide is honest feedback from real use.
+
+Good feedback usually includes:
+
+- PMG version
+- what you were doing
+- what you expected to happen
+- what actually happened
+- whether the issue was cosmetic, workflow-related, or disruptive
+- screenshots if useful
+- a reviewed diagnostics package if appropriate
+
+Useful feedback areas include:
+
+- board readability
+- install/setup friction
+- local-list parsing behavior
+- false positives or false negatives in clipboard guardrails
+- signal readability
+- details-window usefulness
+- ignore-list behavior
+- information that feels useful versus noisy
+- anything that feels questionable from an EVE policy/trust perspective
+
+Issues can be opened on the GitHub repo when something needs tracking.
+
+* * *
 
 ## Why PMG is free
 
@@ -186,32 +341,23 @@ If PMG ends up being useful to you and you want to give something back, the pref
 
 That is more in the spirit of the project.
 
----
-
-## Feedback
-
-During tech preview, the most useful thing you can provide is honest feedback.
-
-Good feedback usually includes:
-
-- what you were doing
-- what you expected to happen
-- what actually happened
-- whether the issue was cosmetic, workflow-related, or operationally disruptive
-
-As the project matures, this repo can expand with more formal issue templates and contribution guidance.
-
----
+* * *
 
 ## Road Ahead
 
-As PMG continues to mature, this repository can grow to include:
+PMG is moving toward a stronger General Release candidate, but it is not there yet.
 
-- refreshed screenshots
-- polished installation instructions
-- release downloads and patch notes
-- known limitations
-- configuration guidance
-- contribution guidance
+Near-term priorities are likely to remain focused on:
 
-For now, the goal is still the same: keep the grill hot and make the tool more useful with each pass.
+- better reliability
+- cleaner setup
+- better diagnostics
+- clearer documentation
+- stronger public trust posture
+- cleaner release packaging
+- signal-quality improvements
+- continued UI readability improvements
+
+The goal is not to do everything at once.
+
+The goal is to keep the grill hot and make each release more useful than the last.
