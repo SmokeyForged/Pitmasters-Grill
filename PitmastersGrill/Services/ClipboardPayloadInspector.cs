@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Linq;
 
 namespace PitmastersGrill.Services
 {
     public sealed class ClipboardPayloadInspector
     {
-        public const int MaximumClipboardCharacters = 80000;
-        public const int MaximumNonEmptyLines = 1500;
+        public const int MaximumClipboardCharacters = 200000;
+        public const int MaximumNonEmptyLines = 3000;
         public const int MaximumSingleLineCharacters = 160;
         private const double MinimumPlausibleNameRatio = 0.70;
 
@@ -142,6 +142,9 @@ namespace PitmastersGrill.Services
                                       shellOperatorCount +
                                       codeOrMarkupCount +
                                       longLineCount;
+            var plausibleRatio = plausibleNameCount / (double)nonEmptyLines.Count;
+            var strongLocalListSignal = nonEmptyLines.Count >= 20 &&
+                                        plausibleNameCount >= Math.Max(10, (int)Math.Ceiling(nonEmptyLines.Count * 0.85));
 
             if (promptLikeCount > 0)
             {
@@ -153,7 +156,7 @@ namespace PitmastersGrill.Services
                     suspiciousLineCount);
             }
 
-            if (codeOrMarkupCount > 0)
+            if (codeOrMarkupCount > 0 && !strongLocalListSignal)
             {
                 return ClipboardPayloadInspectionResult.Reject(
                     "Clipboard looked like code, markup, or stack-trace content.",
@@ -173,7 +176,7 @@ namespace PitmastersGrill.Services
                     suspiciousLineCount);
             }
 
-            if (longLineCount > 0)
+            if (longLineCount > 0 && !strongLocalListSignal)
             {
                 return ClipboardPayloadInspectionResult.Reject(
                     "Clipboard contained lines too long to treat as pilot names.",
@@ -183,7 +186,7 @@ namespace PitmastersGrill.Services
                     suspiciousLineCount);
             }
 
-            if (suspiciousLineCount >= Math.Max(1, nonEmptyLines.Count / 3))
+            if (suspiciousLineCount >= Math.Max(1, nonEmptyLines.Count / 3) && !strongLocalListSignal)
             {
                 return ClipboardPayloadInspectionResult.Reject(
                     "Clipboard contained too many non-local command, code, or path signals.",
@@ -212,8 +215,6 @@ namespace PitmastersGrill.Services
                     plausibleNameCount,
                     suspiciousLineCount);
             }
-
-            var plausibleRatio = plausibleNameCount / (double)nonEmptyLines.Count;
 
             if (plausibleRatio < MinimumPlausibleNameRatio)
             {

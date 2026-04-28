@@ -64,6 +64,7 @@ namespace PitmastersGrill.Services
             Action<string, BoardPopulationStatusKind> updateClipboardStatus,
             Func<List<string>, bool, Task> processNamesAsync)
         {
+            var clipboardStopwatch = Stopwatch.StartNew();
             if (_isClipboardProcessing)
             {
                 return;
@@ -139,7 +140,13 @@ namespace PitmastersGrill.Services
                 }
 
                 var comparisonText = _boardPopulationRetryController.GetClipboardComparisonText(_lastProcessedClipboardText);
+                var classifyStopwatch = Stopwatch.StartNew();
                 var result = _clipboardIngestService.Process(rawClipboardText, comparisonText);
+                classifyStopwatch.Stop();
+                DiagnosticTelemetry.RecordTiming("clipboard classification", classifyStopwatch.ElapsedMilliseconds, $"chars={result.CharacterCount} lines={result.NonEmptyLineCount}");
+                DiagnosticTelemetry.RecordTiming("local-list parse", classifyStopwatch.ElapsedMilliseconds, $"parsedNames={result.ParsedNames.Count} plausibleNames={result.PlausibleNameCount}");
+                DiagnosticTelemetry.RecordClipboardSummary(
+                    $"shouldProcess={result.ShouldProcess}; reason={result.IgnoreReason}; parsedNames={result.ParsedNames.Count}; chars={result.CharacterCount}; nonEmptyLines={result.NonEmptyLineCount}; plausibleNames={result.PlausibleNameCount}; suspiciousLines={result.SuspiciousLineCount}");
 
                 if (!result.ShouldProcess)
                 {
@@ -190,6 +197,8 @@ namespace PitmastersGrill.Services
             {
                 setBoardButtonsEnabled(true);
                 _isClipboardProcessing = false;
+                clipboardStopwatch.Stop();
+                DiagnosticTelemetry.RecordTiming("clipboard-to-board total", clipboardStopwatch.ElapsedMilliseconds, "clipboard handler");
                 _diagnostics.ClipboardProcessEnd();
             }
         }
@@ -271,12 +280,16 @@ namespace PitmastersGrill.Services
 
             saveCurrentNotesAndTags();
 
-            _diagnostics.BoardProcessRequested(isRetryPass, characterNames?.Count ?? 0);
+            var sourceNames = characterNames ?? new List<string>();
+            _diagnostics.BoardProcessRequested(isRetryPass, sourceNames.Count);
 
-            var cleanedNames = characterNames
+            var normalizationStopwatch = Stopwatch.StartNew();
+            var cleanedNames = sourceNames
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            normalizationStopwatch.Stop();
+            DiagnosticTelemetry.RecordTiming("pilot normalization/deduplication", normalizationStopwatch.ElapsedMilliseconds, $"incoming={sourceNames.Count} unique={cleanedNames.Count}");
 
             if (cleanedNames.Count == 0)
             {
@@ -306,7 +319,10 @@ namespace PitmastersGrill.Services
             DebugTraceWriter.WriteLine(
                 $"initial board cache hydrate deferred: retryPass={isRetryPass}, names={cleanedNames.Count}");
 
+            var initialBoardStopwatch = Stopwatch.StartNew();
             buildInitialBoard(cleanedNames, cachedIdentities, cachedStats);
+            initialBoardStopwatch.Stop();
+            DiagnosticTelemetry.RecordTiming("UI board population/render", initialBoardStopwatch.ElapsedMilliseconds, $"initial rows={cleanedNames.Count}");
 
             var generation = beginProcessingGeneration();
             var boardStopwatch = Stopwatch.StartNew();

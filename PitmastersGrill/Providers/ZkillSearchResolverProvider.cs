@@ -105,6 +105,7 @@ namespace PitmastersGrill.Providers
                         AllianceId = "",
                         AllianceName = "",
                         AllianceTicker = "",
+                        CorpId = "",
                         CorpName = "",
                         CorpTicker = "",
                         ResolverConfidence = "search",

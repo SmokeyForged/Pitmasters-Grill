@@ -1,4 +1,4 @@
-﻿using PitmastersGrill.Models;
+using PitmastersGrill.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +22,6 @@ namespace PitmastersGrill.Services
 
     public sealed class IgnoreAllianceBoardController
     {
-        public bool HasIgnoredAllianceIds => _ignoreAllianceCoordinator.HasIgnoredAllianceIds;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
 
         public IgnoreAllianceBoardController(IgnoreAllianceCoordinator ignoreAllianceCoordinator)
@@ -30,6 +29,9 @@ namespace PitmastersGrill.Services
             _ignoreAllianceCoordinator = ignoreAllianceCoordinator
                 ?? throw new ArgumentNullException(nameof(ignoreAllianceCoordinator));
         }
+
+        public bool HasIgnoredAllianceIds => _ignoreAllianceCoordinator.HasIgnoredAllianceIds;
+        public bool HasIgnoredEntries => _ignoreAllianceCoordinator.HasIgnoredEntries;
 
         public IgnoreAllianceBoardApplyResult ApplyToCurrentRows(
             IEnumerable<PilotBoardRow> currentRows,
@@ -40,60 +42,80 @@ namespace PitmastersGrill.Services
                 throw new ArgumentNullException(nameof(currentRows));
             }
 
-            if (!_ignoreAllianceCoordinator.HasIgnoredAllianceIds)
+            if (!_ignoreAllianceCoordinator.HasIgnoredEntries)
             {
                 return new IgnoreAllianceBoardApplyResult(Array.Empty<PilotBoardRow>(), false);
             }
 
-            var filterResult = _ignoreAllianceCoordinator.ApplyToRows(
-                currentRows,
-                row => TryGetAllianceId(row?.AllianceId));
-
-            var removedRows = filterResult.RemovedItems.ToList();
+            var removedRows = currentRows
+                .Where(ShouldIgnore)
+                .ToList();
             var selectedRowRemoved = selectedRow != null && removedRows.Contains(selectedRow);
+
+            foreach (var row in removedRows.Take(25))
+            {
+                var match = GetIgnoreMatch(row);
+                if (match == null)
+                {
+                    continue;
+                }
+
+                DiagnosticTelemetry.RecordIgnoreSuppression(
+                    $"pilot='{row.CharacterName}' pilotId='{row.CharacterId}' corp='{row.CorpName}' corpId='{row.CorpId}' alliance='{row.AllianceName}' allianceId='{row.AllianceId}' matchedType={match.Type} matchedId={match.Id}");
+            }
 
             return new IgnoreAllianceBoardApplyResult(removedRows, selectedRowRemoved);
         }
 
-
         public bool ShouldRemoveResolvedRow(PilotBoardRow row)
         {
-            if (row == null || !_ignoreAllianceCoordinator.HasIgnoredAllianceIds)
+            if (row == null || !_ignoreAllianceCoordinator.HasIgnoredEntries)
             {
                 return false;
             }
 
-            return ShouldIgnore(row);
+            var match = GetIgnoreMatch(row);
+            if (match == null)
+            {
+                return false;
+            }
+
+            DiagnosticTelemetry.RecordIgnoreSuppression(
+                $"pilot='{row.CharacterName}' pilotId='{row.CharacterId}' corp='{row.CorpName}' corpId='{row.CorpId}' alliance='{row.AllianceName}' allianceId='{row.AllianceId}' matchedType={match.Type} matchedId={match.Id}");
+            return true;
         }
 
         public bool ShouldIgnore(PilotBoardRow row)
         {
-            if (row == null)
-            {
-                return false;
-            }
-
-            return _ignoreAllianceCoordinator.ShouldIgnoreAlliance(TryGetAllianceId(row.AllianceId));
+            return GetIgnoreMatch(row) != null;
         }
 
-        private static long? TryGetAllianceId(string allianceIdText)
+        public TypedIgnoreMatch? GetIgnoreMatch(PilotBoardRow row)
         {
-            if (string.IsNullOrWhiteSpace(allianceIdText))
+            if (row == null)
             {
                 return null;
             }
 
-            if (!long.TryParse(allianceIdText.Trim(), out var allianceId))
+            return _ignoreAllianceCoordinator.GetIgnoreMatch(
+                TryGetId(row.CharacterId),
+                TryGetId(row.CorpId),
+                TryGetId(row.AllianceId));
+        }
+
+        private static long? TryGetId(string idText)
+        {
+            if (string.IsNullOrWhiteSpace(idText))
             {
                 return null;
             }
 
-            if (allianceId <= 0)
+            if (!long.TryParse(idText.Trim(), out var id) || id <= 0)
             {
                 return null;
             }
 
-            return allianceId;
+            return id;
         }
     }
 }

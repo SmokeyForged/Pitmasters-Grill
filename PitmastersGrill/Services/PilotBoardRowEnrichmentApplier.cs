@@ -102,6 +102,7 @@ namespace PitmastersGrill.Services
         {
             return !string.Equals(before.CharacterId, after.CharacterId, StringComparison.Ordinal)
                 || !string.Equals(before.AllianceId, after.AllianceId, StringComparison.Ordinal)
+                || !string.Equals(before.CorpId, after.CorpId, StringComparison.Ordinal)
                 || !string.Equals(before.CorpName, after.CorpName, StringComparison.Ordinal)
                 || !string.Equals(before.CorpTicker, after.CorpTicker, StringComparison.Ordinal)
                 || !string.Equals(before.AllianceName, after.AllianceName, StringComparison.Ordinal)
@@ -116,6 +117,7 @@ namespace PitmastersGrill.Services
             row.AllianceId = identity.AllianceId;
             row.AllianceName = identity.AllianceName;
             row.AllianceTicker = identity.AllianceTicker;
+            row.CorpId = identity.CorpId;
             row.CorpName = identity.CorpName;
             row.CorpTicker = identity.CorpTicker;
             row.IsResolved = !string.IsNullOrWhiteSpace(identity.CharacterId);

@@ -6,15 +6,27 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>0.9.3</Version>
-    <AssemblyVersion>0.9.3.0</AssemblyVersion>
-    <FileVersion>0.9.3.0</FileVersion>
-    <InformationalVersion>0.9.3</InformationalVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\PMGIcon.ico</ApplicationIcon>
+    <Version>0.9.4</Version>
+    <AssemblyVersion>0.9.4.0</AssemblyVersion>
+    <FileVersion>0.9.4.0</FileVersion>
+    <InformationalVersion>0.9.4</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
     <PackageReference Include="SharpCompress" Version="0.47.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\PMGIcon.ico" />
+    <Resource Include="Assets\PMGIcon.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
   </ItemGroup>
 
 </Project>

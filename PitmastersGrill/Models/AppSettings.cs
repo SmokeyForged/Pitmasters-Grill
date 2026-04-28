@@ -4,6 +4,10 @@
     {
         public bool DarkModeEnabled { get; set; } = true;
 
+        public string VisualTheme { get; set; } = "CharcoalOps";
+
+        public string ColorBlindMode { get; set; } = "Standard";
+
         public bool AlwaysOnTopEnabled { get; set; } = false;
 
         public double WindowOpacityPercent { get; set; } = 100;

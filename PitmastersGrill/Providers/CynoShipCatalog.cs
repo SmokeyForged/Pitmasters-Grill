@@ -18,6 +18,7 @@ namespace PitmastersGrill.Providers
             { 22436, "Widow" },
             { 22440, "Panther" },
             { 44996, "Marshal" },
+            { 44995, "Enforcer" },
             { 85236, "Python" },
 
             // Heavy Interdiction Cruisers

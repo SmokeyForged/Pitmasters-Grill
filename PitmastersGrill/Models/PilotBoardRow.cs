@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -11,6 +11,7 @@ namespace PitmastersGrill.Models
         private string _allianceId = "";
         private string _allianceName = "";
         private string _allianceTicker = "";
+        private string _corpId = "";
         private string _corpName = "";
         private string _corpTicker = "";
         private int? _killCount;
@@ -20,8 +21,13 @@ namespace PitmastersGrill.Models
         private string _lastShipSeenName = "";
         private string _lastShipSeenAtUtc = "";
         private string _lastShipSeenDateDisplay = "";
+        private bool _hasConfirmedCynoModuleEvidence;
+        private string _confirmedCynoSignalTypesDisplay = "";
         private bool _knownCynoOverride;
         private bool _baitOverride;
+        private string _boardSignalKind = "None";
+        private string _boardSignalIcon = "";
+        private string _boardSignalToolTip = "No cyno signal";
         private bool _isResolved;
         private string _resolverConfidence = "";
         private string _resolvedAtUtc = "";
@@ -66,6 +72,12 @@ namespace PitmastersGrill.Models
         {
             get => _allianceTicker;
             set => SetField(ref _allianceTicker, value);
+        }
+
+        public string CorpId
+        {
+            get => _corpId;
+            set => SetField(ref _corpId, value);
         }
 
         public string CorpName
@@ -122,6 +134,18 @@ namespace PitmastersGrill.Models
             set => SetField(ref _lastShipSeenDateDisplay, value);
         }
 
+        public bool HasConfirmedCynoModuleEvidence
+        {
+            get => _hasConfirmedCynoModuleEvidence;
+            set => SetField(ref _hasConfirmedCynoModuleEvidence, value);
+        }
+
+        public string ConfirmedCynoSignalTypesDisplay
+        {
+            get => _confirmedCynoSignalTypesDisplay;
+            set => SetField(ref _confirmedCynoSignalTypesDisplay, value);
+        }
+
         public bool KnownCynoOverride
         {
             get => _knownCynoOverride;
@@ -132,6 +156,24 @@ namespace PitmastersGrill.Models
         {
             get => _baitOverride;
             set => SetField(ref _baitOverride, value);
+        }
+
+        public string BoardSignalKind
+        {
+            get => _boardSignalKind;
+            set => SetField(ref _boardSignalKind, value);
+        }
+
+        public string BoardSignalIcon
+        {
+            get => _boardSignalIcon;
+            set => SetField(ref _boardSignalIcon, value);
+        }
+
+        public string BoardSignalToolTip
+        {
+            get => _boardSignalToolTip;
+            set => SetField(ref _boardSignalToolTip, value);
         }
 
         public bool IsResolved

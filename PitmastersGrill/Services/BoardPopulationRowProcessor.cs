@@ -51,7 +51,10 @@ namespace PitmastersGrill.Services
                 $"row process start: generation={generation}, name='{row.CharacterName}'");
 
             var existingIdentity = BuildExistingIdentity(row);
+            var resolverStopwatch = Stopwatch.StartNew();
             var identityOutcome = await _resolverService.ResolveCharacterAsync(row.CharacterName, existingIdentity);
+            resolverStopwatch.Stop();
+            DiagnosticTelemetry.RecordTiming("resolver total", resolverStopwatch.ElapsedMilliseconds, row.CharacterName);
 
             if (!IsCurrentGeneration(generation, getCurrentGeneration))
             {
@@ -188,8 +191,10 @@ namespace PitmastersGrill.Services
             {
                 CharacterName = row.CharacterName,
                 CharacterId = row.CharacterId,
+                AllianceId = row.AllianceId,
                 AllianceName = row.AllianceName,
                 AllianceTicker = row.AllianceTicker,
+                CorpId = row.CorpId,
                 CorpName = row.CorpName,
                 CorpTicker = row.CorpTicker,
                 ResolverConfidence = row.ResolverConfidence,

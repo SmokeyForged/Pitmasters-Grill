@@ -9,6 +9,7 @@
         public string AllianceName { get; set; } = "";
         public string AllianceTicker { get; set; } = "";
 
+        public string CorpId { get; set; } = "";
         public string CorpName { get; set; } = "";
         public string CorpTicker { get; set; } = "";
 

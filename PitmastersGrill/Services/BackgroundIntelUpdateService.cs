@@ -274,6 +274,7 @@ namespace PitmastersGrill.Services
             ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_registry_day;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_fleet_observations_day;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_ship_observations_day;");
+            ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_cyno_module_observations_day;");
             transaction.Commit();
 
             cancellationToken.ThrowIfCancellationRequested();

@@ -2,13 +2,15 @@
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using PitmastersGrill.Services;
 
 namespace PitmastersGrill.Persistence
 {
     public static class DiagnosticBundleService
     {
-        private const string VersionLabel = "Technical Preview-v0.9.3";
+        private const string VersionLabel = "Technical Preview-v0.9.4";
         private const int MaximumBundlesToRetain = 20;
 
         public static string GetDiagnosticsDirectory()
@@ -24,12 +26,20 @@ namespace PitmastersGrill.Persistence
                 var safeReason = SanitizeFilePart(reason);
                 var bundlePath = Path.Combine(
                     root,
-                    $"pmg-diagnostics-{DateTime.Now:yyyyMMdd-HHmmssfff}-{safeReason}.zip");
+                    $"PMG-diagnostics-{DateTime.Now:yyyyMMdd-HHmmssfff}-{safeReason}.zip");
 
                 using var archive = ZipFile.Open(bundlePath, ZipArchiveMode.Create);
 
                 AddManifest(archive, reason, exception);
                 AddBundleNotes(archive);
+                AddSettingsSummary(archive);
+                AddProviderHealthSummary(archive);
+                AddPerformanceSummary(archive);
+                AddCacheSummary(archive);
+                AddClipboardSummary(archive);
+                AddResolverFailureSummary(archive);
+                AddCynoSignalSummary(archive);
+                AddIgnoreSummary(archive);
                 AddDirectoryFiles(archive, LogPaths.GetActiveDirectory(), "logs/active");
                 AddDirectoryFiles(archive, AppPaths.GetDebugDirectory(), "debug");
 
@@ -65,6 +75,10 @@ namespace PitmastersGrill.Persistence
             writer.WriteLine($"createdLocal={DateTime.Now:O}");
             writer.WriteLine($"createdUtc={DateTime.UtcNow:O}");
             writer.WriteLine($"version={VersionLabel}");
+            writer.WriteLine($"assemblyVersion={Assembly.GetExecutingAssembly().GetName().Version}");
+            writer.WriteLine($"framework={System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+            writer.WriteLine($"osDescription={System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
+            writer.WriteLine($"processArchitecture={System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
             writer.WriteLine($"reason={Sanitize(reason)}");
             writer.WriteLine($"osVersion={Environment.OSVersion}");
             writer.WriteLine($"is64BitProcess={Environment.Is64BitProcess}");
@@ -85,6 +99,138 @@ namespace PitmastersGrill.Persistence
             writer.WriteLine($"message={Sanitize(RedactSensitiveDiagnosticsText(exception.Message))}");
             writer.WriteLine("stackTrace=");
             writer.WriteLine(RedactSensitiveDiagnosticsText(exception.ToString()));
+        }
+
+        private static void AddSettingsSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "settings-summary.txt", writer =>
+            {
+                writer.WriteLine("PMG settings summary");
+                var settings = new AppSettingsService().Load();
+                writer.WriteLine($"settingsPath={RedactSensitiveDiagnosticsText(AppPaths.GetSettingsPath())}");
+                writer.WriteLine($"visualTheme={settings.VisualTheme}");
+                writer.WriteLine($"colorBlindMode={settings.ColorBlindMode}");
+                writer.WriteLine($"darkMode={settings.DarkModeEnabled}");
+                writer.WriteLine($"logLevel={AppLogger.CurrentLogLevel}");
+                writer.WriteLine($"killmailDataPath={RedactSensitiveDiagnosticsText(KillmailPaths.GetKillmailDataDirectoryDisplayPath())}");
+                writer.WriteLine($"killmailDataPathSource={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
+                writer.WriteLine("Secrets/tokens/credentials are not collected.");
+            });
+        }
+
+        private static void AddProviderHealthSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "provider-health.txt", writer =>
+            {
+                writer.WriteLine("Provider health summary");
+                foreach (var provider in DiagnosticTelemetry.GetProviderHealthSnapshots())
+                {
+                    writer.WriteLine($"{provider.ProviderName}: status={provider.Status}; lastSuccessUtc={provider.LastSuccessUtc:O}; lastFailureUtc={provider.LastFailureUtc:O}; failures={provider.RecentFailureCount}; avgLatencyMs={provider.AverageLatencyMs:F0}; backoffActive={provider.IsBackoffActive}; backoffUntilUtc={provider.BackoffUntilUtc:O}; cacheHits={provider.CacheHitCount}; cacheMisses={provider.CacheMissCount}; lastError={provider.LastErrorSummary}");
+                }
+            });
+        }
+
+        private static void AddPerformanceSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "performance-timings.txt", writer =>
+            {
+                writer.WriteLine("Recent performance timings");
+                foreach (var timing in DiagnosticTelemetry.GetRecentTimings())
+                {
+                    writer.WriteLine($"{timing.TimestampUtc:O}; stage={timing.Stage}; elapsedMs={timing.ElapsedMs}; detail={timing.Detail}");
+                }
+            });
+        }
+
+        private static void AddCacheSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "cache-summary.txt", writer =>
+            {
+                try
+                {
+                    writer.Write(CacheMaintenanceService.FormatStats(new CacheMaintenanceService().GetStats()));
+                }
+                catch (Exception ex)
+                {
+                    writer.WriteLine($"cacheSummaryError={Sanitize(ex.Message)}");
+                }
+            });
+        }
+
+        private static void AddClipboardSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "clipboard-parse-summary.txt", writer =>
+            {
+                writer.WriteLine(DiagnosticTelemetry.GetClipboardSummary());
+                writer.WriteLine("Raw clipboard contents are not included.");
+            });
+        }
+
+        private static void AddResolverFailureSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "recent-resolver-failures.txt", writer =>
+            {
+                var failures = DiagnosticTelemetry.GetProviderHealthSnapshots()
+                    .Where(x => x.LastFailureUtc.HasValue || x.RecentFailureCount > 0)
+                    .ToList();
+                if (failures.Count == 0)
+                {
+                    writer.WriteLine("No provider failures recorded in this app session.");
+                    return;
+                }
+
+                foreach (var failure in failures)
+                {
+                    writer.WriteLine($"{failure.ProviderName}: failures={failure.RecentFailureCount}; lastFailureUtc={failure.LastFailureUtc:O}; lastError={failure.LastErrorSummary}");
+                }
+            });
+        }
+
+        private static void AddCynoSignalSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "cyno-signal-summary.txt", writer =>
+            {
+                var summaries = DiagnosticTelemetry.GetRecentCynoSignalSummaries();
+                if (summaries.Count == 0)
+                {
+                    writer.WriteLine("No Cyno Signal detail-panel analyses recorded in this app session.");
+                    return;
+                }
+
+                foreach (var summary in summaries)
+                {
+                    writer.WriteLine(summary);
+                }
+            });
+        }
+
+        private static void AddIgnoreSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "typed-ignore-list.txt", writer =>
+            {
+                var state = new IgnoreAllianceListService().LoadState();
+                writer.WriteLine("Typed ignore list entries");
+                foreach (var entry in state.Entries.OrderBy(x => x.Type).ThenBy(x => x.Id))
+                {
+                    writer.WriteLine($"type={entry.Type}; id={entry.Id}; name={Sanitize(entry.DisplayName)}; source={Sanitize(entry.Source)}; updatedAtUtc={entry.UpdatedAtUtc}");
+                }
+
+                writer.WriteLine();
+                writer.WriteLine($"ignoreSuppressionCount={DiagnosticTelemetry.GetIgnoreSuppressionCount()}");
+                writer.WriteLine("recent suppression samples");
+                foreach (var sample in DiagnosticTelemetry.GetRecentIgnoreSuppressionSamples())
+                {
+                    writer.WriteLine(sample);
+                }
+            });
+        }
+
+        private static void AddTextEntry(ZipArchive archive, string path, Action<StreamWriter> write)
+        {
+            var entry = archive.CreateEntry(path, CompressionLevel.Fastest);
+            using var stream = entry.Open();
+            using var writer = new StreamWriter(stream, Encoding.UTF8);
+            write(writer);
         }
 
         private static void AddBundleNotes(ZipArchive archive)
@@ -169,7 +315,7 @@ namespace PitmastersGrill.Persistence
                 }
 
                 var bundles = Directory
-                    .GetFiles(diagnosticsDirectory, "pmg-diagnostics-*.zip", SearchOption.TopDirectoryOnly)
+                    .GetFiles(diagnosticsDirectory, "*diagnostics-*.zip", SearchOption.TopDirectoryOnly)
                     .Select(path => new FileInfo(path))
                     .OrderByDescending(info => info.CreationTimeUtc)
                     .ToList();

@@ -42,6 +42,8 @@ namespace PitmastersGrill.Services
             TextBox killmailDataRootPathTextBox,
             TextBlock killmailDataPathModeText,
             TextBlock effectiveKillmailDataPathText,
+            ComboBox visualThemeComboBox,
+            ComboBox colorBlindModeComboBox,
             ComboBox logLevelComboBox)
         {
             if (settings == null)
@@ -99,6 +101,8 @@ namespace PitmastersGrill.Services
             }
 
             ApplyLogLevelSelection(logLevelComboBox, settings.LogLevel);
+            ApplyThemeSelection(visualThemeComboBox, settings.VisualTheme);
+            ApplyColorBlindModeSelection(colorBlindModeComboBox, settings.ColorBlindMode);
         }
 
         public void HandleDarkModeChanged(
@@ -253,6 +257,56 @@ namespace PitmastersGrill.Services
             AppLogger.AppInfo($"Log level changed. level={selectedLogLevel}");
         }
 
+        public void HandleVisualThemeChanged(
+            AppSettings settings,
+            ComboBox visualThemeComboBox,
+            ResourceDictionary resources,
+            Window window,
+            Action applyBoardPopulationStatusVisual)
+        {
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            var selectedTheme = GetSelectedTheme(visualThemeComboBox);
+            if (string.Equals(settings.VisualTheme, selectedTheme.ToString(), StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            settings.VisualTheme = selectedTheme.ToString();
+            _appSettingsService.Save(settings);
+            ApplyTheme(resources, settings, window, applyBoardPopulationStatusVisual);
+
+            AppLogger.UiInfo($"Visual theme changed. theme={settings.VisualTheme}");
+        }
+
+        public void HandleColorBlindModeChanged(
+            AppSettings settings,
+            ComboBox colorBlindModeComboBox,
+            ResourceDictionary resources,
+            Window window,
+            Action applyBoardPopulationStatusVisual)
+        {
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            var selectedMode = GetSelectedColorBlindMode(colorBlindModeComboBox);
+            if (string.Equals(settings.ColorBlindMode, selectedMode.ToString(), StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            settings.ColorBlindMode = selectedMode.ToString();
+            _appSettingsService.Save(settings);
+            ApplyTheme(resources, settings, window, applyBoardPopulationStatusVisual);
+
+            AppLogger.UiInfo($"Color-blind mode changed. mode={settings.ColorBlindMode}");
+        }
+
         public void ApplyTheme(
             ResourceDictionary resources,
             AppSettings settings,
@@ -271,22 +325,27 @@ namespace PitmastersGrill.Services
 
             if (settings.DarkModeEnabled)
             {
-                SetBrushResource(resources, "HeaderTextBrush", "#FFFFFF");
-                SetBrushResource(resources, "BodyTextBrush", "#F3F3F3");
-                SetBrushResource(resources, "MutedTextBrush", "#DDDDDD");
-                SetBrushResource(resources, "GridLineBrush", "#4A4A4A");
-                SetBrushResource(resources, "PanelBorderBrush", "#3A3A3A");
+                ApplyThemeResourceDictionary(resources, GetSelectedTheme(settings.VisualTheme));
+                SetBrushResource(resources, "HeaderTextBrush", GetColorResource(resources, "TextPrimary", "#FFFFFF"));
+                SetBrushResource(resources, "BodyTextBrush", GetColorResource(resources, "TextPrimary", "#F3F3F3"));
+                SetBrushResource(resources, "MutedTextBrush", GetColorResource(resources, "TextSecondary", "#DDDDDD"));
+                SetBrushResource(resources, "GridLineBrush", GetColorResource(resources, "BoardGridLine", "#4A4A4A"));
+                SetBrushResource(resources, "PanelBorderBrush", GetColorResource(resources, "PanelBorder", "#3A3A3A"));
+                ApplyThemeBrushes(resources);
             }
             else
             {
+                ApplyLightPaletteTokens(resources);
                 SetBrushResource(resources, "HeaderTextBrush", "#111111");
                 SetBrushResource(resources, "BodyTextBrush", "#222222");
                 SetBrushResource(resources, "MutedTextBrush", "#444444");
                 SetBrushResource(resources, "GridLineBrush", "#CFCFCF");
                 SetBrushResource(resources, "PanelBorderBrush", "#D0D0D0");
+                ApplyThemeBrushes(resources);
             }
 
             ApplySurfaceOpacity(resources, settings);
+            ApplySignalAccessibilityPalette(resources, settings);
             applyBoardPopulationStatusVisual?.Invoke();
             ApplyTitleBarTheme(window, settings.DarkModeEnabled);
         }
@@ -622,6 +681,38 @@ namespace PitmastersGrill.Services
             logLevelComboBox.SelectedIndex = logLevel == AppLogLevel.Debug ? 1 : 0;
         }
 
+        public void ApplyThemeSelection(ComboBox visualThemeComboBox, string visualTheme)
+        {
+            if (visualThemeComboBox == null)
+            {
+                return;
+            }
+
+            visualThemeComboBox.SelectedIndex = GetSelectedTheme(visualTheme) switch
+            {
+                PmgVisualTheme.TacticalGrill => 1,
+                PmgVisualTheme.ClassicPmgGrill => 2,
+                _ => 0
+            };
+        }
+
+        public void ApplyColorBlindModeSelection(ComboBox colorBlindModeComboBox, string colorBlindMode)
+        {
+            if (colorBlindModeComboBox == null)
+            {
+                return;
+            }
+
+            colorBlindModeComboBox.SelectedIndex = GetSelectedColorBlindMode(colorBlindMode) switch
+            {
+                PmgColorBlindMode.DeuteranopiaFriendly => 1,
+                PmgColorBlindMode.ProtanopiaFriendly => 2,
+                PmgColorBlindMode.TritanopiaFriendly => 3,
+                PmgColorBlindMode.HighContrast => 4,
+                _ => 0
+            };
+        }
+
         public AppLogLevel GetSelectedLogLevel(ComboBox logLevelComboBox)
         {
             if (logLevelComboBox == null)
@@ -725,13 +816,13 @@ namespace PitmastersGrill.Services
 
             if (settings.DarkModeEnabled)
             {
-                SetBrushResource(resources, "WindowBackgroundBrush", "#1E1E1E", alpha);
-                SetBrushResource(resources, "SurfaceBrush", "#1F1F1F", alpha);
-                SetBrushResource(resources, "SurfaceAltBrush", "#252525", alpha);
+                SetBrushResource(resources, "WindowBackgroundBrush", GetColorResource(resources, "BackgroundBase", "#1E1E1E"), alpha);
+                SetBrushResource(resources, "SurfaceBrush", GetColorResource(resources, "PanelBackground", "#1F1F1F"), alpha);
+                SetBrushResource(resources, "SurfaceAltBrush", GetColorResource(resources, "PanelBackgroundAlt", "#252525"), alpha);
 
-                SetBrushResource(resources, "GridBackgroundBrush", "#2B2B2B");
-                SetBrushResource(resources, "GridAlternateBrush", "#323232");
-                SetBrushResource(resources, "GridHeaderBrush", "#202020");
+                SetBrushResource(resources, "GridBackgroundBrush", GetColorResource(resources, "BoardBackground", "#2B2B2B"), alpha);
+                SetBrushResource(resources, "GridAlternateBrush", GetColorResource(resources, "BoardAlternate", "#323232"), alpha);
+                SetBrushResource(resources, "GridHeaderBrush", GetColorResource(resources, "BoardHeaderBackground", "#202020"), alpha);
             }
             else
             {
@@ -739,19 +830,181 @@ namespace PitmastersGrill.Services
                 SetBrushResource(resources, "SurfaceBrush", "#FFFFFF", alpha);
                 SetBrushResource(resources, "SurfaceAltBrush", "#FAFAFA", alpha);
 
-                SetBrushResource(resources, "GridBackgroundBrush", "#FFFFFF");
-                SetBrushResource(resources, "GridAlternateBrush", "#F2F2F2");
-                SetBrushResource(resources, "GridHeaderBrush", "#E8E8E8");
+                SetBrushResource(resources, "GridBackgroundBrush", "#FFFFFF", alpha);
+                SetBrushResource(resources, "GridAlternateBrush", "#F2F2F2", alpha);
+                SetBrushResource(resources, "GridHeaderBrush", "#E8E8E8", alpha);
             }
         }
 
-        private void SetBrushResource(ResourceDictionary resources, string resourceKey, string hexColor)
+        private static PmgVisualTheme GetSelectedTheme(string? visualTheme)
+        {
+            return Enum.TryParse<PmgVisualTheme>(visualTheme, ignoreCase: true, out var parsed)
+                ? parsed
+                : PmgVisualTheme.CharcoalOps;
+        }
+
+        private static PmgVisualTheme GetSelectedTheme(ComboBox visualThemeComboBox)
+        {
+            if (visualThemeComboBox == null)
+            {
+                return PmgVisualTheme.CharcoalOps;
+            }
+
+            return visualThemeComboBox.SelectedIndex switch
+            {
+                1 => PmgVisualTheme.TacticalGrill,
+                2 => PmgVisualTheme.ClassicPmgGrill,
+                _ => PmgVisualTheme.CharcoalOps
+            };
+        }
+
+        private static PmgColorBlindMode GetSelectedColorBlindMode(string? colorBlindMode)
+        {
+            return Enum.TryParse<PmgColorBlindMode>(colorBlindMode, ignoreCase: true, out var parsed)
+                ? parsed
+                : PmgColorBlindMode.Standard;
+        }
+
+        private static PmgColorBlindMode GetSelectedColorBlindMode(ComboBox colorBlindModeComboBox)
+        {
+            if (colorBlindModeComboBox == null)
+            {
+                return PmgColorBlindMode.Standard;
+            }
+
+            return colorBlindModeComboBox.SelectedIndex switch
+            {
+                1 => PmgColorBlindMode.DeuteranopiaFriendly,
+                2 => PmgColorBlindMode.ProtanopiaFriendly,
+                3 => PmgColorBlindMode.TritanopiaFriendly,
+                4 => PmgColorBlindMode.HighContrast,
+                _ => PmgColorBlindMode.Standard
+            };
+        }
+
+        private static void ApplyThemeResourceDictionary(ResourceDictionary resources, PmgVisualTheme visualTheme)
+        {
+            var path = visualTheme switch
+            {
+                PmgVisualTheme.TacticalGrill => "Themes/TacticalGrill.xaml",
+                PmgVisualTheme.ClassicPmgGrill => "Themes/ClassicPmgGrill.xaml",
+                _ => "Themes/CharcoalOps.xaml"
+            };
+
+            try
+            {
+                if (Application.LoadComponent(new Uri(path, UriKind.Relative)) is not ResourceDictionary dictionary)
+                {
+                    return;
+                }
+
+                foreach (var key in dictionary.Keys)
+                {
+                    resources[key] = dictionary[key];
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiWarn($"Theme dictionary load failed. theme={visualTheme} message={ex.Message}");
+                ApplyLightPaletteTokens(resources);
+            }
+        }
+
+        private static void ApplyLightPaletteTokens(ResourceDictionary resources)
+        {
+            resources["BackgroundBase"] = (Color)ColorConverter.ConvertFromString("#F5F5F5");
+            resources["PanelBackground"] = (Color)ColorConverter.ConvertFromString("#FFFFFF");
+            resources["PanelBackgroundAlt"] = (Color)ColorConverter.ConvertFromString("#FAFAFA");
+            resources["PanelBorder"] = (Color)ColorConverter.ConvertFromString("#D0D0D0");
+            resources["BoardBackground"] = (Color)ColorConverter.ConvertFromString("#FFFFFF");
+            resources["BoardAlternate"] = (Color)ColorConverter.ConvertFromString("#F2F2F2");
+            resources["BoardHeaderBackground"] = (Color)ColorConverter.ConvertFromString("#E8E8E8");
+            resources["BoardGridLine"] = (Color)ColorConverter.ConvertFromString("#CFCFCF");
+            resources["AccentEmber"] = (Color)ColorConverter.ConvertFromString("#D97706");
+            resources["AccentHotCoal"] = (Color)ColorConverter.ConvertFromString("#B45309");
+            resources["AccentAsh"] = (Color)ColorConverter.ConvertFromString("#6B7280");
+            resources["ThreatCritical"] = (Color)ColorConverter.ConvertFromString("#B91C1C");
+            resources["ThreatSevere"] = (Color)ColorConverter.ConvertFromString("#DC2626");
+            resources["ThreatHigh"] = (Color)ColorConverter.ConvertFromString("#D97706");
+            resources["ThreatElevated"] = (Color)ColorConverter.ConvertFromString("#B98235");
+            resources["ThreatLow"] = (Color)ColorConverter.ConvertFromString("#85754E");
+            resources["ThreatNeutral"] = (Color)ColorConverter.ConvertFromString("#6B7280");
+            resources["SuccessGreen"] = (Color)ColorConverter.ConvertFromString("#15803D");
+            resources["WarningAmber"] = (Color)ColorConverter.ConvertFromString("#B45309");
+            resources["ErrorRed"] = (Color)ColorConverter.ConvertFromString("#B91C1C");
+        }
+
+        private static string GetColorResource(ResourceDictionary resources, string resourceKey, string fallbackHexColor)
+        {
+            return resources[resourceKey] is Color color
+                ? color.ToString()
+                : fallbackHexColor;
+        }
+
+        private static void ApplyThemeBrushes(ResourceDictionary resources)
+        {
+            SetBrushResource(resources, "AccentEmberBrush", GetColorResource(resources, "AccentEmber", "#F28C28"));
+            SetBrushResource(resources, "AccentHotCoalBrush", GetColorResource(resources, "AccentHotCoal", "#D94A1E"));
+            SetBrushResource(resources, "AccentAshBrush", GetColorResource(resources, "AccentAsh", "#858985"));
+            SetBrushResource(resources, "ThreatCriticalBrush", GetColorResource(resources, "ThreatCritical", "#FF3B21"));
+            SetBrushResource(resources, "ThreatSevereBrush", GetColorResource(resources, "ThreatSevere", "#D94A1E"));
+            SetBrushResource(resources, "ThreatHighBrush", GetColorResource(resources, "ThreatHigh", "#F28C28"));
+            SetBrushResource(resources, "ThreatElevatedBrush", GetColorResource(resources, "ThreatElevated", "#C79035"));
+            SetBrushResource(resources, "ThreatLowBrush", GetColorResource(resources, "ThreatLow", "#B6A36B"));
+            SetBrushResource(resources, "ThreatNeutralBrush", GetColorResource(resources, "ThreatNeutral", "#858985"));
+            SetBrushResource(resources, "SuccessGreenBrush", GetColorResource(resources, "SuccessGreen", "#6FBF73"));
+            SetBrushResource(resources, "WarningAmberBrush", GetColorResource(resources, "WarningAmber", "#F6B94B"));
+            SetBrushResource(resources, "ErrorRedBrush", GetColorResource(resources, "ErrorRed", "#EF5350"));
+            SetBrushResource(resources, "BoardSignalConfirmedCovertBrush", "#B48CFF");
+            SetBrushResource(resources, "BoardSignalConfirmedNormalBrush", GetColorResource(resources, "ThreatCritical", "#EF5350"));
+            SetBrushResource(resources, "BoardSignalInferredCynoBrush", GetColorResource(resources, "ThreatHigh", "#F28C28"));
+            SetBrushResource(resources, "BoardSignalPossibleBrush", GetColorResource(resources, "WarningAmber", "#F6B94B"));
+            SetBrushResource(resources, "BoardSignalBaitBrush", "#B8915E");
+        }
+
+        private static void ApplySignalAccessibilityPalette(ResourceDictionary resources, AppSettings settings)
+        {
+            switch (GetSelectedColorBlindMode(settings.ColorBlindMode))
+            {
+                case PmgColorBlindMode.DeuteranopiaFriendly:
+                    SetSignalBrushes(resources, "#CC79A7", "#D55E00", "#E69F00", "#F0E442", "#999999");
+                    break;
+                case PmgColorBlindMode.ProtanopiaFriendly:
+                    SetSignalBrushes(resources, "#CC79A7", "#D55E00", "#0072B2", "#E69F00", "#999999");
+                    break;
+                case PmgColorBlindMode.TritanopiaFriendly:
+                    SetSignalBrushes(resources, "#9467BD", "#D62728", "#2CA02C", "#FF7F0E", "#8C564B");
+                    break;
+                case PmgColorBlindMode.HighContrast:
+                    SetSignalBrushes(resources, "#FFFFFF", "#FF1744", "#00E5FF", "#FFD600", "#BDBDBD");
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private static void SetSignalBrushes(
+            ResourceDictionary resources,
+            string confirmedCovert,
+            string confirmedNormal,
+            string inferred,
+            string possible,
+            string bait)
+        {
+            SetBrushResource(resources, "BoardSignalConfirmedCovertBrush", confirmedCovert);
+            SetBrushResource(resources, "BoardSignalConfirmedNormalBrush", confirmedNormal);
+            SetBrushResource(resources, "BoardSignalInferredCynoBrush", inferred);
+            SetBrushResource(resources, "BoardSignalPossibleBrush", possible);
+            SetBrushResource(resources, "BoardSignalBaitBrush", bait);
+        }
+
+        private static void SetBrushResource(ResourceDictionary resources, string resourceKey, string hexColor)
         {
             var color = (Color)ColorConverter.ConvertFromString(hexColor);
             resources[resourceKey] = new SolidColorBrush(color);
         }
 
-        private void SetBrushResource(ResourceDictionary resources, string resourceKey, string hexColor, byte alpha)
+        private static void SetBrushResource(ResourceDictionary resources, string resourceKey, string hexColor, byte alpha)
         {
             var baseColor = (Color)ColorConverter.ConvertFromString(hexColor);
             resources[resourceKey] = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));

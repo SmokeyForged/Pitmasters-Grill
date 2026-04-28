@@ -164,6 +164,50 @@ namespace PitmastersGrill.Persistence
             return result?.ToString() ?? "";
         }
 
+
+        public List<string> GetCompleteDays(int maxDays = 0)
+        {
+            var results = new List<string>();
+            var connectionString = $"Data Source={_databasePath}";
+
+            using var connection = new SqliteConnection(connectionString);
+            connection.Open();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = maxDays > 0
+                ? @"
+            SELECT day_utc
+            FROM day_import_state
+            WHERE state = 'complete'
+            ORDER BY day_utc DESC
+            LIMIT $maxDays;
+            "
+                : @"
+            SELECT day_utc
+            FROM day_import_state
+            WHERE state = 'complete'
+            ORDER BY day_utc DESC;
+            ";
+
+            if (maxDays > 0)
+            {
+                command.Parameters.AddWithValue("$maxDays", maxDays);
+            }
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var day = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                if (!string.IsNullOrWhiteSpace(day))
+                {
+                    results.Add(day);
+                }
+            }
+
+            return results;
+        }
+
         public List<DayImportState> GetIncompleteDays()
         {
             var results = new List<DayImportState>();

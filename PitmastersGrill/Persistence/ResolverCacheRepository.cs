@@ -45,6 +45,7 @@ namespace PitmastersGrill.Persistence
                     alliance_id,
                     alliance_name,
                     alliance_ticker,
+                    corp_id,
                     corp_name,
                     corp_ticker,
                     resolver_confidence,
@@ -71,12 +72,13 @@ namespace PitmastersGrill.Persistence
                     AllianceId = reader.GetString(2),
                     AllianceName = reader.GetString(3),
                     AllianceTicker = reader.GetString(4),
-                    CorpName = reader.GetString(5),
-                    CorpTicker = reader.GetString(6),
-                    ResolverConfidence = reader.GetString(7),
-                    ResolvedAtUtc = reader.GetString(8),
-                    ExpiresAtUtc = reader.GetString(9),
-                    AffiliationCheckedAtUtc = reader.GetString(10)
+                    CorpId = reader.GetString(5),
+                    CorpName = reader.GetString(6),
+                    CorpTicker = reader.GetString(7),
+                    ResolverConfidence = reader.GetString(8),
+                    ResolvedAtUtc = reader.GetString(9),
+                    ExpiresAtUtc = reader.GetString(10),
+                    AffiliationCheckedAtUtc = reader.GetString(11)
                 };
 
                 if (!DateTime.TryParse(entry.ExpiresAtUtc, out var expiresAtUtc))
@@ -111,6 +113,7 @@ namespace PitmastersGrill.Persistence
                 alliance_id,
                 alliance_name,
                 alliance_ticker,
+                corp_id,
                 corp_name,
                 corp_ticker,
                 resolver_confidence,
@@ -124,6 +127,7 @@ namespace PitmastersGrill.Persistence
                 $allianceId,
                 $allianceName,
                 $allianceTicker,
+                $corpId,
                 $corpName,
                 $corpTicker,
                 $resolverConfidence,
@@ -136,6 +140,7 @@ namespace PitmastersGrill.Persistence
                 alliance_id = excluded.alliance_id,
                 alliance_name = excluded.alliance_name,
                 alliance_ticker = excluded.alliance_ticker,
+                corp_id = excluded.corp_id,
                 corp_name = excluded.corp_name,
                 corp_ticker = excluded.corp_ticker,
                 resolver_confidence = excluded.resolver_confidence,
@@ -149,6 +154,7 @@ namespace PitmastersGrill.Persistence
             command.Parameters.AddWithValue("$allianceId", entry.AllianceId);
             command.Parameters.AddWithValue("$allianceName", entry.AllianceName);
             command.Parameters.AddWithValue("$allianceTicker", entry.AllianceTicker);
+            command.Parameters.AddWithValue("$corpId", entry.CorpId);
             command.Parameters.AddWithValue("$corpName", entry.CorpName);
             command.Parameters.AddWithValue("$corpTicker", entry.CorpTicker);
             command.Parameters.AddWithValue("$resolverConfidence", entry.ResolverConfidence);

@@ -9,6 +9,7 @@
         WindowStyle="SingleBorderWindow"
         ShowInTaskbar="False"
         Topmost="True"
+        Icon="../Assets/PMGIcon.ico"
         Background="#111111">
     <Border Padding="24" Background="#111111">
         <Grid>

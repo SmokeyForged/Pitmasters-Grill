@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Color x:Key="BackgroundBase">#121414</Color>
+    <Color x:Key="PanelBackground">#1B1F20</Color>
+    <Color x:Key="PanelBackgroundAlt">#222829</Color>
+    <Color x:Key="PanelBorder">#3A4242</Color>
+    <Color x:Key="BoardBackground">#171A1A</Color>
+    <Color x:Key="BoardAlternate">#202525</Color>
+    <Color x:Key="BoardHeaderBackground">#101313</Color>
+    <Color x:Key="BoardGridLine">#58605F</Color>
+    <Color x:Key="TextPrimary">#F5F2EA</Color>
+    <Color x:Key="TextSecondary">#C8C3B7</Color>
+    <Color x:Key="AccentEmber">#F28C28</Color>
+    <Color x:Key="AccentHotCoal">#D94A1E</Color>
+    <Color x:Key="AccentAsh">#858985</Color>
+    <Color x:Key="ThreatCritical">#FF3B21</Color>
+    <Color x:Key="ThreatSevere">#D94A1E</Color>
+    <Color x:Key="ThreatHigh">#F28C28</Color>
+    <Color x:Key="ThreatElevated">#C79035</Color>
+    <Color x:Key="ThreatLow">#B6A36B</Color>
+    <Color x:Key="ThreatNeutral">#858985</Color>
+    <Color x:Key="SuccessGreen">#6FBF73</Color>
+    <Color x:Key="WarningAmber">#F6B94B</Color>
+    <Color x:Key="ErrorRed">#EF5350</Color>
+</ResourceDictionary>

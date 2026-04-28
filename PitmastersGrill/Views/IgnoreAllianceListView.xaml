@@ -1,53 +1,49 @@
-﻿<UserControl x:Class="PitmastersGrill.Views.IgnoreAllianceListView"
+<UserControl x:Class="PitmastersGrill.Views.IgnoreAllianceListView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DesignHeight="380"
-             d:DesignWidth="640">
-	<ScrollViewer Background="{DynamicResource WindowBackgroundBrush}"
+             d:DesignWidth="720">
+    <ScrollViewer Background="{DynamicResource WindowBackgroundBrush}"
                   HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto">
-		<StackPanel>
-			<Border Background="{DynamicResource SurfaceAltBrush}"
+        <StackPanel>
+            <Border Background="{DynamicResource SurfaceAltBrush}"
                     BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="1"
                     Padding="16"
                     Margin="12,12,12,8">
-				<StackPanel>
-					<TextBlock Text="Ignore Alliance IDs"
+                <StackPanel>
+                    <TextBlock Text="Typed Ignore List"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource HeaderTextBrush}"
-                               TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
 
-					<TextBlock Text="Alliance IDs saved here will be hidden from the current board immediately and suppressed on future board updates once affiliation is known."
-                               TextWrapping="Wrap"
+                    <TextBlock Text="Suppression uses IDs, not names. Pilot ignores win over corporation ignores, and corporation ignores win over alliance ignores."
                                Foreground="{DynamicResource MutedTextBrush}"/>
-				</StackPanel>
-			</Border>
+                </StackPanel>
+            </Border>
 
-			<Border Background="{DynamicResource SurfaceAltBrush}"
+            <Border Background="{DynamicResource SurfaceAltBrush}"
                     BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="1"
                     Padding="16"
                     Margin="12,0,12,8">
-				<StackPanel>
-					<TextBlock Text="Manual Alliance ID Entry"
+                <StackPanel>
+                    <TextBlock Text="Manual ID Entry"
                                Foreground="{DynamicResource BodyTextBrush}"
                                FontWeight="SemiBold"
-                               TextWrapping="Wrap"
                                Margin="0,0,0,6"/>
 
-					<TextBlock Text="Enter one or more numeric alliance IDs separated by spaces, commas, or new lines."
-                               TextWrapping="Wrap"
+                    <TextBlock Text="Enter one or more numeric IDs separated by spaces, commas, or new lines. Pick the ID type before adding."
                                Foreground="{DynamicResource MutedTextBrush}"
                                Margin="0,0,0,8"/>
 
-					<TextBox x:Name="AllianceIdsInputTextBox"
-                             MinHeight="68"
+                    <TextBox x:Name="IgnoreIdsInputTextBox"
+                             MinHeight="58"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
                              HorizontalScrollBarVisibility="Disabled"
@@ -57,59 +53,88 @@
                              BorderBrush="{DynamicResource PanelBorderBrush}"
                              Margin="0,0,0,10"/>
 
-					<WrapPanel>
-						<Button x:Name="AddAllianceIdsButton"
+                    <WrapPanel>
+                        <ComboBox x:Name="IgnoreTypeComboBox"
+                                  Width="150"
+                                  Height="32"
+                                  Margin="0,0,8,8">
+                            <ComboBoxItem Content="Pilot"/>
+                            <ComboBoxItem Content="Corporation"/>
+                            <ComboBoxItem Content="Alliance"/>
+                        </ComboBox>
+
+                        <Button x:Name="AddIgnoreIdsButton"
                                 Content="Add ID"
                                 Width="92"
                                 Height="32"
                                 Margin="0,0,8,8"
-                                Click="AddAllianceIdsButton_Click"/>
+                                Click="AddIgnoreIdsButton_Click"/>
 
-						<Button x:Name="SaveIgnoreListButton"
+                        <Button x:Name="SaveIgnoreListButton"
                                 Content="Save List"
                                 Width="92"
                                 Height="32"
                                 Margin="0,0,8,8"
                                 Click="SaveIgnoreListButton_Click"/>
 
-						<Button x:Name="ClearIgnoreListButton"
+                        <Button x:Name="RemoveSelectedIgnoreButton"
+                                Content="Remove Selected"
+                                Width="124"
+                                Height="32"
+                                Margin="0,0,8,8"
+                                Click="RemoveSelectedIgnoreButton_Click"/>
+
+                        <Button x:Name="ClearIgnoreListButton"
                                 Content="Clear All"
                                 Width="92"
                                 Height="32"
                                 Margin="0,0,8,8"
                                 Click="ClearIgnoreListButton_Click"/>
-					</WrapPanel>
-				</StackPanel>
-			</Border>
 
-			<Border Background="{DynamicResource SurfaceAltBrush}"
+                        <Button x:Name="RefreshNamesButton"
+                                Content="Refresh Names"
+                                Width="116"
+                                Height="32"
+                                Margin="0,0,8,8"
+                                Click="RefreshNamesButton_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource SurfaceAltBrush}"
                     BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="1"
                     Padding="16"
                     Margin="12,0,12,8">
-				<DockPanel MinHeight="160">
-					<TextBlock DockPanel.Dock="Top"
-                               Text="Current Ignore List"
+                <DockPanel MinHeight="180">
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Current Ignore Entries"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource BodyTextBrush}"
-                               TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
 
-					<ListBox x:Name="IgnoredAllianceIdsListBox"
-                             MinHeight="140"
-                             MaxHeight="360"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             Background="{DynamicResource SurfaceBrush}"
-                             Foreground="{DynamicResource BodyTextBrush}"
-                             BorderBrush="{DynamicResource PanelBorderBrush}"/>
-				</DockPanel>
-			</Border>
+                    <DataGrid x:Name="IgnoredEntriesGrid"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              IsReadOnly="True"
+                              MinHeight="160"
+                              MaxHeight="360"
+                              SelectionMode="Extended"
+                              Background="{DynamicResource SurfaceBrush}"
+                              Foreground="{DynamicResource BodyTextBrush}"
+                              BorderBrush="{DynamicResource PanelBorderBrush}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="1*"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="2*"/>
+                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="1*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
 
-			<TextBlock x:Name="IgnoreListStatusText"
+            <TextBlock x:Name="IgnoreListStatusText"
                        Margin="12,0,12,12"
-                       TextWrapping="Wrap"
                        Foreground="{DynamicResource MutedTextBrush}"/>
-		</StackPanel>
-	</ScrollViewer>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

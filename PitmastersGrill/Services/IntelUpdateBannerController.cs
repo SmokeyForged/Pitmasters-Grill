@@ -90,9 +90,39 @@ namespace PitmastersGrill.Services
                 return input ?? string.Empty;
             }
 
-            return input
+            var normalized = input
                 .Replace("LOCAL INTEL", "KILLMAIL INTEL", StringComparison.OrdinalIgnoreCase)
                 .Replace("Local intel", "Killmail intel", StringComparison.OrdinalIgnoreCase);
+
+            if (normalized.Contains("KILLMAIL INTEL CURRENT", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Intel current";
+            }
+
+            if (normalized.Contains("Current through latest published archive", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Through latest archive";
+            }
+
+            var throughIndex = normalized.IndexOf(" through ", StringComparison.OrdinalIgnoreCase);
+            if (throughIndex >= 0)
+            {
+                var date = TryGetLastIsoDate(normalized);
+                if (!string.IsNullOrWhiteSpace(date))
+                {
+                    return $"Through {date}";
+                }
+            }
+
+            return normalized;
+        }
+
+        private static string TryGetLastIsoDate(string input)
+        {
+            var matches = System.Text.RegularExpressions.Regex.Matches(input ?? "", @"\d{4}-\d{2}-\d{2}");
+            return matches.Count == 0
+                ? ""
+                : matches[matches.Count - 1].Value;
         }
 
         private static SolidColorBrush CreateFrozenBrush(string hex)

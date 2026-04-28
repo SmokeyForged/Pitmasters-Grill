@@ -19,6 +19,7 @@ namespace PitmastersGrill.Services
         private readonly PilotRegistryDayRepository _pilotRegistryDayRepository;
         private readonly PilotFleetObservationDayRepository _pilotFleetObservationDayRepository;
         private readonly PilotShipObservationDayRepository _pilotShipObservationDayRepository;
+        private readonly PilotCynoModuleObservationDayRepository _pilotCynoModuleObservationDayRepository;
         private readonly CynoShipCatalog _cynoShipCatalog;
 
         public KillmailDayImportService(
@@ -34,6 +35,7 @@ namespace PitmastersGrill.Services
             _pilotRegistryDayRepository = new PilotRegistryDayRepository(killmailDbPath);
             _pilotFleetObservationDayRepository = new PilotFleetObservationDayRepository(killmailDbPath);
             _pilotShipObservationDayRepository = new PilotShipObservationDayRepository(killmailDbPath);
+            _pilotCynoModuleObservationDayRepository = new PilotCynoModuleObservationDayRepository(killmailDbPath);
             _cynoShipCatalog = new CynoShipCatalog();
         }
 
@@ -141,6 +143,7 @@ namespace PitmastersGrill.Services
             var registryAccumulators = new Dictionary<string, PilotRegistryDayRecord>(StringComparer.OrdinalIgnoreCase);
             var fleetAccumulators = new Dictionary<string, PilotFleetObservationDayRecord>(StringComparer.OrdinalIgnoreCase);
             var shipAccumulators = new Dictionary<string, PilotShipObservationDayRecord>(StringComparer.OrdinalIgnoreCase);
+            var cynoModuleObservations = new List<PilotCynoModuleObservationDayRecord>();
 
             var importedKillmailCount = 0;
             var parseStopwatch = Stopwatch.StartNew();
@@ -254,23 +257,34 @@ namespace PitmastersGrill.Services
                         existingShip.UpdatedAtUtc = utcNow;
                     }
                 }
+
+                foreach (var cynoModule in parsed.CynoModuleObservations)
+                {
+                    cynoModule.DayUtc = remoteDay.DayUtc;
+                    cynoModule.UpdatedAtUtc = utcNow;
+                    cynoModuleObservations.Add(cynoModule);
+
+                    AppLogger.DatabaseInfo(
+                        $"Confirmed cyno module observed on public loss. character_id={cynoModule.CharacterId} killmail_id={cynoModule.KillmailId} killmail_time={cynoModule.KillmailTimeUtc} module_type_id={cynoModule.ModuleTypeId} module_name='{cynoModule.ModuleName}' victim_ship_type_id={cynoModule.VictimShipTypeId?.ToString(CultureInfo.InvariantCulture) ?? ""}");
+                }
             }
 
             parseStopwatch.Stop();
 
             DebugTraceWriter.WriteLine(
-                $"killmail import aggregate summary: day={remoteDay.DayUtc}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}");
+                $"killmail import aggregate summary: day={remoteDay.DayUtc}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, cynoModuleObservations={cynoModuleObservations.Count}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}");
 
             var writeStopwatch = Stopwatch.StartNew();
 
             _pilotRegistryDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotRegistryDayRecord>(registryAccumulators.Values));
             _pilotFleetObservationDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotFleetObservationDayRecord>(fleetAccumulators.Values));
             _pilotShipObservationDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotShipObservationDayRecord>(shipAccumulators.Values));
+            _pilotCynoModuleObservationDayRepository.ReplaceDay(remoteDay.DayUtc, cynoModuleObservations);
 
             writeStopwatch.Stop();
 
             DebugTraceWriter.WriteLine(
-                $"killmail import write summary: day={remoteDay.DayUtc}, uniquePilotsWritten={registryAccumulators.Count}, fleetPilotsWritten={fleetAccumulators.Count}, shipPilotsWritten={shipAccumulators.Count}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}");
+                $"killmail import write summary: day={remoteDay.DayUtc}, uniquePilotsWritten={registryAccumulators.Count}, fleetPilotsWritten={fleetAccumulators.Count}, shipPilotsWritten={shipAccumulators.Count}, cynoModuleObservationsWritten={cynoModuleObservations.Count}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}");
 
             dayState.LocalImportedCount = importedKillmailCount;
             dayState.ImportedAtUtc = DateTime.UtcNow.ToString("o");
@@ -302,7 +316,7 @@ namespace PitmastersGrill.Services
                 totalStopwatch.Stop();
 
                 DebugTraceWriter.WriteLine(
-                    $"killmail import complete: day={remoteDay.DayUtc}, archiveBytes={downloadResult.ArchiveLengthBytes}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, extractElapsedMs={extractResult.ExtractElapsedMs}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}, totalElapsedMs={totalStopwatch.ElapsedMilliseconds}");
+                    $"killmail import complete: day={remoteDay.DayUtc}, archiveBytes={downloadResult.ArchiveLengthBytes}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, cynoModuleObservations={cynoModuleObservations.Count}, extractElapsedMs={extractResult.ExtractElapsedMs}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}, totalElapsedMs={totalStopwatch.ElapsedMilliseconds}");
 
                 return new KillmailDayImportResult
                 {
@@ -351,6 +365,23 @@ namespace PitmastersGrill.Services
             return error.Contains("404", StringComparison.OrdinalIgnoreCase);
         }
 
+        internal static List<PilotCynoModuleObservationDayRecord> ParseConfirmedCynoModuleObservations(string jsonContent, string dayUtc = "", string updatedAtUtc = "")
+        {
+            var parsed = ParseKillmailEntry(jsonContent);
+            if (parsed == null)
+            {
+                return new List<PilotCynoModuleObservationDayRecord>();
+            }
+
+            foreach (var observation in parsed.CynoModuleObservations)
+            {
+                observation.DayUtc = dayUtc;
+                observation.UpdatedAtUtc = updatedAtUtc;
+            }
+
+            return parsed.CynoModuleObservations;
+        }
+
         private static ParsedKillmailEntry? ParseKillmailEntry(string jsonContent)
         {
             if (string.IsNullOrWhiteSpace(jsonContent))
@@ -374,10 +405,12 @@ namespace PitmastersGrill.Services
             }
 
             var killmailTimeText = killmailTimeUtc.Value.ToString("o");
+            var killmailId = TryReadLongAsString(root, "killmail_id");
 
             var registryPilots = new Dictionary<string, RegistryPilotSeen>(StringComparer.OrdinalIgnoreCase);
             var fleetPilots = new Dictionary<string, FleetPilotSeen>(StringComparer.OrdinalIgnoreCase);
             var shipPilots = new Dictionary<string, ShipPilotSeen>(StringComparer.OrdinalIgnoreCase);
+            var cynoModuleObservations = new List<PilotCynoModuleObservationDayRecord>();
 
             var attackerIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var attackerShipUpdates = new List<(string CharacterId, int? ShipTypeId)>();
@@ -434,6 +467,7 @@ namespace PitmastersGrill.Services
                 var victimCharacterId = TryReadLongAsString(victim, "character_id");
                 if (!string.IsNullOrWhiteSpace(victimCharacterId))
                 {
+                    var victimShipTypeId = TryReadInt(victim, "ship_type_id");
                     registryPilots[victimCharacterId] = new RegistryPilotSeen
                     {
                         CharacterId = victimCharacterId,
@@ -444,9 +478,21 @@ namespace PitmastersGrill.Services
                     shipPilots[victimCharacterId] = new ShipPilotSeen
                     {
                         CharacterId = victimCharacterId,
-                        LastSeenShipTypeId = TryReadInt(victim, "ship_type_id"),
+                        LastSeenShipTypeId = victimShipTypeId,
                         LastSeenShipTimeUtc = killmailTimeText
                     };
+
+                    if (victim.TryGetProperty("items", out var victimItems) &&
+                        victimItems.ValueKind == JsonValueKind.Array)
+                    {
+                        ScanVictimItemsForCynoModules(
+                            victimItems,
+                            victimCharacterId,
+                            killmailId,
+                            killmailTimeText,
+                            victimShipTypeId,
+                            cynoModuleObservations);
+                    }
                 }
             }
 
@@ -454,8 +500,84 @@ namespace PitmastersGrill.Services
             {
                 RegistryPilots = new List<RegistryPilotSeen>(registryPilots.Values),
                 FleetPilots = new List<FleetPilotSeen>(fleetPilots.Values),
-                ShipPilots = new List<ShipPilotSeen>(shipPilots.Values)
+                ShipPilots = new List<ShipPilotSeen>(shipPilots.Values),
+                CynoModuleObservations = cynoModuleObservations
             };
+        }
+
+        private static void ScanVictimItemsForCynoModules(
+            JsonElement items,
+            string victimCharacterId,
+            string killmailId,
+            string killmailTimeUtc,
+            int? victimShipTypeId,
+            List<PilotCynoModuleObservationDayRecord> observations)
+        {
+            if (items.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var item in items.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var typeId = TryReadInt(item, "item_type_id") ?? TryReadInt(item, "type_id");
+                if (typeId.HasValue &&
+                    CynoSignalAnalyzer.TryGetModuleSignalType(typeId.Value, out _, out var moduleName))
+                {
+                    var quantityDestroyed = TryReadInt(item, "quantity_destroyed") ?? 0;
+                    var quantityDropped = TryReadInt(item, "quantity_dropped") ?? 0;
+                    observations.Add(new PilotCynoModuleObservationDayRecord
+                    {
+                        CharacterId = victimCharacterId,
+                        KillmailId = killmailId,
+                        KillmailTimeUtc = killmailTimeUtc,
+                        VictimShipTypeId = victimShipTypeId,
+                        ModuleTypeId = typeId.Value,
+                        ModuleName = moduleName,
+                        QuantityDestroyed = quantityDestroyed,
+                        QuantityDropped = quantityDropped,
+                        ItemState = GetItemState(quantityDestroyed, quantityDropped),
+                        Source = "public loss victim item list"
+                    });
+                }
+
+                if (item.TryGetProperty("items", out var nestedItems) &&
+                    nestedItems.ValueKind == JsonValueKind.Array)
+                {
+                    ScanVictimItemsForCynoModules(
+                        nestedItems,
+                        victimCharacterId,
+                        killmailId,
+                        killmailTimeUtc,
+                        victimShipTypeId,
+                        observations);
+                }
+            }
+        }
+
+        private static string GetItemState(int quantityDestroyed, int quantityDropped)
+        {
+            if (quantityDestroyed > 0 && quantityDropped > 0)
+            {
+                return "destroyed/dropped";
+            }
+
+            if (quantityDestroyed > 0)
+            {
+                return "destroyed";
+            }
+
+            if (quantityDropped > 0)
+            {
+                return "dropped";
+            }
+
+            return "fitted/unknown";
         }
 
         private static int? TryReadInt(JsonElement element, string propertyName)
@@ -535,6 +657,7 @@ namespace PitmastersGrill.Services
             public List<RegistryPilotSeen> RegistryPilots { get; set; } = new();
             public List<FleetPilotSeen> FleetPilots { get; set; } = new();
             public List<ShipPilotSeen> ShipPilots { get; set; } = new();
+            public List<PilotCynoModuleObservationDayRecord> CynoModuleObservations { get; set; } = new();
         }
 
         private class RegistryPilotSeen

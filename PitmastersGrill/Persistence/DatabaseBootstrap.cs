@@ -41,6 +41,7 @@ namespace PitmastersGrill.Persistence
                     alliance_id TEXT NOT NULL DEFAULT '',
                     alliance_name TEXT NOT NULL DEFAULT '',
                     alliance_ticker TEXT NOT NULL DEFAULT '',
+                    corp_id TEXT NOT NULL DEFAULT '',
                     corp_name TEXT NOT NULL DEFAULT '',
                     corp_ticker TEXT NOT NULL DEFAULT '',
                     resolver_confidence TEXT NOT NULL DEFAULT '',
@@ -90,6 +91,12 @@ namespace PitmastersGrill.Persistence
 
             EnsureColumnExists(
                 connection,
+                "resolver_cache",
+                "corp_id",
+                "TEXT NOT NULL DEFAULT ''");
+
+            EnsureColumnExists(
+                connection,
                 "stats_cache",
                 "last_ship_seen_name",
                 "TEXT NOT NULL DEFAULT ''");
@@ -105,7 +112,7 @@ namespace PitmastersGrill.Persistence
                 metadataCommand.CommandText =
                 @"
                 INSERT OR REPLACE INTO app_metadata (key, value)
-                VALUES ('schema_version', '9');
+                VALUES ('schema_version', '10');
                 ";
                 metadataCommand.ExecuteNonQuery();
             }

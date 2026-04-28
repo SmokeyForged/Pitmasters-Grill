@@ -27,7 +27,7 @@ namespace PitmastersGrill.Persistence
 
             CreateIndexes(connection);
 
-            SetMetadataValue(connection, "schema_version", "5");
+            SetMetadataValue(connection, "schema_version", "6");
             SetMetadataValueIfMissing(connection, "seed_version", "");
             SetMetadataValueIfMissing(connection, "seed_built_at_utc", "");
             SetMetadataValueIfMissing(connection, "last_startup_check_at_utc", "");
@@ -87,6 +87,22 @@ namespace PitmastersGrill.Persistence
                 updated_at_utc TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (day_utc, character_id)
             );
+
+            CREATE TABLE IF NOT EXISTS pilot_cyno_module_observations_day (
+                day_utc TEXT NOT NULL,
+                character_id TEXT NOT NULL,
+                killmail_id TEXT NOT NULL DEFAULT '',
+                killmail_time_utc TEXT NOT NULL DEFAULT '',
+                victim_ship_type_id INTEGER NULL,
+                module_type_id INTEGER NOT NULL,
+                module_name TEXT NOT NULL DEFAULT '',
+                quantity_destroyed INTEGER NOT NULL DEFAULT 0,
+                quantity_dropped INTEGER NOT NULL DEFAULT 0,
+                item_state TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT '',
+                updated_at_utc TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (day_utc, character_id, killmail_id, module_type_id)
+            );
             ";
             command.ExecuteNonQuery();
         }
@@ -110,6 +126,15 @@ namespace PitmastersGrill.Persistence
 
             CREATE INDEX IF NOT EXISTS idx_pilot_ship_observations_day_last_seen_cyno
                 ON pilot_ship_observations_day(day_utc, last_seen_cyno_ship_time_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_module_observations_character_time
+                ON pilot_cyno_module_observations_day(character_id, killmail_time_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_module_observations_day
+                ON pilot_cyno_module_observations_day(day_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_module_observations_module
+                ON pilot_cyno_module_observations_day(module_type_id);
             ";
             command.ExecuteNonQuery();
         }

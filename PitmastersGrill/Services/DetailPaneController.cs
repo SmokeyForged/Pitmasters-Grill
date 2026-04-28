@@ -29,7 +29,13 @@ namespace PitmastersGrill.Services
             TextBlock selectedCharacterText,
             TextBlock fullCorpText,
             TextBlock fullAllianceText,
-            TextBlock freshnessText)
+            TextBlock freshnessText,
+            TextBlock recentPublicActivityText,
+            TextBlock cynoSignalText,
+            ProgressBar cynoConfidenceBar,
+            TextBlock cynoEvidenceText,
+            TextBlock cynoLimitationsText,
+            TextBlock explainabilityText)
         {
             if (row == null)
             {
@@ -46,7 +52,7 @@ namespace PitmastersGrill.Services
                 return;
             }
 
-            ApplyDetailPaneText(row, selectedCharacterText, fullCorpText, fullAllianceText, freshnessText);
+            ApplyDetailPaneText(row, selectedCharacterText, fullCorpText, fullAllianceText, freshnessText, recentPublicActivityText, cynoSignalText, cynoConfidenceBar, cynoEvidenceText, cynoLimitationsText, explainabilityText);
         }
 
         public void ShowDetailPane(
@@ -56,6 +62,12 @@ namespace PitmastersGrill.Services
             TextBlock fullCorpText,
             TextBlock fullAllianceText,
             TextBlock freshnessText,
+            TextBlock recentPublicActivityText,
+            TextBlock cynoSignalText,
+            ProgressBar cynoConfidenceBar,
+            TextBlock cynoEvidenceText,
+            TextBlock cynoLimitationsText,
+            TextBlock explainabilityText,
             TextBox notesTagsBox,
             CheckBox knownCynoOverrideCheckBox,
             CheckBox baitOverrideCheckBox)
@@ -66,7 +78,7 @@ namespace PitmastersGrill.Services
             }
 
             _activeDetailCharacterName = row.CharacterName;
-            ApplyDetailPaneText(row, selectedCharacterText, fullCorpText, fullAllianceText, freshnessText);
+            ApplyDetailPaneText(row, selectedCharacterText, fullCorpText, fullAllianceText, freshnessText, recentPublicActivityText, cynoSignalText, cynoConfidenceBar, cynoEvidenceText, cynoLimitationsText, explainabilityText);
 
             IsApplyingState = true;
 
@@ -191,12 +203,40 @@ namespace PitmastersGrill.Services
             TextBlock selectedCharacterText,
             TextBlock fullCorpText,
             TextBlock fullAllianceText,
-            TextBlock freshnessText)
+            TextBlock freshnessText,
+            TextBlock recentPublicActivityText,
+            TextBlock cynoSignalText,
+            ProgressBar cynoConfidenceBar,
+            TextBlock cynoEvidenceText,
+            TextBlock cynoLimitationsText,
+            TextBlock explainabilityText)
         {
             selectedCharacterText.Text = row.CharacterName;
             fullCorpText.Text = _pilotBoardRowDetailFormatter.GetCorpDisplayText(row);
             fullAllianceText.Text = _pilotBoardRowDetailFormatter.GetAllianceDisplayText(row);
             freshnessText.Text = _pilotBoardRowDetailFormatter.GetFreshnessDisplayText(row);
+            recentPublicActivityText.Text = _pilotBoardRowDetailFormatter.GetRecentPublicActivityText(row);
+            var cynoSignal = _pilotBoardRowDetailFormatter.GetCynoSignal(row);
+            cynoSignalText.Text = _pilotBoardRowDetailFormatter.GetCynoSignalText(cynoSignal);
+            cynoConfidenceBar.Value = cynoSignal.Score;
+            var signalBrushKey = GetCynoSignalBrushKey(cynoSignal.Status);
+            cynoSignalText.SetResourceReference(TextBlock.ForegroundProperty, signalBrushKey);
+            cynoConfidenceBar.SetResourceReference(ProgressBar.ForegroundProperty, signalBrushKey);
+            cynoEvidenceText.Text = _pilotBoardRowDetailFormatter.GetCynoEvidenceText(cynoSignal);
+            cynoLimitationsText.Text = _pilotBoardRowDetailFormatter.GetCynoLimitationsText(cynoSignal);
+            explainabilityText.Text = _pilotBoardRowDetailFormatter.GetExplainabilityText(row);
+        }
+
+        private static string GetCynoSignalBrushKey(CynoSignalStatus status)
+        {
+            return status switch
+            {
+                CynoSignalStatus.Confirmed => "ThreatCriticalBrush",
+                CynoSignalStatus.Likely => "ThreatHighBrush",
+                CynoSignalStatus.Possible => "WarningAmberBrush",
+                CynoSignalStatus.Inferred => "ThreatLowBrush",
+                _ => "AccentAshBrush"
+            };
         }
     }
 }

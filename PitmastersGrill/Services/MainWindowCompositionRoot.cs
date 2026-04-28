@@ -12,6 +12,7 @@ namespace PitmastersGrill.Services
             DatabaseBootstrap databaseBootstrap,
             BoardRowFactory boardRowFactory,
             NotesRepository notesRepository,
+            PilotBoardRowDetailFormatter pilotBoardRowDetailFormatter,
             DetailPaneController detailPaneController,
             BoardPopulationRowProcessor boardPopulationRowProcessor,
             BoardPopulationPassController boardPopulationPassController,
@@ -26,6 +27,7 @@ namespace PitmastersGrill.Services
             DatabaseBootstrap = databaseBootstrap ?? throw new ArgumentNullException(nameof(databaseBootstrap));
             BoardRowFactory = boardRowFactory ?? throw new ArgumentNullException(nameof(boardRowFactory));
             NotesRepository = notesRepository ?? throw new ArgumentNullException(nameof(notesRepository));
+            PilotBoardRowDetailFormatter = pilotBoardRowDetailFormatter ?? throw new ArgumentNullException(nameof(pilotBoardRowDetailFormatter));
             DetailPaneController = detailPaneController ?? throw new ArgumentNullException(nameof(detailPaneController));
             BoardPopulationRowProcessor = boardPopulationRowProcessor ?? throw new ArgumentNullException(nameof(boardPopulationRowProcessor));
             BoardPopulationPassController = boardPopulationPassController ?? throw new ArgumentNullException(nameof(boardPopulationPassController));
@@ -41,6 +43,7 @@ namespace PitmastersGrill.Services
         public DatabaseBootstrap DatabaseBootstrap { get; }
         public BoardRowFactory BoardRowFactory { get; }
         public NotesRepository NotesRepository { get; }
+        public PilotBoardRowDetailFormatter PilotBoardRowDetailFormatter { get; }
         public DetailPaneController DetailPaneController { get; }
         public BoardPopulationRowProcessor BoardPopulationRowProcessor { get; }
         public BoardPopulationPassController BoardPopulationPassController { get; }
@@ -87,12 +90,14 @@ namespace PitmastersGrill.Services
             var boardRowFactory = new BoardRowFactory();
 
             var boardPopulationRetryPolicy = new BoardPopulationRetryPolicy();
-            var pilotBoardRowDetailFormatter = new PilotBoardRowDetailFormatter(boardPopulationRetryPolicy);
-            var pilotBoardRowEnrichmentApplier = new PilotBoardRowEnrichmentApplier(defaultBoardPopulationRetryDelaySeconds);
-
             var databasePath = AppPaths.GetDatabasePath();
             var databaseBootstrap = new DatabaseBootstrap(databasePath);
             var notesRepository = new NotesRepository(databasePath);
+            var cynoModuleObservationRepository = new PilotCynoModuleObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
+            var pilotBoardRowDetailFormatter = new PilotBoardRowDetailFormatter(
+                boardPopulationRetryPolicy,
+                cynoModuleObservationRepository);
+            var pilotBoardRowEnrichmentApplier = new PilotBoardRowEnrichmentApplier(defaultBoardPopulationRetryDelaySeconds);
             var detailPaneController = new DetailPaneController(notesRepository, pilotBoardRowDetailFormatter);
 
             var resolverCacheRepository = new ResolverCacheRepository(databasePath);
@@ -141,6 +146,7 @@ namespace PitmastersGrill.Services
                 databaseBootstrap,
                 boardRowFactory,
                 notesRepository,
+                pilotBoardRowDetailFormatter,
                 detailPaneController,
                 boardPopulationRowProcessor,
                 boardPopulationPassController,

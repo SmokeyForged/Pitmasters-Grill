@@ -34,6 +34,7 @@ namespace PitmastersGrill
         private AppSettings _appSettings = new();
 
         private readonly BoardRowFactory _boardRowFactory;
+        private readonly PilotBoardRowDetailFormatter _pilotBoardRowDetailFormatter;
         private readonly DetailPaneController _detailPaneController;
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
@@ -51,10 +52,15 @@ namespace PitmastersGrill
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
         private readonly DispatcherTimer _clipboardDebounceTimer;
         private readonly CancellationTokenSource _windowShutdownCts = new();
+        private readonly SystemTrayIconService _systemTrayIconService;
         private IgnoreAllianceListView? _ignoreAllianceListView;
 
 
         private readonly ObservableCollection<PilotBoardRow> _currentRows = new();
+        private readonly ObservableCollection<ProviderHealthSnapshot> _providerHealthRows = new();
+        private readonly CacheMaintenanceService _cacheMaintenanceService = new();
+        private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
+        private PilotDetailWindow? _activePilotDetailWindow;
         private bool _isApplyingSettings;
         private bool _isShuttingDown;
         private int _processingGeneration;
@@ -72,6 +78,9 @@ namespace PitmastersGrill
             InitializeComponent();
 
             _diagnostics = new MainWindowDiagnostics(Dispatcher);
+            _systemTrayIconService = new SystemTrayIconService(
+                this,
+                () => RequestApplicationShutdown("Tray icon Exit"));
             _clipboardDebounceTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
             {
                 Interval = TimeSpan.FromMilliseconds(ClipboardDebounceMilliseconds)
@@ -91,6 +100,7 @@ namespace PitmastersGrill
 
             _boardRowFactory = composed.BoardRowFactory;
             _notesRepository = composed.NotesRepository;
+            _pilotBoardRowDetailFormatter = composed.PilotBoardRowDetailFormatter;
             _detailPaneController = composed.DetailPaneController;
             _boardPopulationRowProcessor = composed.BoardPopulationRowProcessor;
             _boardPopulationPassController = composed.BoardPopulationPassController;
@@ -141,6 +151,8 @@ namespace PitmastersGrill
                 KillmailDataRootPathTextBox,
                 KillmailDataPathModeText,
                 EffectiveKillmailDataPathText,
+                VisualThemeComboBox,
+                ColorBlindModeComboBox,
                 LogLevelComboBox);
 
             InitializeBoardColumnVisibilityUi();
@@ -153,9 +165,13 @@ namespace PitmastersGrill
             _mainWindowAppearanceController.ApplyWindowSettings(this, _appSettings, WindowOpacityValueText, Resources);
 
             PilotBoard.ItemsSource = _currentRows;
+            ProviderHealthGrid.ItemsSource = _providerHealthRows;
+            RefreshProviderHealthUi();
+            RefreshCacheStatsUi();
             UpdateLastRefreshed();
             UpdateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
             HideDetailPane();
+            UpdateOpenDetailsButtonState();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
 
             AppLogger.DatabaseInfo(
@@ -197,6 +213,7 @@ namespace PitmastersGrill
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
             _clipboardDebounceTimer.Stop();
             _clipboardDebounceTimer.Tick -= ClipboardDebounceTimer_Tick;
+            _systemTrayIconService.Dispose();
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
@@ -284,6 +301,7 @@ namespace PitmastersGrill
                 Resources,
                 this,
                 ApplyBoardPopulationStatusVisual);
+            _activePilotDetailWindow?.ApplyThemeResources(Resources);
         }
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -349,6 +367,39 @@ namespace PitmastersGrill
             }
 
             _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, LogLevelComboBox);
+        }
+
+        private void VisualThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isApplyingSettings || VisualThemeComboBox == null)
+            {
+                return;
+            }
+
+            _mainWindowAppearanceController.HandleVisualThemeChanged(
+                _appSettings,
+                VisualThemeComboBox,
+                Resources,
+                this,
+                ApplyBoardPopulationStatusVisual);
+            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+        }
+
+        private void ColorBlindModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isApplyingSettings || ColorBlindModeComboBox == null)
+            {
+                return;
+            }
+
+            _mainWindowAppearanceController.HandleColorBlindModeChanged(
+                _appSettings,
+                ColorBlindModeComboBox,
+                Resources,
+                this,
+                ApplyBoardPopulationStatusVisual);
+            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+            PilotBoard?.Items.Refresh();
         }
 
         private void InitializeBoardColumnVisibilityUi()
@@ -486,6 +537,9 @@ namespace PitmastersGrill
 
             if (applied && selectedRow != null)
             {
+                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(selectedRow);
+                PilotBoard.Items.Refresh();
+                RefreshDetailWindowIfSelected(selectedRow);
                 AppLogger.UiInfo(
                     $"Known cyno override changed. character='{selectedRow.CharacterName}' enabled={selectedRow.KnownCynoOverride}");
             }
@@ -502,6 +556,9 @@ namespace PitmastersGrill
 
             if (applied && selectedRow != null)
             {
+                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(selectedRow);
+                PilotBoard.Items.Refresh();
+                RefreshDetailWindowIfSelected(selectedRow);
                 AppLogger.UiInfo(
                     $"Bait override changed. character='{selectedRow.CharacterName}' enabled={selectedRow.BaitOverride}");
             }
@@ -718,7 +775,7 @@ namespace PitmastersGrill
 
                         action();
                     }).Task,
-                    RefreshDetailPaneIfSelected,
+                    RefreshDetailWindowIfSelected,
                     UpdateLastRefreshed,
                     (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message),
                     rowToEvaluate => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(rowToEvaluate));
@@ -763,6 +820,7 @@ namespace PitmastersGrill
             {
                 row.KnownCynoOverride = _notesRepository.GetKnownCynoOverride(row.CharacterName);
                 row.BaitOverride = _notesRepository.GetBaitOverride(row.CharacterName);
+                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
                 _currentRows.Add(row);
             }
 
@@ -770,6 +828,8 @@ namespace PitmastersGrill
 
             PilotBoard.SelectedItem = null;
             HideDetailPane();
+            CloseActiveDetailWindow();
+            UpdateOpenDetailsButtonState();
             UpdateLastRefreshed();
 
             buildStopwatch.Stop();
@@ -794,6 +854,8 @@ namespace PitmastersGrill
             {
                 PilotBoard.SelectedItem = null;
                 HideDetailPane();
+                CloseActiveDetailWindow();
+                UpdateOpenDetailsButtonState();
             }
 
             AppLogger.UiInfo($"Ignored alliance filter removed a resolved row from current board. character='{row.CharacterName}' allianceId='{row.AllianceId}'");
@@ -818,6 +880,8 @@ namespace PitmastersGrill
             {
                 PilotBoard.SelectedItem = null;
                 HideDetailPane();
+                CloseActiveDetailWindow();
+                UpdateOpenDetailsButtonState();
             }
             else
             {
@@ -827,34 +891,43 @@ namespace PitmastersGrill
             AppLogger.UiInfo($"Ignored alliance filter removed rows from current board. removedRows={applyResult.RemovedCount}");
         }
 
-        private void RefreshDetailPaneIfSelected(PilotBoardRow row)
+        private void RefreshDetailWindowIfSelected(PilotBoardRow row)
         {
-            _detailPaneController.RefreshDetailPaneIfSelected(
-                row,
-                DetailPane.Visibility,
-                SelectedCharacterText,
-                FullCorpText,
-                FullAllianceText,
-                FreshnessText);
+            _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
 
-            if (IsRowDisplayedInDetailPane(row))
+            if (_activePilotDetailWindow != null &&
+                string.Equals(_activePilotDetailWindow.CharacterName, row.CharacterName, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateIgnoreAllianceButtonState(row);
+                _activePilotDetailWindow.RefreshRow();
+            }
+        }
+
+        private void RefreshConfirmedCynoModuleStateForCurrentRows()
+        {
+            foreach (var row in _currentRows)
+            {
+                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
+            }
+
+            PilotBoard?.Items.Refresh();
+
+            if (PilotBoard?.SelectedItem is PilotBoardRow selectedRow)
+            {
+                RefreshDetailWindowIfSelected(selectedRow);
             }
         }
 
         private void PilotBoard_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             SaveCurrentNotesAndTags();
+            UpdateOpenDetailsButtonState();
 
             if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
             {
-                ShowDetailPane(selectedRow);
                 AppLogger.UiInfo($"Board selection changed. character='{selectedRow.CharacterName}'");
                 return;
             }
 
-            HideDetailPane();
             AppLogger.UiInfo("Board selection cleared.");
         }
 
@@ -876,7 +949,8 @@ namespace PitmastersGrill
             AppLogger.UiInfo("Detail pane close requested.");
 
             PilotBoard.SelectedItem = null;
-            HideDetailPane();
+            CloseActiveDetailWindow();
+            UpdateOpenDetailsButtonState();
         }
 
         private void ClearBoardButton_Click(object sender, RoutedEventArgs e)
@@ -892,7 +966,8 @@ namespace PitmastersGrill
 
             PilotBoard.SelectedItem = null;
             _currentRows.Clear();
-            HideDetailPane();
+            CloseActiveDetailWindow();
+            UpdateOpenDetailsButtonState();
 
             UpdateLastRefreshed();
             UpdateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
@@ -910,6 +985,17 @@ namespace PitmastersGrill
             }
 
             OpenZkillForRow(selectedRow);
+        }
+
+        private void OpenDetailsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (PilotBoard.SelectedItem is not PilotBoardRow selectedRow)
+            {
+                AppLogger.UiWarn("Open details requested with no selected row.");
+                return;
+            }
+
+            OpenDetailsWindow(selectedRow);
         }
 
         private async void EnableKillmailDbPullButton_Click(object sender, RoutedEventArgs e)
@@ -1015,6 +1101,194 @@ namespace PitmastersGrill
                 : message.Trim();
         }
 
+        private void RefreshProviderHealthButton_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshProviderHealthUi();
+            SetDiagnosticsStatus("Provider health refreshed.");
+        }
+
+        private void RefreshProviderHealthUi()
+        {
+            if (ProviderHealthGrid == null)
+            {
+                return;
+            }
+
+            _providerHealthRows.Clear();
+            foreach (var snapshot in DiagnosticTelemetry.GetProviderHealthSnapshots())
+            {
+                _providerHealthRows.Add(snapshot);
+            }
+        }
+
+        private void RefreshCacheStatsButton_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshCacheStatsUi();
+            SetDiagnosticsStatus("Cache stats refreshed.");
+        }
+
+        private void ClearExpiredCacheButton_Click(object sender, RoutedEventArgs e)
+        {
+            RunCacheMaintenanceAction(
+                "Clear expired cache",
+                requiresConfirmation: true,
+                action: () =>
+                {
+                    var removed = _cacheMaintenanceService.ClearExpired();
+                    SetDiagnosticsStatus($"Expired cache cleanup removed {removed:N0} rows.");
+                    AppLogger.DatabaseInfo($"Cache maintenance UI cleared expired rows. removedRows={removed}");
+                });
+        }
+
+        private void VacuumCacheButton_Click(object sender, RoutedEventArgs e)
+        {
+            RunCacheMaintenanceAction(
+                "Compact cache database",
+                requiresConfirmation: true,
+                action: () =>
+                {
+                    _cacheMaintenanceService.Vacuum();
+                    SetDiagnosticsStatus("Cache database compacted.");
+                    AppLogger.DatabaseInfo("Cache maintenance UI compacted SQLite database.");
+                });
+        }
+
+        private void ClearAllCacheButton_Click(object sender, RoutedEventArgs e)
+        {
+            RunCacheMaintenanceAction(
+                "Clear all resolver/stat cache rows",
+                requiresConfirmation: true,
+                action: () =>
+                {
+                    var removed = _cacheMaintenanceService.ClearAll();
+                    SetDiagnosticsStatus($"All resolver/stat cache cleanup removed {removed:N0} rows.");
+                    AppLogger.DatabaseWarn($"Cache maintenance UI cleared all resolver/stat cache rows. removedRows={removed}");
+                });
+        }
+
+        private async void RebuildKillmailDerivedIntelButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_boardPopulationEntryController.IsClipboardProcessing)
+            {
+                SetDiagnosticsStatus("Derived intel rebuild blocked while a lookup is active.");
+                MessageBox.Show(
+                    "A board lookup is currently running. Let it finish before rebuilding derived killmail intel.",
+                    "PMG Killmail Derived Intel",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                "Rebuild killmail derived intel from local extracted killmail archives?\n\nThis only rebuilds derived confirmed cyno-module observations. It does not clear notes, settings, themes, ignore lists, manual overrides, or unrelated cache data.",
+                "PMG Killmail Derived Intel",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (confirm != MessageBoxResult.Yes)
+            {
+                SetDiagnosticsStatus("Derived intel rebuild cancelled.");
+                return;
+            }
+
+            try
+            {
+                RebuildKillmailDerivedIntelButton.IsEnabled = false;
+                SetDiagnosticsStatus("Rebuilding killmail derived intel...");
+                var result = await _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(_windowShutdownCts.Token);
+                RefreshCacheStatsUi();
+                RefreshConfirmedCynoModuleStateForCurrentRows();
+
+                SetDiagnosticsStatus(result.Message);
+                MessageBox.Show(
+                    result.Message,
+                    result.NoLocalSourceAvailable ? "PMG Killmail Derived Intel Source Missing" : "PMG Killmail Derived Intel",
+                    MessageBoxButton.OK,
+                    result.NoLocalSourceAvailable ? MessageBoxImage.Information : MessageBoxImage.None);
+            }
+            catch (OperationCanceledException)
+            {
+                SetDiagnosticsStatus("Derived intel rebuild cancelled.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.DatabaseError("Killmail derived intel rebuild failed.", ex);
+                SetDiagnosticsStatus("Derived intel rebuild failed.");
+                MessageBox.Show(
+                    $"Failed to rebuild killmail derived intel.\n\n{ex.Message}",
+                    "PMG Killmail Derived Intel Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                RebuildKillmailDerivedIntelButton.IsEnabled = true;
+            }
+        }
+
+        private void RunCacheMaintenanceAction(string title, bool requiresConfirmation, Action action)
+        {
+            if (_boardPopulationEntryController.IsClipboardProcessing)
+            {
+                SetDiagnosticsStatus("Cache maintenance blocked while a lookup is active.");
+                MessageBox.Show(
+                    "A board lookup is currently running. Let it finish before changing the local cache.",
+                    "PMG Cache Maintenance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            if (requiresConfirmation)
+            {
+                var result = MessageBox.Show(
+                    $"{title}?\n\nThis only affects PMG local cache tables and does not delete unrelated files.",
+                    "PMG Cache Maintenance",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result != MessageBoxResult.Yes)
+                {
+                    SetDiagnosticsStatus("Cache maintenance cancelled.");
+                    return;
+                }
+            }
+
+            try
+            {
+                action();
+                RefreshCacheStatsUi();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.DatabaseError($"Cache maintenance failed. action='{title}'", ex);
+                SetDiagnosticsStatus("Cache maintenance failed.");
+                MessageBox.Show(
+                    $"Cache maintenance failed.\n\n{ex.Message}",
+                    "PMG Cache Maintenance Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void RefreshCacheStatsUi()
+        {
+            if (CacheStatsText == null)
+            {
+                return;
+            }
+
+            try
+            {
+                CacheStatsText.Text = CacheMaintenanceService.FormatStats(_cacheMaintenanceService.GetStats());
+            }
+            catch (Exception ex)
+            {
+                AppLogger.DatabaseError("Cache stats refresh failed.", ex);
+                CacheStatsText.Text = $"Cache stats failed: {ex.Message}";
+            }
+        }
+
 
         private void SaveMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1079,16 +1353,58 @@ namespace PitmastersGrill
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Escape && DetailPane.Visibility == Visibility.Visible)
+            // Details now live in their own window; Escape handling belongs there.
+        }
+
+        private void OpenDetailsWindow(PilotBoardRow row)
+        {
+            if (_activePilotDetailWindow != null)
             {
-                SaveCurrentNotesAndTags();
+                if (string.Equals(_activePilotDetailWindow.CharacterName, row.CharacterName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _activePilotDetailWindow.Activate();
+                    return;
+                }
 
-                AppLogger.UiInfo("Escape pressed. Closing detail pane.");
-
-                PilotBoard.SelectedItem = null;
-                HideDetailPane();
-                e.Handled = true;
+                CloseActiveDetailWindow();
             }
+
+            _activePilotDetailWindow = new PilotDetailWindow(
+                row,
+                _pilotBoardRowDetailFormatter,
+                _notesRepository,
+                TryIgnoreForRow,
+                OpenZkillForRow)
+            {
+                Owner = this
+            };
+            _activePilotDetailWindow.ApplyThemeResources(Resources);
+            _activePilotDetailWindow.Closed += ActivePilotDetailWindow_Closed;
+            _activePilotDetailWindow.Show();
+            AppLogger.UiInfo($"Details window opened. character='{row.CharacterName}'");
+        }
+
+        private void ActivePilotDetailWindow_Closed(object? sender, EventArgs e)
+        {
+            if (_activePilotDetailWindow != null)
+            {
+                _activePilotDetailWindow.Closed -= ActivePilotDetailWindow_Closed;
+                _activePilotDetailWindow = null;
+            }
+        }
+
+        private void CloseActiveDetailWindow()
+        {
+            if (_activePilotDetailWindow == null)
+            {
+                return;
+            }
+
+            var window = _activePilotDetailWindow;
+            _activePilotDetailWindow = null;
+            window.Closed -= ActivePilotDetailWindow_Closed;
+            window.SaveCurrentState();
+            window.Close();
         }
 
         private void ShowDetailPane(PilotBoardRow row)
@@ -1100,6 +1416,12 @@ namespace PitmastersGrill
                 FullCorpText,
                 FullAllianceText,
                 FreshnessText,
+                RecentPublicActivityText,
+                CynoSignalText,
+                CynoConfidenceBar,
+                CynoEvidenceText,
+                CynoLimitationsText,
+                ExplainabilityText,
                 NotesTagsBox,
                 KnownCynoOverrideCheckBox,
                 BaitOverrideCheckBox);
@@ -1115,11 +1437,47 @@ namespace PitmastersGrill
                 KnownCynoOverrideCheckBox,
                 BaitOverrideCheckBox);
 
+            if (ExplainabilityText != null)
+            {
+                ExplainabilityText.Text = "Explainability: --";
+            }
+
+            if (RecentPublicActivityText != null)
+            {
+                RecentPublicActivityText.Text = "Recent Public Kill/Loss Activity: --";
+            }
+
+            if (CynoSignalText != null)
+            {
+                CynoSignalText.Text = "Cyno Signal: Unknown";
+            }
+
+            if (CynoConfidenceBar != null)
+            {
+                CynoConfidenceBar.Value = 0;
+            }
+
+            if (CynoEvidenceText != null)
+            {
+                CynoEvidenceText.Text = "Evidence: --";
+            }
+
+            if (CynoLimitationsText != null)
+            {
+                CynoLimitationsText.Text = "Limitations: --";
+            }
+
             UpdateIgnoreAllianceButtonState(null);
         }
 
         private void SaveCurrentNotesAndTags()
         {
+            if (_activePilotDetailWindow != null)
+            {
+                _activePilotDetailWindow.SaveCurrentState();
+                return;
+            }
+
             _detailPaneController.SaveCurrentNotesAndTags(
                 NotesTagsBox.Text,
                 KnownCynoOverrideCheckBox.IsChecked == true,
@@ -1142,26 +1500,43 @@ namespace PitmastersGrill
                 return;
             }
 
-            var allianceId = TryGetAllianceId(selectedRow.AllianceId);
-            if (!allianceId.HasValue)
+            TryIgnoreAllianceForRow(selectedRow);
+        }
+
+        private bool TryIgnoreAllianceForRow(PilotBoardRow selectedRow)
+        {
+            return TryIgnoreForRow(selectedRow, IgnoreEntryType.Alliance);
+        }
+
+        private bool TryIgnoreForRow(PilotBoardRow selectedRow, IgnoreEntryType type)
+        {
+            var id = GetIgnoreId(selectedRow, type);
+            if (!id.HasValue)
             {
-                AppLogger.UiWarn($"Ignore alliance requested without a valid alliance ID. character='{selectedRow.CharacterName}' allianceId='{selectedRow.AllianceId ?? ""}'");
-                return;
+                AppLogger.UiWarn($"Ignore requested without a valid ID. character='{selectedRow.CharacterName}' type={type}");
+                return false;
             }
 
-            var added = _ignoreAllianceCoordinator.AddAllianceIdAndPersist(allianceId.Value);
+            var displayName = GetIgnoreDisplayName(selectedRow, type);
+            var added = _ignoreAllianceCoordinator.AddEntryAndPersist(
+                type,
+                id.Value,
+                $"detail window ignore {type}",
+                displayName);
+
             if (!added)
             {
-                AppLogger.UiInfo($"Ignore alliance requested for existing entry. character='{selectedRow.CharacterName}' allianceId='{allianceId.Value}'");
+                AppLogger.UiInfo($"Ignore requested for existing entry. character='{selectedRow.CharacterName}' type={type} id='{id.Value}'");
                 UpdateIgnoreAllianceButtonState(selectedRow);
                 _ignoreAllianceListView?.RefreshFromCoordinator();
-                return;
+                return false;
             }
 
-            AppLogger.UiInfo($"Alliance added to ignore list from detail pane. character='{selectedRow.CharacterName}' allianceId='{allianceId.Value}'");
+            AppLogger.UiInfo($"Typed ignore added from details. character='{selectedRow.CharacterName}' type={type} id='{id.Value}' name='{displayName}'");
 
             _ignoreAllianceListView?.RefreshFromCoordinator();
             ApplyIgnoredAllianceRowsToCurrentBoard();
+            return true;
         }
 
         private PilotBoardRow? GetSelectedOrDisplayedDetailRow()
@@ -1243,6 +1618,16 @@ namespace PitmastersGrill
                 : $"Ignore alliance '{row.AllianceName}' ({allianceId.Value}).";
         }
 
+        private void UpdateOpenDetailsButtonState()
+        {
+            if (OpenDetailsButton == null)
+            {
+                return;
+            }
+
+            OpenDetailsButton.IsEnabled = PilotBoard?.SelectedItem is PilotBoardRow;
+        }
+
         private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
             try
@@ -1286,6 +1671,28 @@ namespace PitmastersGrill
             }
 
             return allianceId;
+        }
+
+        private static long? GetIgnoreId(PilotBoardRow row, IgnoreEntryType type)
+        {
+            return type switch
+            {
+                IgnoreEntryType.Pilot => TryGetAllianceId(row.CharacterId),
+                IgnoreEntryType.Corporation => TryGetAllianceId(row.CorpId),
+                IgnoreEntryType.Alliance => TryGetAllianceId(row.AllianceId),
+                _ => null
+            };
+        }
+
+        private static string GetIgnoreDisplayName(PilotBoardRow row, IgnoreEntryType type)
+        {
+            return type switch
+            {
+                IgnoreEntryType.Pilot => string.IsNullOrWhiteSpace(row.CharacterName) ? "Unresolved" : row.CharacterName,
+                IgnoreEntryType.Corporation => string.IsNullOrWhiteSpace(row.CorpName) ? "Unresolved" : row.CorpName,
+                IgnoreEntryType.Alliance => string.IsNullOrWhiteSpace(row.AllianceName) ? "Unresolved" : row.AllianceName,
+                _ => "Unresolved"
+            };
         }
 
         private void UpdateLastRefreshed()

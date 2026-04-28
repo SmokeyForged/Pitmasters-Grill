@@ -31,6 +31,7 @@ namespace PitmastersGrill.Services
 
         public Dictionary<string, ResolverCacheEntry> GetCached(List<string> characterNames)
         {
+            using var timing = DiagnosticTelemetry.BeginTiming("cache lookup", $"resolver names={characterNames?.Count ?? 0}");
             var results = new Dictionary<string, ResolverCacheEntry>(StringComparer.OrdinalIgnoreCase);
 
             if (characterNames == null || characterNames.Count == 0)
@@ -72,7 +73,10 @@ namespace PitmastersGrill.Services
                     }
 
                     results[pair.Key] = pair.Value;
+                    DiagnosticTelemetry.RecordCacheHit("resolver_cache");
                 }
+
+                DiagnosticTelemetry.RecordCacheMiss("resolver_cache");
             }
             catch (Exception ex)
             {
@@ -100,6 +104,7 @@ namespace PitmastersGrill.Services
 
             if (existingIdentity != null && IsFresh(existingIdentity.ExpiresAtUtc))
             {
+                DiagnosticTelemetry.RecordCacheHit("resolver_cache");
                 var promotedExisting = await TryPromoteNotFoundViaEsiExactFallbackAsync(
                     trimmedName,
                     existingIdentity,
@@ -130,6 +135,7 @@ namespace PitmastersGrill.Services
             var cached = TryGetCachedByCharacterName(trimmedName);
             if (cached != null && IsFresh(cached.ExpiresAtUtc))
             {
+                DiagnosticTelemetry.RecordCacheHit("resolver_cache");
                 var promotedCached = await TryPromoteNotFoundViaEsiExactFallbackAsync(
                     trimmedName,
                     cached,
@@ -157,9 +163,22 @@ namespace PitmastersGrill.Services
                     "Fresh resolver cache hit");
             }
 
-            var resolvedFromZkill = await _zkillSearchResolverProvider.TryResolveCharacterAsync(
-                trimmedName,
-                cancellationToken);
+            DiagnosticTelemetry.RecordCacheMiss("resolver_cache");
+            ProviderOutcome<ResolverCacheEntry> resolvedFromZkill;
+            var providerStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                resolvedFromZkill = await _zkillSearchResolverProvider.TryResolveCharacterAsync(
+                    trimmedName,
+                    cancellationToken);
+            }
+            finally
+            {
+                providerStopwatch.Stop();
+            }
+
+            DiagnosticTelemetry.RecordProviderOutcome(resolvedFromZkill, providerStopwatch.ElapsedMilliseconds);
+            DiagnosticTelemetry.RecordTiming("zkill lookup", providerStopwatch.ElapsedMilliseconds, trimmedName);
 
             if (resolvedFromZkill.Kind == ProviderOutcomeKind.Success && resolvedFromZkill.Value != null)
             {
@@ -188,6 +207,7 @@ namespace PitmastersGrill.Services
                     AllianceId = "",
                     AllianceName = "",
                     AllianceTicker = "",
+                    CorpId = "",
                     CorpName = "",
                     CorpTicker = "",
                     ResolverConfidence = "not_found",
@@ -268,7 +288,8 @@ namespace PitmastersGrill.Services
                     resolvedCharacter);
             }
 
-            if (HasFreshAffiliationCheck(resolvedCharacter.AffiliationCheckedAtUtc))
+            if (HasFreshAffiliationCheck(resolvedCharacter.AffiliationCheckedAtUtc) &&
+                !string.IsNullOrWhiteSpace(resolvedCharacter.CorpId))
             {
                 return ProviderOutcome<ResolverCacheEntry>.Success(
                     resolvedCharacter,
@@ -276,9 +297,13 @@ namespace PitmastersGrill.Services
                     "Fresh affiliation check already available");
             }
 
+            var affiliationStopwatch = System.Diagnostics.Stopwatch.StartNew();
             var affiliationOutcome = await _esiPublicAffiliationProvider.TryGetAffiliationAsync(
                 resolvedCharacter.CharacterId,
                 cancellationToken);
+            affiliationStopwatch.Stop();
+            DiagnosticTelemetry.RecordProviderOutcome(affiliationOutcome, affiliationStopwatch.ElapsedMilliseconds);
+            DiagnosticTelemetry.RecordTiming("ESI lookup", affiliationStopwatch.ElapsedMilliseconds, $"affiliation {resolvedCharacter.CharacterId}");
 
             var nowUtc = DateTime.UtcNow.ToString("o");
 
@@ -384,6 +409,7 @@ namespace PitmastersGrill.Services
                 AllianceId = affiliation.AllianceId,
                 AllianceName = affiliation.AllianceName,
                 AllianceTicker = affiliation.AllianceTicker,
+                CorpId = affiliation.CorporationId,
                 CorpName = affiliation.CorpName,
                 CorpTicker = affiliation.CorpTicker,
                 ResolverConfidence = string.IsNullOrWhiteSpace(resolvedCharacter.ResolverConfidence)
@@ -403,6 +429,11 @@ namespace PitmastersGrill.Services
             if (string.IsNullOrWhiteSpace(enriched.CorpName))
             {
                 enriched.CorpName = resolvedCharacter.CorpName;
+            }
+
+            if (string.IsNullOrWhiteSpace(enriched.CorpId))
+            {
+                enriched.CorpId = resolvedCharacter.CorpId;
             }
 
             if (string.IsNullOrWhiteSpace(enriched.CorpTicker))
@@ -455,9 +486,13 @@ namespace PitmastersGrill.Services
             string characterName,
             CancellationToken cancellationToken)
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var exactOutcome = await _esiExactNameResolverProvider.TryResolveCharacterIdExactAsync(
                 characterName,
                 cancellationToken);
+            stopwatch.Stop();
+            DiagnosticTelemetry.RecordProviderOutcome(exactOutcome, stopwatch.ElapsedMilliseconds);
+            DiagnosticTelemetry.RecordTiming("ESI lookup", stopwatch.ElapsedMilliseconds, $"exact-name {characterName}");
 
             if (exactOutcome.Kind != ProviderOutcomeKind.Success || string.IsNullOrWhiteSpace(exactOutcome.Value))
             {
@@ -473,6 +508,7 @@ namespace PitmastersGrill.Services
                 AllianceId = "",
                 AllianceName = "",
                 AllianceTicker = "",
+                CorpId = "",
                 CorpName = "",
                 CorpTicker = "",
                 ResolverConfidence = "esi_exact_fallback",

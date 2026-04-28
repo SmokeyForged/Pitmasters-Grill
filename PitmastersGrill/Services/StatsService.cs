@@ -37,6 +37,7 @@ namespace PitmastersGrill.Services
         public Dictionary<string, StatsCacheEntry> GetCachedForResolvedRows(
             Dictionary<string, ResolverCacheEntry> identities)
         {
+            using var timing = DiagnosticTelemetry.BeginTiming("cache lookup", $"stats identities={identities?.Count ?? 0}");
             var results = new Dictionary<string, StatsCacheEntry>(StringComparer.OrdinalIgnoreCase);
 
             if (identities == null || identities.Count == 0)
@@ -75,9 +76,11 @@ namespace PitmastersGrill.Services
                     cached == null ||
                     !IsFresh(cached.ExpiresAtUtc))
                 {
+                    DiagnosticTelemetry.RecordCacheMiss("stats_cache");
                     continue;
                 }
 
+                DiagnosticTelemetry.RecordCacheHit("stats_cache");
                 localFleetAggregates.TryGetValue(identity.CharacterId, out var localFleetAggregate);
                 localCynoAggregates.TryGetValue(identity.CharacterId, out var localCynoAggregate);
 
@@ -130,6 +133,7 @@ namespace PitmastersGrill.Services
 
             if (cached != null && IsFresh(cached.ExpiresAtUtc))
             {
+                DiagnosticTelemetry.RecordCacheHit("stats_cache");
                 await ApplyLocalDerivedFieldsAsync(
                     cached,
                     localFleetAggregate,
@@ -145,7 +149,12 @@ namespace PitmastersGrill.Services
                     "Fresh stats cache hit");
             }
 
+            DiagnosticTelemetry.RecordCacheMiss("stats_cache");
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var fetchedOutcome = await _zkillStatsProvider.TryGetStatsAsync(characterId, cancellationToken);
+            stopwatch.Stop();
+            DiagnosticTelemetry.RecordProviderOutcome(fetchedOutcome, stopwatch.ElapsedMilliseconds);
+            DiagnosticTelemetry.RecordTiming("zKill lookup", stopwatch.ElapsedMilliseconds, $"stats {characterId}");
 
             if (fetchedOutcome.Kind == ProviderOutcomeKind.Success && fetchedOutcome.Value != null)
             {
