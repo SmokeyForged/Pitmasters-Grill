@@ -39,28 +39,28 @@ The emphasis is speed, clarity, and practical value.
 
 ### Main board
 
-<img width="818" height="645" alt="image" src="https://github.com/user-attachments/assets/1e7e2f1e-7762-46b2-afe4-60337b8ba95a" />
+<img width="1190" height="1384" alt="image" src="https://github.com/user-attachments/assets/73dab4e3-f137-4459-a0eb-538c9fd9da77" />
 
 
 ### Pilot details pane
 
-<img width="821" height="639" alt="image" src="https://github.com/user-attachments/assets/1d16b53e-e233-4c59-b269-d0d2adc5da0a" />
+<img width="1833" height="1388" alt="image" src="https://github.com/user-attachments/assets/2738936a-734b-4a1d-ac6b-8539298c3b58" />
 
 
 ### Compact mode
 
-<img width="820" height="635" alt="image" src="https://github.com/user-attachments/assets/fe89801a-9cf6-400c-a24f-d41ad5167e76" />
+<img width="1189" height="1386" alt="image" src="https://github.com/user-attachments/assets/4c8c34b4-ed86-4438-ac5a-58704065fe7f" />
+
 
 
 ### Settings / intel configuration
 
-<img width="813" height="635" alt="image" src="https://github.com/user-attachments/assets/1b76eb73-1c01-4315-9757-6adf568f89c3" />
-
+<img width="1185" height="619" alt="image" src="https://github.com/user-attachments/assets/1d374a44-c974-479e-a66d-ba596a5134ea" />
 
 
 ### Settings / Ingore List
 
-<img width="947" height="613" alt="image" src="https://github.com/user-attachments/assets/26ef4131-12ad-4ee3-ad9e-09168d6569fe" />
+<img width="1193" height="854" alt="image" src="https://github.com/user-attachments/assets/dc785eb4-779c-4436-8ab9-0ddca5857d79" />
 
 
 ---
