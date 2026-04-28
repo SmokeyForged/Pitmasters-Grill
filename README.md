@@ -44,7 +44,7 @@ The emphasis is speed, clarity, and practical value.
 
 ### Pilot details pane
 
-<img width="1833" height="1388" alt="image" src="https://github.com/user-attachments/assets/2738936a-734b-4a1d-ac6b-8539298c3b58" />
+<img width="1862" height="1396" alt="image" src="https://github.com/user-attachments/assets/620069dd-7977-4dce-adec-284d9b39c9bb" />
 
 
 ### Compact mode
