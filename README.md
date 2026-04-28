@@ -53,15 +53,18 @@ The emphasis is speed, clarity, and practical value.
 
 
 
-### Settings / intel configuration
+### Settings 
 
 <img width="1185" height="619" alt="image" src="https://github.com/user-attachments/assets/1d374a44-c974-479e-a66d-ba596a5134ea" />
 
 
-### Settings / Ingore List
+### Ingore List
 
 <img width="1193" height="854" alt="image" src="https://github.com/user-attachments/assets/dc785eb4-779c-4436-8ab9-0ddca5857d79" />
 
+### Intel Config
+
+<img width="1186" height="914" alt="image" src="https://github.com/user-attachments/assets/fbee2627-3153-4c4a-bbde-f42169ef1abf" />
 
 ---
 
