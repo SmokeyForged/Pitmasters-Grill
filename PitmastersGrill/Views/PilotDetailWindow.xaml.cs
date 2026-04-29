@@ -49,6 +49,8 @@ namespace PitmastersGrill.Views
             {
                 Resources[key] = sourceResources[key];
             }
+
+            ApplyRow();
         }
 
         public void RefreshRow()
@@ -65,12 +67,11 @@ namespace PitmastersGrill.Views
 
             _notesRepository.SaveNotesAndTags(
                 _row.CharacterName,
-                NotesTagsBox.Text ?? string.Empty,
-                KnownCynoOverrideCheckBox.IsChecked == true,
-                BaitOverrideCheckBox.IsChecked == true);
+                _notesRepository.GetNotes(_row.CharacterName),
+                _row.KnownCynoOverride,
+                _row.BaitOverride);
 
-            _row.KnownCynoOverride = KnownCynoOverrideCheckBox.IsChecked == true;
-            _row.BaitOverride = BaitOverrideCheckBox.IsChecked == true;
+            _row.HasNotes = _notesRepository.HasNotes(_row.CharacterName);
             _formatter.UpdateConfirmedCynoModuleState(_row);
         }
 
@@ -80,25 +81,33 @@ namespace PitmastersGrill.Views
             try
             {
                 PilotNameText.Text = _row.CharacterName;
-                PilotSummaryText.Text = _formatter.GetPilotSummaryText(_row);
-                RecentActivityText.Text = _formatter.GetConciseRecentPublicActivityText(_row);
-                BottomFreshnessText.Text = _formatter.GetBottomFreshnessText(_row);
+                AffiliationText.Text = _formatter.GetCompactPilotAffiliationText(_row);
+                ActivityText.Text = _formatter.GetCompactPilotActivityText(_row);
+                KillLossText.Text = _formatter.GetCompactKillLossText(_row);
 
                 var cynoSignal = _formatter.GetCynoSignal(_row);
-                CynoSignalText.Text = _formatter.GetCynoSignalHeadlineText(cynoSignal);
-                CynoConfidenceBar.Value = cynoSignal.Score;
+                BaitSignalText.Text = _formatter.GetCompactBaitStatusText(_row);
+                CynoSignalText.Text = _formatter.GetCompactCynoSignalHeadlineText(cynoSignal);
+                EvidenceText.Text = _formatter.GetPrimaryCompactEvidenceText(_row, cynoSignal);
+
+                var limitations = _formatter.GetCompactLimitationsText(_row, cynoSignal);
+                LimitationsText.Text = limitations;
+                LimitationsText.Visibility = string.IsNullOrWhiteSpace(limitations)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+
+                BottomFreshnessText.Text = _formatter.GetBottomFreshnessText(_row);
+
                 var brushKey = GetCynoSignalBrushKey(cynoSignal);
                 CynoSignalText.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
-                CynoConfidenceBar.SetResourceReference(ProgressBar.ForegroundProperty, brushKey);
-                EvidenceText.Text = _formatter.GetConciseEvidenceText(cynoSignal);
-                LimitationsText.Text = _formatter.GetConciseLimitationsText(cynoSignal);
 
-                NotesTagsBox.Text = _notesRepository.GetNotes(_row.CharacterName);
-                KnownCynoOverrideCheckBox.IsChecked = _row.KnownCynoOverride;
-                BaitOverrideCheckBox.IsChecked = _row.BaitOverride;
-                UpdateIgnoreButtonStates();
+                SetStateLinkVisual(KnownCynoOverrideLink, _row.KnownCynoOverride, "Toggle known-cyno override for this pilot.");
+                SetStateLinkVisual(BaitOverrideLink, _row.BaitOverride, "Toggle bait override for this pilot.");
+
+                UpdateActionLinkStates();
+
                 AppLogger.UiInfo(
-                    $"Details window row loaded. pilot='{_row.CharacterName}' pilotId='{_row.CharacterId}' corp='{_row.CorpName}' corpId='{_row.CorpId}' alliance='{_row.AllianceName}' allianceId='{_row.AllianceId}' ignorePilotEnabled={IgnorePilotButton.IsEnabled} ignoreCorpEnabled={IgnoreCorpButton.IsEnabled} ignoreAllianceEnabled={IgnoreAllianceButton.IsEnabled}");
+                    $"Details window row loaded. pilot='{_row.CharacterName}' pilotId='{_row.CharacterId}' corp='{_row.CorpName}' corpId='{_row.CorpId}' alliance='{_row.AllianceName}' allianceId='{_row.AllianceId}' manualBait={_row.BaitOverride} derivedBaitEvidenceCount={_row.DerivedBaitEvidenceCount} boardSignal={_row.BoardSignalKind} boardSignalReason='{_row.BoardSignalToolTip}'");
             }
             finally
             {
@@ -106,37 +115,52 @@ namespace PitmastersGrill.Views
             }
         }
 
-        private void IgnorePilotButton_Click(object sender, RoutedEventArgs e)
+        private void KnownCynoOverrideLink_Click(object sender, RoutedEventArgs e)
         {
-            Ignore(IgnoreEntryType.Pilot, IgnorePilotButton);
+            _row.KnownCynoOverride = !_row.KnownCynoOverride;
+            SaveCurrentState();
+            ApplyRow();
         }
 
-        private void IgnoreCorpButton_Click(object sender, RoutedEventArgs e)
+        private void BaitOverrideLink_Click(object sender, RoutedEventArgs e)
         {
-            Ignore(IgnoreEntryType.Corporation, IgnoreCorpButton);
+            _row.BaitOverride = !_row.BaitOverride;
+            SaveCurrentState();
+            ApplyRow();
         }
 
-        private void IgnoreAllianceButton_Click(object sender, RoutedEventArgs e)
+        private void IgnorePilotLink_Click(object sender, RoutedEventArgs e)
         {
-            Ignore(IgnoreEntryType.Alliance, IgnoreAllianceButton);
+            Ignore(IgnoreEntryType.Pilot, IgnorePilotLink);
         }
 
-        private void Ignore(IgnoreEntryType type, Button button)
+        private void IgnoreCorpLink_Click(object sender, RoutedEventArgs e)
+        {
+            Ignore(IgnoreEntryType.Corporation, IgnoreCorpLink);
+        }
+
+        private void IgnoreAllianceLink_Click(object sender, RoutedEventArgs e)
+        {
+            Ignore(IgnoreEntryType.Alliance, IgnoreAllianceLink);
+        }
+
+        private void Ignore(IgnoreEntryType type, Button link)
         {
             SaveCurrentState();
             if (_ignoreAction(_row, type))
             {
-                button.IsEnabled = false;
+                link.IsEnabled = false;
+                SetActionLinkVisual(link, false, "Already ignored or unavailable.");
             }
         }
 
-        private void OpenZkillButton_Click(object sender, RoutedEventArgs e)
+        private void OpenZkillLink_Click(object sender, RoutedEventArgs e)
         {
             SaveCurrentState();
             _openZkillAction(_row);
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        private void CloseLink_Click(object sender, RoutedEventArgs e)
         {
             SaveCurrentState();
             Close();
@@ -160,17 +184,27 @@ namespace PitmastersGrill.Views
             base.OnClosed(e);
         }
 
-        private void UpdateIgnoreButtonStates()
+        private void UpdateActionLinkStates()
         {
-            SetIgnoreButtonState(IgnorePilotButton, TryGetId(_row.CharacterId), "Pilot ID unavailable");
-            SetIgnoreButtonState(IgnoreCorpButton, TryGetId(_row.CorpId), "Corporation ID unavailable");
-            SetIgnoreButtonState(IgnoreAllianceButton, TryGetId(_row.AllianceId), "Alliance ID unavailable");
+            SetActionLinkVisual(IgnorePilotLink, TryGetId(_row.CharacterId).HasValue, "Pilot ID unavailable.");
+            SetActionLinkVisual(IgnoreCorpLink, TryGetId(_row.CorpId).HasValue, "Corporation ID unavailable.");
+            SetActionLinkVisual(IgnoreAllianceLink, TryGetId(_row.AllianceId).HasValue, "Alliance ID unavailable.");
+            SetActionLinkVisual(OpenZkillLink, CanOpenZkill(_row), "zKill link unavailable.");
+            SetActionLinkVisual(CloseLink, true, "Close this detail window.");
         }
 
-        private static void SetIgnoreButtonState(Button button, long? id, string unavailableText)
+        private void SetStateLinkVisual(Button button, bool enabledState, string tooltip)
         {
-            button.IsEnabled = id.HasValue;
-            button.ToolTip = id.HasValue ? $"Add typed ignore entry for ID {id.Value}." : unavailableText;
+            button.IsEnabled = true;
+            button.ToolTip = tooltip;
+            button.SetResourceReference(Control.ForegroundProperty, enabledState ? "SuccessGreenBrush" : "ErrorRedBrush");
+        }
+
+        private void SetActionLinkVisual(Button button, bool canClick, string unavailableText)
+        {
+            button.IsEnabled = canClick;
+            button.ToolTip = canClick ? "Click to run this action." : unavailableText;
+            button.SetResourceReference(Control.ForegroundProperty, canClick ? "SuccessGreenBrush" : "ErrorRedBrush");
         }
 
         private static long? TryGetId(string idText)
@@ -178,6 +212,13 @@ namespace PitmastersGrill.Views
             return long.TryParse(idText, out var id) && id > 0
                 ? id
                 : null;
+        }
+
+        private static bool CanOpenZkill(PilotBoardRow row)
+        {
+            return row != null &&
+                   (!string.IsNullOrWhiteSpace(row.CharacterId) ||
+                    !string.IsNullOrWhiteSpace(row.CharacterName));
         }
 
         private static string GetCynoSignalBrushKey(CynoSignalResult result)

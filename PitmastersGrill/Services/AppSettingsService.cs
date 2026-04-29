@@ -80,7 +80,13 @@ namespace PitmastersGrill.Services
                 settings.LogLevel = AppLogLevel.Normal;
             }
 
+            if (!Enum.TryParse<PilotDetailPlacementPreference>(settings.PilotDetailPlacementPreference, ignoreCase: true, out _))
+            {
+                settings.PilotDetailPlacementPreference = PilotDetailPlacementPreference.AutoPreferRight.ToString();
+            }
+
             settings.PanelModeEnabled = settings.PanelModeEnabled;
+            settings.ShowCorpAllianceCounts = settings.ShowCorpAllianceCounts;
 
             settings.ShowSigColumn ??= true;
             settings.ShowAllianceColumn ??= true;

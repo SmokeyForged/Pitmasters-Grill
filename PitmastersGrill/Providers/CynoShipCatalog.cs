@@ -11,6 +11,9 @@ namespace PitmastersGrill.Providers
             { 11963, "Rapier" },
             { 11965, "Pilgrim" },
             { 11969, "Arazu" },
+            { 33395, "Moracha" },
+            { 33675, "Chameleon" },
+            { 48635, "Tiamat" },
 
             // Black Ops / special black ops
             { 22428, "Redeemer" },
@@ -34,6 +37,20 @@ namespace PitmastersGrill.Providers
             { 12034, "Hound" },
             { 12038, "Purifier" },
             { 44993, "Pacifier" },
+            { 45530, "Virtuoso" },
+
+            // Covert Ops / special covert ops
+            { 11172, "Helios" },
+            { 11182, "Cheetah" },
+            { 11188, "Anathema" },
+            { 11192, "Buzzard" },
+            { 33397, "Chremoas" },
+            { 42246, "Caedes" },
+
+            // Covert cyno - unique/special hulls
+            { 32790, "Etana" },
+            { 33697, "Prospect" },
+            { 42245, "Rabisu" },
 
             // Industrial cyno - Tech I Industrials
             { 648, "Badger" },
@@ -48,6 +65,8 @@ namespace PitmastersGrill.Providers
             { 657, "Iteron Mark V" },
             { 1944, "Bestower" },
             { 19744, "Sigil" },
+            { 32880, "Venture" },
+            { 89648, "Venture Consortium Issue" },
 
             // Industrial cyno - Blockade Runners / Deep Space Transports
             { 12729, "Crane" },
@@ -66,7 +85,16 @@ namespace PitmastersGrill.Providers
             { 29990, "Loki" }
         };
 
-        public bool TryGetCynoShipName(int? shipTypeId, out string shipName)
+        private static readonly HashSet<string> CynoShipNames =
+            new(CynoShipTypeNames.Values, StringComparer.OrdinalIgnoreCase);
+
+        public static bool IsKnownCynoShipName(string? shipName)
+        {
+            return !string.IsNullOrWhiteSpace(shipName) &&
+                   CynoShipNames.Contains(shipName.Trim());
+        }
+
+        public static bool TryGetCynoShipNameByTypeId(int? shipTypeId, out string shipName)
         {
             shipName = "";
 
@@ -76,6 +104,11 @@ namespace PitmastersGrill.Providers
             }
 
             return CynoShipTypeNames.TryGetValue(shipTypeId.Value, out shipName!);
+        }
+
+        public bool TryGetCynoShipName(int? shipTypeId, out string shipName)
+        {
+            return TryGetCynoShipNameByTypeId(shipTypeId, out shipName);
         }
     }
 }

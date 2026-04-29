@@ -178,6 +178,7 @@ namespace PitmastersGrill.Services
                     Source = string.IsNullOrWhiteSpace(module.Source) ? "public loss victim item list" : module.Source,
                     ObservedAtUtc = observedAt,
                     ShipName = shipName,
+                    ModuleName = moduleName,
                     KillmailId = module.KillmailId ?? ""
                 });
             }
@@ -391,20 +392,26 @@ namespace PitmastersGrill.Services
 
         private static string BuildModuleEvidenceSummary(string shipName, DateTime? observedAtUtc, CynoSignalType signalType)
         {
-            var shipPart = string.IsNullOrWhiteSpace(shipName)
-                ? "Seen"
-                : $"Seen {shipName}";
-            var datePart = observedAtUtc.HasValue
-                ? $" on {observedAtUtc.Value:yyyy-MM-dd}"
-                : "";
-            return $"{shipPart}{datePart} as victim with {GetSignalTypeEvidenceName(signalType)} fitted.";
+            return $"{FormatDateForEvidence(observedAtUtc)} — {GetShortSignalTypeEvidenceName(signalType)}";
+        }
+
+        private static string GetShortSignalTypeEvidenceName(CynoSignalType signalType)
+        {
+            return signalType switch
+            {
+                CynoSignalType.Normal => "hard",
+                CynoSignalType.Covert => "covert",
+                CynoSignalType.Industrial => "indi",
+                CynoSignalType.Mixed => "mixed",
+                _ => "cyno"
+            };
         }
 
         private static string FormatDateForEvidence(DateTime? observedAtUtc)
         {
             return observedAtUtc.HasValue
-                ? observedAtUtc.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                : "an unknown date";
+                ? observedAtUtc.Value.ToString("yy/MM/dd", CultureInfo.InvariantCulture)
+                : "unknown date";
         }
     }
 }

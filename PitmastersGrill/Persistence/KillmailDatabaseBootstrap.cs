@@ -27,7 +27,7 @@ namespace PitmastersGrill.Persistence
 
             CreateIndexes(connection);
 
-            SetMetadataValue(connection, "schema_version", "6");
+            SetMetadataValue(connection, "schema_version", "8");
             SetMetadataValueIfMissing(connection, "seed_version", "");
             SetMetadataValueIfMissing(connection, "seed_built_at_utc", "");
             SetMetadataValueIfMissing(connection, "last_startup_check_at_utc", "");
@@ -103,6 +103,44 @@ namespace PitmastersGrill.Persistence
                 updated_at_utc TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (day_utc, character_id, killmail_id, module_type_id)
             );
+
+            CREATE TABLE IF NOT EXISTS pilot_bait_observations_day (
+                day_utc TEXT NOT NULL,
+                character_id TEXT NOT NULL,
+                killmail_id TEXT NOT NULL DEFAULT '',
+                killmail_time_utc TEXT NOT NULL DEFAULT '',
+                victim_ship_type_id INTEGER NULL,
+                victim_ship_name TEXT NOT NULL DEFAULT '',
+                solar_system_id INTEGER NULL,
+                solar_system_name TEXT NOT NULL DEFAULT '',
+                industrial_cyno_module_type_id INTEGER NOT NULL,
+                industrial_cyno_module_name TEXT NOT NULL DEFAULT '',
+                tackle_module_type_id INTEGER NOT NULL,
+                tackle_module_name TEXT NOT NULL DEFAULT '',
+                tackle_type TEXT NOT NULL DEFAULT '',
+                quantity_destroyed INTEGER NOT NULL DEFAULT 0,
+                quantity_dropped INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT '',
+                updated_at_utc TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (day_utc, character_id, killmail_id, tackle_module_type_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS pilot_cyno_tackle_observations_day (
+                day_utc TEXT NOT NULL,
+                character_id TEXT NOT NULL,
+                killmail_id TEXT NOT NULL DEFAULT '',
+                killmail_time_utc TEXT NOT NULL DEFAULT '',
+                victim_ship_type_id INTEGER NULL,
+                victim_ship_name TEXT NOT NULL DEFAULT '',
+                tackle_module_type_id INTEGER NOT NULL,
+                tackle_module_name TEXT NOT NULL DEFAULT '',
+                tackle_type TEXT NOT NULL DEFAULT '',
+                quantity_destroyed INTEGER NOT NULL DEFAULT 0,
+                quantity_dropped INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT '',
+                updated_at_utc TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (day_utc, character_id, killmail_id, tackle_module_type_id)
+            );
             ";
             command.ExecuteNonQuery();
         }
@@ -135,6 +173,30 @@ namespace PitmastersGrill.Persistence
 
             CREATE INDEX IF NOT EXISTS idx_pilot_cyno_module_observations_module
                 ON pilot_cyno_module_observations_day(module_type_id);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_bait_observations_character_time
+                ON pilot_bait_observations_day(character_id, killmail_time_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_bait_observations_day
+                ON pilot_bait_observations_day(day_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_bait_observations_tackle_type
+                ON pilot_bait_observations_day(tackle_type);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_bait_observations_killmail
+                ON pilot_bait_observations_day(killmail_id);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_tackle_observations_character_time
+                ON pilot_cyno_tackle_observations_day(character_id, killmail_time_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_tackle_observations_day
+                ON pilot_cyno_tackle_observations_day(day_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_tackle_observations_tackle_type
+                ON pilot_cyno_tackle_observations_day(tackle_type);
+
+            CREATE INDEX IF NOT EXISTS idx_pilot_cyno_tackle_observations_killmail
+                ON pilot_cyno_tackle_observations_day(killmail_id);
             ";
             command.ExecuteNonQuery();
         }

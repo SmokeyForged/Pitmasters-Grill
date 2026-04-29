@@ -11,14 +11,20 @@ namespace PitmastersGrill.Services
     {
         private readonly BoardPopulationRetryPolicy _boardPopulationRetryPolicy;
         private readonly PilotCynoModuleObservationDayRepository? _cynoModuleObservationRepository;
+        private readonly PilotBaitObservationDayRepository? _baitObservationRepository;
+        private readonly PilotCynoTackleObservationDayRepository? _cynoTackleObservationRepository;
         private readonly CynoSignalAnalyzer _cynoSignalAnalyzer = new();
 
         public PilotBoardRowDetailFormatter(
             BoardPopulationRetryPolicy boardPopulationRetryPolicy,
-            PilotCynoModuleObservationDayRepository? cynoModuleObservationRepository = null)
+            PilotCynoModuleObservationDayRepository? cynoModuleObservationRepository = null,
+            PilotBaitObservationDayRepository? baitObservationRepository = null,
+            PilotCynoTackleObservationDayRepository? cynoTackleObservationRepository = null)
         {
             _boardPopulationRetryPolicy = boardPopulationRetryPolicy ?? throw new ArgumentNullException(nameof(boardPopulationRetryPolicy));
             _cynoModuleObservationRepository = cynoModuleObservationRepository;
+            _baitObservationRepository = baitObservationRepository;
+            _cynoTackleObservationRepository = cynoTackleObservationRepository;
         }
 
         public string GetCorpDisplayText(PilotBoardRow row)
@@ -178,13 +184,14 @@ namespace PitmastersGrill.Services
         public CynoSignalResult GetCynoSignal(PilotBoardRow row)
         {
             var moduleEvidence = GetStoredModuleEvidence(row).ToList();
-            UpdateConfirmedCynoModuleState(row, moduleEvidence);
+            var baitEvidence = GetStoredBaitEvidence(row).ToList();
+            UpdateConfirmedCynoModuleState(row, moduleEvidence, baitEvidence);
 
             var result = _cynoSignalAnalyzer.Analyze(row, moduleEvidence);
             if (row != null)
             {
                 DiagnosticTelemetry.RecordCynoSignalSummary(
-                    $"pilot={row.CharacterName}; id={row.CharacterId}; status={result.Status}; type={GetCynoSignalTypeDisplayText(result)}; score={result.Score}; sourceFreshness={result.SourceFreshness}; evidence={string.Join(" | ", result.Evidence.Select(x => x.Summary))}");
+                    $"pilot={row.CharacterName}; id={row.CharacterId}; status={result.Status}; type={GetCynoSignalTypeDisplayText(result)}; score={result.Score}; manualBait={row.BaitOverride}; derivedBaitEvidenceCount={row.DerivedBaitEvidenceCount}; boardSignal={row.BoardSignalKind}; sourceFreshness={result.SourceFreshness}; evidence={string.Join(" | ", result.Evidence.Select(x => x.Summary))}");
             }
 
             return result;
@@ -208,6 +215,35 @@ namespace PitmastersGrill.Services
             }
 
             return GetStoredModuleEvidence(row).Any();
+        }
+
+        public IReadOnlyList<IndustrialCynoBaitEvidence> GetDerivedBaitEvidence(PilotBoardRow row)
+        {
+            return GetStoredBaitEvidence(row).ToList();
+        }
+
+        public string GetBaitSignalHeadlineText(PilotBoardRow row)
+        {
+            return GetCompactBaitStatusText(row);
+        }
+
+        public string GetBaitEvidenceText(PilotBoardRow row)
+        {
+            var line = BuildBaitEvidenceLines(GetStoredBaitEvidence(row).ToList()).FirstOrDefault();
+            return string.IsNullOrWhiteSpace(line)
+                ? "Evidence: none"
+                : $"Evidence: {line}";
+        }
+
+        public string GetBaitLimitationsText(PilotBoardRow row)
+        {
+            var baitEvidence = GetStoredBaitEvidence(row).ToList();
+            if (baitEvidence.Count == 0 && row?.BaitOverride != true)
+            {
+                return "";
+            }
+
+            return "- Based on public loss victim item data, not live fit visibility.";
         }
 
         public string GetCynoSignalText(CynoSignalResult result)
@@ -252,6 +288,107 @@ namespace PitmastersGrill.Services
 
             return CynoSignalAnalyzer.GetSignalTypeDisplayName(result.SignalType);
         }
+
+        public string GetCompactCynoSignalHeadlineText(CynoSignalResult result)
+        {
+            if (result == null || result.Status == CynoSignalStatus.Unknown)
+            {
+                return "Cyno: Unknown";
+            }
+
+            return $"Cyno: {result.Status} — {GetCompactCynoSignalTypeDisplayText(result)} — {result.Score}%";
+        }
+
+        public string GetCompactPilotAffiliationText(PilotBoardRow row)
+        {
+            var corp = string.IsNullOrWhiteSpace(row?.CorpName) ? "Unknown corp" : row.CorpName;
+            var alliance = string.IsNullOrWhiteSpace(row?.AllianceName) ? "No alliance" : row.AllianceName;
+            return $"{corp} / {alliance}";
+        }
+
+        public string GetCompactPilotActivityText(PilotBoardRow row)
+        {
+            var ship = string.IsNullOrWhiteSpace(row?.LastShipSeenName) ? "Ship unavailable" : row.LastShipSeenName;
+            var seen = string.IsNullOrWhiteSpace(row?.LastShipSeenAtUtc)
+                ? "last seen unknown"
+                : $"last seen {FormatCompactUtc(row.LastShipSeenAtUtc)}";
+
+            return $"{ship} • {seen}";
+        }
+
+        public string GetCompactKillLossText(PilotBoardRow row)
+        {
+            var kills = row?.KillCount?.ToString(CultureInfo.InvariantCulture) ?? "Unknown";
+            var losses = row?.LossCount?.ToString(CultureInfo.InvariantCulture) ?? "Unknown";
+            return $"Kills {kills} • Losses {losses}";
+        }
+
+        public string GetCompactBaitStatusText(PilotBoardRow row)
+        {
+            var baitEvidence = GetStoredBaitEvidence(row).ToList();
+            UpdateDerivedBaitState(row, baitEvidence);
+
+            if (row?.BaitOverride == true && baitEvidence.Count > 0)
+            {
+                return "Bait: Override + evidence";
+            }
+
+            if (row?.BaitOverride == true)
+            {
+                return "Bait: Override";
+            }
+
+            if (baitEvidence.Count > 0)
+            {
+                return "Bait: Confirmed";
+            }
+
+            return "Bait: No evidence";
+        }
+
+        public string GetPrimaryCompactEvidenceText(PilotBoardRow row, CynoSignalResult result)
+        {
+            var baitLine = BuildBaitEvidenceLines(GetStoredBaitEvidence(row).ToList()).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(baitLine))
+            {
+                return $"Evidence: {baitLine}";
+            }
+
+            var cynoLine = BuildConfirmedModuleEvidenceLines(result).FirstOrDefault();
+            var tackleLine = BuildCynoHullTackleEvidenceLines(GetStoredCynoHullTackleEvidence(row).ToList()).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(cynoLine))
+            {
+                return string.IsNullOrWhiteSpace(tackleLine)
+                    ? $"Evidence: {cynoLine}"
+                    : $"Evidence: {cynoLine}{Environment.NewLine}Tackle: {tackleLine}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(tackleLine))
+            {
+                return $"Tackle: {tackleLine}";
+            }
+
+            return "Evidence: none";
+        }
+
+        public string GetCompactLimitationsText(PilotBoardRow row, CynoSignalResult result)
+        {
+            var hasBait = GetStoredBaitEvidence(row).Any();
+            var hasConfirmedCyno = result?.Evidence?.Any(x => x.IsConfirmedModuleEvidence) == true;
+
+            if (hasBait || hasConfirmedCyno)
+            {
+                return "Limitations: Public loss data only";
+            }
+
+            if (result == null || result.Status == CynoSignalStatus.Unknown)
+            {
+                return "";
+            }
+
+            return "Limitations: Inference only";
+        }
+
 
         public string GetCynoEvidenceText(CynoSignalResult result)
         {
@@ -368,7 +505,35 @@ namespace PitmastersGrill.Services
             return _cynoModuleObservationRepository.GetRecentCynoModuleEvidenceByCharacterId(row.CharacterId);
         }
 
+        private IEnumerable<IndustrialCynoBaitEvidence> GetStoredBaitEvidence(PilotBoardRow row)
+        {
+            if (_baitObservationRepository == null || string.IsNullOrWhiteSpace(row?.CharacterId))
+            {
+                return Enumerable.Empty<IndustrialCynoBaitEvidence>();
+            }
+
+            return _baitObservationRepository.GetRecentBaitEvidenceByCharacterId(row.CharacterId);
+        }
+
+        private IEnumerable<CynoHullTackleEvidence> GetStoredCynoHullTackleEvidence(PilotBoardRow row)
+        {
+            if (_cynoTackleObservationRepository == null || string.IsNullOrWhiteSpace(row?.CharacterId))
+            {
+                return Enumerable.Empty<CynoHullTackleEvidence>();
+            }
+
+            return _cynoTackleObservationRepository.GetRecentTackleEvidenceByCharacterId(row.CharacterId);
+        }
+
         private void UpdateConfirmedCynoModuleState(PilotBoardRow row, IReadOnlyCollection<CynoModuleEvidence> moduleEvidence)
+        {
+            UpdateConfirmedCynoModuleState(row, moduleEvidence, GetStoredBaitEvidence(row).ToList());
+        }
+
+        private void UpdateConfirmedCynoModuleState(
+            PilotBoardRow row,
+            IReadOnlyCollection<CynoModuleEvidence> moduleEvidence,
+            IReadOnlyCollection<IndustrialCynoBaitEvidence> baitEvidence)
         {
             if (row == null)
             {
@@ -391,21 +556,39 @@ namespace PitmastersGrill.Services
             row.ConfirmedCynoSignalTypesDisplay = confirmedTypes.Count == 0
                 ? ""
                 : string.Join(" + ", confirmedTypes.Select(CynoSignalAnalyzer.GetSignalTypeDisplayName));
+            UpdateDerivedBaitState(row, baitEvidence);
 
             var signal = _cynoSignalAnalyzer.Analyze(row, moduleEvidence);
-            ApplyBoardSignalState(row, confirmedTypes, signal);
+            ApplyBoardSignalState(row, confirmedTypes, signal, baitEvidence.Count > 0);
+        }
+
+        private static void UpdateDerivedBaitState(
+            PilotBoardRow row,
+            IReadOnlyCollection<IndustrialCynoBaitEvidence> baitEvidence)
+        {
+            if (row == null)
+            {
+                return;
+            }
+
+            row.HasDerivedBaitEvidence = baitEvidence.Count > 0;
+            row.DerivedBaitEvidenceCount = baitEvidence.Count;
         }
 
         private static IEnumerable<string> BuildConfirmedModuleEvidenceLines(CynoSignalResult result)
         {
+            if (result == null)
+            {
+                yield break;
+            }
+
             var confirmedGroups = result.Evidence
                 .Where(x => x.IsConfirmedModuleEvidence)
                 .Where(x => x.SignalType != CynoSignalType.Unknown)
                 .GroupBy(x => new
                 {
                     KillmailId = x.KillmailId ?? "",
-                    Date = x.ObservedAtUtc?.Date,
-                    ShipName = x.ShipName ?? ""
+                    Date = x.ObservedAtUtc?.Date
                 })
                 .OrderByDescending(group => group.Max(x => x.ObservedAtUtc ?? DateTime.MinValue));
 
@@ -415,45 +598,39 @@ namespace PitmastersGrill.Services
                     .OrderByDescending(x => x.ObservedAtUtc ?? DateTime.MinValue)
                     .First();
 
-                var shipPart = string.IsNullOrWhiteSpace(first.ShipName)
-                    ? "Seen"
-                    : $"Seen {first.ShipName}";
-
-                var datePart = first.ObservedAtUtc.HasValue
-                    ? $" on {first.ObservedAtUtc.Value:yyyy-MM-dd}"
-                    : "";
-
-                var typeNames = group
+                var datePart = FormatEvidenceDate(first.ObservedAtUtc);
+                var typeDisplay = string.Join(" + ", group
                     .Select(x => x.SignalType)
                     .Where(x => x != CynoSignalType.Unknown)
                     .Distinct()
                     .OrderBy(GetSignalTypeSortOrder)
-                    .Select(CynoSignalAnalyzer.GetSignalTypeEvidenceName)
-                    .Select(x => x.Replace(" cyno", "", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                    .Select(GetShortCynoEvidenceName));
 
-                var typeDisplay = typeNames.Count == 0
-                    ? "cyno"
-                    : string.Join(" + ", typeNames) + " cyno";
-
-                yield return $"{shipPart}{datePart} as victim with {typeDisplay} fitted.";
+                yield return $"{datePart} — {typeDisplay}";
             }
         }
 
         private static void ApplyBoardSignalState(
             PilotBoardRow row,
             IReadOnlyCollection<CynoSignalType> confirmedTypes,
-            CynoSignalResult signal)
+            CynoSignalResult signal,
+            bool hasDerivedBaitEvidence)
         {
-            if (row.KnownCynoOverride)
-            {
-                SetBoardSignal(row, "ConfirmedCovert", "✦", "Manual Known-Cyno Override");
-                return;
-            }
-
             if (row.BaitOverride)
             {
                 SetBoardSignal(row, "Bait", "B", "Bait override");
+                return;
+            }
+
+            if (hasDerivedBaitEvidence)
+            {
+                SetBoardSignal(row, "Bait", "B", "Auto bait: industrial cyno + tackle module found on public loss");
+                return;
+            }
+
+            if (row.KnownCynoOverride)
+            {
+                SetBoardSignal(row, "ConfirmedCovert", "✦", "Manual Known-Cyno Override");
                 return;
             }
 
@@ -507,6 +684,134 @@ namespace PitmastersGrill.Services
             row.BoardSignalToolTip = toolTip;
         }
 
+        private static IEnumerable<string> BuildBaitEvidenceLines(IReadOnlyCollection<IndustrialCynoBaitEvidence> evidence)
+        {
+            if (evidence == null)
+            {
+                yield break;
+            }
+
+            var grouped = evidence
+                .GroupBy(x => new
+                {
+                    KillmailId = x.KillmailId ?? "",
+                    Date = x.KillmailTimeUtc?.Date
+                })
+                .OrderByDescending(group => group.Max(x => x.KillmailTimeUtc ?? DateTime.MinValue));
+
+            foreach (var group in grouped)
+            {
+                var first = group
+                    .OrderByDescending(x => x.KillmailTimeUtc ?? DateTime.MinValue)
+                    .First();
+
+                var datePart = FormatEvidenceDate(first.KillmailTimeUtc);
+                var tacklePart = string.Join(" + ", group
+                    .Select(x => string.IsNullOrWhiteSpace(x.TackleModuleName) ? GetTackleTypeDisplayName(x.TackleType) : x.TackleModuleName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+                if (string.IsNullOrWhiteSpace(tacklePart))
+                {
+                    tacklePart = "tackle";
+                }
+
+                yield return $"{datePart} — indi + {tacklePart}";
+            }
+        }
+
+        private static string GetShortCynoEvidenceName(CynoSignalType signalType)
+        {
+            return signalType switch
+            {
+                CynoSignalType.Normal => "hard",
+                CynoSignalType.Covert => "covert",
+                CynoSignalType.Industrial => "indi",
+                _ => "cyno"
+            };
+        }
+
+        private static IEnumerable<string> BuildCynoHullTackleEvidenceLines(IReadOnlyCollection<CynoHullTackleEvidence> evidence)
+        {
+            if (evidence == null)
+            {
+                yield break;
+            }
+
+            var grouped = evidence
+                .GroupBy(x => new
+                {
+                    KillmailId = x.KillmailId ?? "",
+                    Date = x.KillmailTimeUtc?.Date
+                })
+                .OrderByDescending(group => group.Max(x => x.KillmailTimeUtc ?? DateTime.MinValue));
+
+            foreach (var group in grouped)
+            {
+                var first = group
+                    .OrderByDescending(x => x.KillmailTimeUtc ?? DateTime.MinValue)
+                    .First();
+
+                var datePart = FormatEvidenceDate(first.KillmailTimeUtc);
+                var shipPart = string.IsNullOrWhiteSpace(first.VictimShipName)
+                    ? ""
+                    : $"{first.VictimShipName} + ";
+                var tacklePart = string.Join(" + ", group
+                    .Select(x => string.IsNullOrWhiteSpace(x.TackleModuleName) ? GetTackleTypeDisplayName(x.TackleType) : x.TackleModuleName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+                if (string.IsNullOrWhiteSpace(tacklePart))
+                {
+                    tacklePart = "tackle";
+                }
+
+                yield return $"{datePart} - {shipPart}{tacklePart}";
+            }
+        }
+
+        private static string GetTackleTypeDisplayName(TackleModuleType tackleType)
+        {
+            return tackleType switch
+            {
+                TackleModuleType.WarpScrambler => "warp scrambler",
+                TackleModuleType.WarpDisruptor => "warp disruptor",
+                _ => "tackle"
+            };
+        }
+
+        private string GetCompactCynoSignalTypeDisplayText(CynoSignalResult result)
+        {
+            if (result == null)
+            {
+                return "unknown";
+            }
+
+            var confirmedTypes = result.Evidence
+                .Where(x => x.IsConfirmedModuleEvidence)
+                .Select(x => x.SignalType)
+                .Where(x => x != CynoSignalType.Unknown)
+                .Distinct()
+                .OrderBy(GetSignalTypeSortOrder)
+                .ToList();
+
+            if (confirmedTypes.Count > 0)
+            {
+                return string.Join(" + ", confirmedTypes.Select(GetShortCynoEvidenceName));
+            }
+
+            return GetShortCynoEvidenceName(result.SignalType);
+        }
+
+        private static string FormatEvidenceDate(DateTime? value)
+        {
+            return value.HasValue
+                ? value.Value.ToString("yy/MM/dd", CultureInfo.InvariantCulture)
+                : "unknown date";
+        }
+
         private static int GetSignalTypeSortOrder(CynoSignalType signalType)
         {
             return signalType switch
@@ -517,6 +822,20 @@ namespace PitmastersGrill.Services
                 CynoSignalType.Mixed => 3,
                 _ => 4
             };
+        }
+
+        private static string FormatCompactUtc(string value)
+        {
+            if (DateTime.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsed))
+            {
+                return $"{parsed.ToUniversalTime():yy/MM/dd HH:mm} UTC";
+            }
+
+            return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
         }
 
         private static string FormatUtc(string value)

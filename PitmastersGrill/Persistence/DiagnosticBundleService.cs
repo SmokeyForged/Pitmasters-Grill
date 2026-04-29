@@ -10,7 +10,7 @@ namespace PitmastersGrill.Persistence
 {
     public static class DiagnosticBundleService
     {
-        private const string VersionLabel = "Technical Preview-v0.9.4";
+        private const string VersionLabel = "Technical Preview-v0.9.5";
         private const int MaximumBundlesToRetain = 20;
 
         public static string GetDiagnosticsDirectory()
@@ -39,6 +39,7 @@ namespace PitmastersGrill.Persistence
                 AddClipboardSummary(archive);
                 AddResolverFailureSummary(archive);
                 AddCynoSignalSummary(archive);
+                AddDerivedBaitSummary(archive);
                 AddIgnoreSummary(archive);
                 AddDirectoryFiles(archive, LogPaths.GetActiveDirectory(), "logs/active");
                 AddDirectoryFiles(archive, AppPaths.GetDebugDirectory(), "debug");
@@ -200,6 +201,30 @@ namespace PitmastersGrill.Persistence
                 foreach (var summary in summaries)
                 {
                     writer.WriteLine(summary);
+                }
+            });
+        }
+
+        private static void AddDerivedBaitSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "derived-bait-summary.txt", writer =>
+            {
+                try
+                {
+                    var repository = new PilotBaitObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
+                    writer.WriteLine("Derived industrial-cyno bait evidence");
+                    writer.WriteLine($"totalDerivedBaitObservations={repository.CountAll()}");
+                    writer.WriteLine("recent examples");
+
+                    foreach (var evidence in repository.GetRecentExamples(20))
+                    {
+                        writer.WriteLine(
+                            $"characterId={evidence.CharacterId}; killmailId={evidence.KillmailId}; killmailTimeUtc={evidence.KillmailTimeUtc:O}; victimShip={Sanitize(evidence.VictimShipName)}; industrialCyno={Sanitize(evidence.IndustrialCynoModuleName)}; tackle={Sanitize(evidence.TackleModuleName)}; tackleType={evidence.TackleType}; source={Sanitize(evidence.Source)}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    writer.WriteLine($"derivedBaitSummaryError={Sanitize(ex.Message)}");
                 }
             });
         }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 using PitmastersGrill.Models;
+using PitmastersGrill.Providers;
 using System;
 using System.Collections.Generic;
 
@@ -257,39 +258,93 @@ namespace PitmastersGrill.Persistence
             $@"
             SELECT
                 p.character_id,
+                p.last_seen_ship_type_id,
+                p.last_seen_ship_time_utc,
                 p.last_seen_cyno_ship_type_id,
                 p.last_seen_cyno_ship_name,
                 p.last_seen_cyno_ship_time_utc
             FROM pilot_ship_observations_day p
-            INNER JOIN (
-                SELECT
-                    character_id,
-                    MAX(last_seen_cyno_ship_time_utc) AS max_cyno_time
-                FROM pilot_ship_observations_day
-                WHERE character_id IN ({string.Join(", ", placeholders)})
-                  AND last_seen_cyno_ship_time_utc <> ''
-                GROUP BY character_id
-            ) latest
-                ON latest.character_id = p.character_id
-               AND latest.max_cyno_time = p.last_seen_cyno_ship_time_utc;
+            WHERE p.character_id IN ({string.Join(", ", placeholders)})
+              AND (
+                    (p.last_seen_cyno_ship_time_utc <> '' AND p.last_seen_cyno_ship_name <> '')
+                 OR (p.last_seen_ship_time_utc <> '' AND p.last_seen_ship_type_id IS NOT NULL)
+              )
+            ORDER BY
+                p.character_id ASC,
+                CASE
+                    WHEN p.last_seen_ship_time_utc > p.last_seen_cyno_ship_time_utc THEN p.last_seen_ship_time_utc
+                    ELSE p.last_seen_cyno_ship_time_utc
+                END DESC,
+                p.day_utc DESC;
             ";
 
             using var reader = command.ExecuteReader();
 
             while (reader.Read())
             {
-                var aggregate = new PilotCynoObservationAggregate
-                {
-                    CharacterId = reader.GetString(0),
-                    LastSeenCynoShipTypeId = reader.IsDBNull(1) ? null : reader.GetInt32(1),
-                    LastSeenCynoShipName = reader.IsDBNull(2) ? "" : reader.GetString(2),
-                    LastSeenCynoShipTimeUtc = reader.IsDBNull(3) ? "" : reader.GetString(3)
-                };
+                var characterId = reader.GetString(0);
+                int? lastSeenShipTypeId = reader.IsDBNull(1) ? null : reader.GetInt32(1);
+                var lastSeenShipTimeUtc = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                int? persistedCynoShipTypeId = reader.IsDBNull(3) ? null : reader.GetInt32(3);
+                var persistedCynoShipName = reader.IsDBNull(4) ? "" : reader.GetString(4);
+                var persistedCynoShipTimeUtc = reader.IsDBNull(5) ? "" : reader.GetString(5);
 
-                results[aggregate.CharacterId] = aggregate;
+                if (!results.TryGetValue(characterId, out var aggregate))
+                {
+                    aggregate = new PilotCynoObservationAggregate
+                    {
+                        CharacterId = characterId
+                    };
+
+                    results[characterId] = aggregate;
+                }
+
+                if (!string.IsNullOrWhiteSpace(persistedCynoShipName) &&
+                    !string.IsNullOrWhiteSpace(persistedCynoShipTimeUtc))
+                {
+                    TryApplyNewerCynoObservation(
+                        aggregate,
+                        persistedCynoShipTypeId,
+                        persistedCynoShipName,
+                        persistedCynoShipTimeUtc);
+                }
+
+                if (CynoShipCatalog.TryGetCynoShipNameByTypeId(lastSeenShipTypeId, out var currentCatalogCynoShipName) &&
+                    !string.IsNullOrWhiteSpace(lastSeenShipTimeUtc))
+                {
+                    TryApplyNewerCynoObservation(
+                        aggregate,
+                        lastSeenShipTypeId,
+                        currentCatalogCynoShipName,
+                        lastSeenShipTimeUtc);
+                }
             }
 
             return results;
+        }
+
+        private static void TryApplyNewerCynoObservation(
+            PilotCynoObservationAggregate aggregate,
+            int? shipTypeId,
+            string shipName,
+            string seenAtUtc)
+        {
+            if (aggregate == null ||
+                string.IsNullOrWhiteSpace(shipName) ||
+                string.IsNullOrWhiteSpace(seenAtUtc))
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(aggregate.LastSeenCynoShipTimeUtc) &&
+                string.CompareOrdinal(seenAtUtc, aggregate.LastSeenCynoShipTimeUtc) <= 0)
+            {
+                return;
+            }
+
+            aggregate.LastSeenCynoShipTypeId = shipTypeId;
+            aggregate.LastSeenCynoShipName = shipName;
+            aggregate.LastSeenCynoShipTimeUtc = seenAtUtc;
         }
 
         private static List<string> NormalizeIds(IEnumerable<string> characterIds)

@@ -9,6 +9,8 @@ namespace PitmastersGrill.Models
         public int TotalDays { get; set; }
         public int KillmailsScanned { get; set; }
         public int ConfirmedCynoModuleObservationsFound { get; set; }
+        public int DerivedBaitObservationsFound { get; set; }
+        public int CynoHullTackleObservationsFound { get; set; }
         public int DaysDownloaded { get; set; }
         public int DaysFailed { get; set; }
         public string Phase { get; set; } = "Idle";
@@ -41,7 +43,7 @@ namespace PitmastersGrill.Models
                 ? ""
                 : $" - {Detail}";
 
-            return $"{Phase}{progressPart}{dayPart}: killmails={KillmailsScanned:N0}, cynoModules={ConfirmedCynoModuleObservationsFound:N0}, downloadedDays={DaysDownloaded:N0}, failedDays={DaysFailed:N0}{detailPart}";
+            return $"{Phase}{progressPart}{dayPart}: killmails={KillmailsScanned:N0}, cynoModules={ConfirmedCynoModuleObservationsFound:N0}, bait={DerivedBaitObservationsFound:N0}, tackle={CynoHullTackleObservationsFound:N0}, downloadedDays={DaysDownloaded:N0}, failedDays={DaysFailed:N0}{detailPart}";
         }
     }
 }

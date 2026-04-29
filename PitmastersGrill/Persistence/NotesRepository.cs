@@ -46,6 +46,11 @@ namespace PitmastersGrill.Persistence
             return GetBooleanColumn(characterName, "known_cyno_override");
         }
 
+        public bool HasNotes(string characterName)
+        {
+            return !string.IsNullOrWhiteSpace(GetNotes(characterName));
+        }
+
         public bool GetBaitOverride(string characterName)
         {
             return GetBooleanColumn(characterName, "bait_override");

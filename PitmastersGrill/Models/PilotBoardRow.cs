@@ -23,8 +23,14 @@ namespace PitmastersGrill.Models
         private string _lastShipSeenDateDisplay = "";
         private bool _hasConfirmedCynoModuleEvidence;
         private string _confirmedCynoSignalTypesDisplay = "";
+        private bool _hasDerivedBaitEvidence;
+        private int _derivedBaitEvidenceCount;
         private bool _knownCynoOverride;
         private bool _baitOverride;
+        private bool _hasNotes;
+        private int _allianceLocalCount;
+        private int _corpLocalCount;
+        private bool _showCorpAllianceCounts;
         private string _boardSignalKind = "None";
         private string _boardSignalIcon = "";
         private string _boardSignalToolTip = "No cyno signal";
@@ -65,7 +71,13 @@ namespace PitmastersGrill.Models
         public string AllianceName
         {
             get => _allianceName;
-            set => SetField(ref _allianceName, value);
+            set
+            {
+                if (SetField(ref _allianceName, value))
+                {
+                    OnPropertyChanged(nameof(AllianceNameDisplay));
+                }
+            }
         }
 
         public string AllianceTicker
@@ -83,7 +95,13 @@ namespace PitmastersGrill.Models
         public string CorpName
         {
             get => _corpName;
-            set => SetField(ref _corpName, value);
+            set
+            {
+                if (SetField(ref _corpName, value))
+                {
+                    OnPropertyChanged(nameof(CorpNameDisplay));
+                }
+            }
         }
 
         public string CorpTicker
@@ -146,6 +164,18 @@ namespace PitmastersGrill.Models
             set => SetField(ref _confirmedCynoSignalTypesDisplay, value);
         }
 
+        public bool HasDerivedBaitEvidence
+        {
+            get => _hasDerivedBaitEvidence;
+            set => SetField(ref _hasDerivedBaitEvidence, value);
+        }
+
+        public int DerivedBaitEvidenceCount
+        {
+            get => _derivedBaitEvidenceCount;
+            set => SetField(ref _derivedBaitEvidenceCount, value);
+        }
+
         public bool KnownCynoOverride
         {
             get => _knownCynoOverride;
@@ -157,6 +187,53 @@ namespace PitmastersGrill.Models
             get => _baitOverride;
             set => SetField(ref _baitOverride, value);
         }
+
+        public bool HasNotes
+        {
+            get => _hasNotes;
+            set => SetField(ref _hasNotes, value);
+        }
+
+        public int AllianceLocalCount
+        {
+            get => _allianceLocalCount;
+            set
+            {
+                if (SetField(ref _allianceLocalCount, value))
+                {
+                    OnPropertyChanged(nameof(AllianceNameDisplay));
+                }
+            }
+        }
+
+        public int CorpLocalCount
+        {
+            get => _corpLocalCount;
+            set
+            {
+                if (SetField(ref _corpLocalCount, value))
+                {
+                    OnPropertyChanged(nameof(CorpNameDisplay));
+                }
+            }
+        }
+
+        public bool ShowCorpAllianceCounts
+        {
+            get => _showCorpAllianceCounts;
+            set
+            {
+                if (SetField(ref _showCorpAllianceCounts, value))
+                {
+                    OnPropertyChanged(nameof(AllianceNameDisplay));
+                    OnPropertyChanged(nameof(CorpNameDisplay));
+                }
+            }
+        }
+
+        public string AllianceNameDisplay => FormatNameWithLocalCount(AllianceName, AllianceLocalCount, ShowCorpAllianceCounts);
+
+        public string CorpNameDisplay => FormatNameWithLocalCount(CorpName, CorpLocalCount, ShowCorpAllianceCounts);
 
         public string BoardSignalKind
         {
@@ -268,15 +345,31 @@ namespace PitmastersGrill.Models
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        private void SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = "")
+        private bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = "")
         {
             if (Equals(field, value))
             {
-                return;
+                return false;
             }
 
             field = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
+
+        private void OnPropertyChanged(string propertyName)
+        {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private static string FormatNameWithLocalCount(string name, int count, bool showCounts)
+        {
+            if (string.IsNullOrWhiteSpace(name) || !showCounts || count <= 1)
+            {
+                return name;
+            }
+
+            return $"{name} [{count}]";
         }
     }
 }

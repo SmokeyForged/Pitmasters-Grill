@@ -12,6 +12,7 @@ namespace PitmastersGrill.Models
         public string Source { get; set; } = "";
         public DateTime? ObservedAtUtc { get; set; }
         public string ShipName { get; set; } = "";
+        public string ModuleName { get; set; } = "";
         public string KillmailId { get; set; } = "";
     }
 }

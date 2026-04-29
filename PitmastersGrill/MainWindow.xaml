@@ -7,7 +7,7 @@
         xmlns:views="clr-namespace:PitmastersGrill.Views"
         mc:Ignorable="d"
         Title="Pitmasters Grill"
-        Height="430"
+        Height="571"
         Width="760"
         MinHeight="300"
         MinWidth="420"
@@ -227,6 +227,65 @@
         </Style>
 
 
+        <Style x:Key="PilotNoteButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="MinWidth" Value="18"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentAshBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="ToolTip" Value="Add note"/>
+        </Style>
+
+        <Style x:Key="CompactAwareTabItemStyle" TargetType="TabItem">
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabItem}">
+                        <Border x:Name="TabRoot"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="4,4,0,0"
+                                Margin="0,0,2,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="HeaderContent"
+                                              ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabRoot" Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
+                                <Setter TargetName="TabRoot" Property="BorderBrush" Value="{DynamicResource AccentEmberBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource HeaderTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabRoot" Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="TabRoot" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=CompactModeToggleButton}" Value="True">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Height" Value="0"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+
     </Window.Resources>
 
     <Grid Background="{DynamicResource WindowBackgroundBrush}">
@@ -352,14 +411,14 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" Margin="12">
+        <Grid x:Name="MainContentGrid" Grid.Row="1" Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid x:Name="TopCommandGrid" Grid.Row="0" Margin="0,0,0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -416,7 +475,9 @@
                 <ToggleButton Grid.Column="4"
                               x:Name="CompactModeToggleButton"
                               Style="{StaticResource CompactModeToggleStyle}"
-                              Margin="0,0,8,0"/>
+                              Margin="0,0,8,0"
+                              Checked="CompactModeToggleButton_Changed"
+                              Unchecked="CompactModeToggleButton_Changed"/>
 
                 <Button Grid.Column="5"
                         x:Name="ExitApplicationButton"
@@ -429,7 +490,8 @@
             <TabControl x:Name="MainTabControl"
                         Grid.Row="1"
                         Background="{DynamicResource WindowBackgroundBrush}"
-                        BorderBrush="{DynamicResource PanelBorderBrush}">
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                        ItemContainerStyle="{StaticResource CompactAwareTabItemStyle}">
                 <TabItem Header="Board">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
                         <Grid x:Name="BoardOverlayHost">
@@ -452,7 +514,11 @@
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       SelectionChanged="PilotBoard_SelectionChanged"
-                                      MouseDoubleClick="PilotBoard_MouseDoubleClick" Grid.ColumnSpan="4">
+                                      MouseDoubleClick="PilotBoard_MouseDoubleClick"
+                                      PreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
+                                      PreviewMouseLeftButtonDown="PilotBoard_PreviewMouseLeftButtonDown"
+                                      PreviewMouseLeftButtonUp="PilotBoard_PreviewMouseLeftButtonUp"
+                                      PreviewMouseMove="PilotBoard_PreviewMouseMove" Grid.ColumnSpan="4">
                                 <DataGrid.Resources>
                                     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
                                     <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
@@ -471,9 +537,31 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
 
-                                    <DataGridTextColumn x:Name="CharacterColumn" Header="Character" Binding="{Binding CharacterName}" Width="2*"/>
-                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceName}" Width="1.8*"/>
-                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpName}" Width="1.8*"/>
+                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="2*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <DockPanel LastChildFill="True">
+                                                    <Button x:Name="PilotNoteButton"
+                                                            DockPanel.Dock="Right"
+                                                            Style="{StaticResource PilotNoteButtonStyle}"
+                                                            Content="✎"
+                                                            Click="PilotNoteButton_Click"/>
+                                                    <TextBlock Text="{Binding CharacterName}"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </DockPanel>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding HasNotes}" Value="True">
+                                                        <Setter TargetName="PilotNoteButton" Property="Content" Value="⚑"/>
+                                                        <Setter TargetName="PilotNoteButton" Property="ToolTip" Value="View/edit note"/>
+                                                        <Setter TargetName="PilotNoteButton" Property="Foreground" Value="{DynamicResource WarningAmberBrush}"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="1.8*"/>
+                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="1.8*"/>
                                     <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="0.9*"/>
                                     <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="0.9*"/>
                                     <DataGridTextColumn x:Name="AvgFleetSizeColumn"
@@ -830,6 +918,17 @@
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Text="Choose which optional board columns are visible. The Character column always stays visible so rows remain identifiable."/>
 
+                                            <CheckBox x:Name="ShowCorpAllianceCountsCheckBox"
+                                                      Content="Show corp/alliance counts on board"
+                                                      Foreground="{DynamicResource BodyTextBrush}"
+                                                      Margin="0,8,0,4"
+                                                      Checked="ShowCorpAllianceCountsCheckBox_Changed"
+                                                      Unchecked="ShowCorpAllianceCountsCheckBox_Changed"/>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="24,0,0,8"
+                                                       Text="When enabled, corp/alliance columns append visible local counts such as [3]. Solo counts are hidden."/>
+
                                             <WrapPanel Margin="0,8,0,12">
                                                 <CheckBox x:Name="ShowSigColumnCheckBox"
                                                           Content="Sig"
@@ -934,7 +1033,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="Technical Preview-v0.9.4"/>
+                                                       Text="Technical Preview-v0.9.5"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"
@@ -1201,6 +1300,24 @@
                                                     Click="EnableKillmailDbPullButton_Click"/>
                                         </WrapPanel>
 
+                                        <TextBlock Text="Pilot Detail Placement"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,8,0,8"/>
+
+                                        <ComboBox x:Name="PilotDetailPlacementComboBox"
+                                                  Width="220"
+                                                  HorizontalAlignment="Left"
+                                                  Margin="0,0,0,8"
+                                                  SelectionChanged="PilotDetailPlacementComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Auto, prefer right"/>
+                                            <ComboBoxItem Content="Auto, prefer left"/>
+                                        </ComboBox>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Text="Compact details open beside the board. PMG uses this preferred side when there is room and flips sides near screen edges."/>
+
                                         <TextBlock Text="Killmail Data Location"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
@@ -1254,7 +1371,8 @@
                 </TabItem>
             </TabControl>
 
-            <Border Grid.Row="2"
+            <Border x:Name="BoardStatusFooter"
+                    Grid.Row="2"
                     Margin="0,6,0,0"
                     Padding="8,5"
                     Background="{DynamicResource SurfaceAltBrush}"

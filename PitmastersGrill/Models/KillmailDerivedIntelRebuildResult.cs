@@ -13,6 +13,8 @@ namespace PitmastersGrill.Models
         public int DaysFailed { get; set; }
         public int KillmailsScanned { get; set; }
         public int ConfirmedCynoModuleObservationsFound { get; set; }
+        public int DerivedBaitObservationsFound { get; set; }
+        public int CynoHullTackleObservationsFound { get; set; }
         public string Message { get; set; } = "";
     }
 }

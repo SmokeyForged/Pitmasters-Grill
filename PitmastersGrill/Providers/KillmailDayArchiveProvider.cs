@@ -8,6 +8,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using SharpCompress.Common;
+using SharpCompress.Readers;
 
 namespace PitmastersGrill.Providers
 {
@@ -148,7 +150,26 @@ namespace PitmastersGrill.Providers
             Directory.CreateDirectory(extractRoot);
 
             var extractStopwatch = Stopwatch.StartNew();
-            await ExtractArchiveAsync(archivePath, extractRoot, cancellationToken);
+            try
+            {
+                await ExtractArchiveAsync(archivePath, extractRoot, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var error =
+                    $"Archive extraction failed. archive={Path.GetFileName(archivePath)}, target={Path.GetFileName(extractRoot)}, error={ex.Message}";
+
+                DebugTraceWriter.WriteLine(
+                    $"killmail archive extract failed: day={dayUtc}, archive={Path.GetFileName(archivePath)}, target={Path.GetFileName(extractRoot)}, error={ex}");
+
+                return new KillmailArchiveExtractResult
+                {
+                    Success = false,
+                    ExtractRoot = extractRoot,
+                    Error = error
+                };
+            }
+
             extractStopwatch.Stop();
 
             var jsonFileCount = Directory.GetFiles(extractRoot, "*.json", SearchOption.AllDirectories).Length;
@@ -201,36 +222,47 @@ namespace PitmastersGrill.Providers
             string extractRoot,
             CancellationToken cancellationToken)
         {
-            var psi = new ProcessStartInfo
+            using var stream = File.OpenRead(archivePath);
+            await using var reader = await ReaderFactory.OpenAsyncReader(stream, cancellationToken: cancellationToken);
+
+            while (await reader.MoveToNextEntryAsync(cancellationToken))
             {
-                FileName = "tar.exe",
-                Arguments = $"-xf \"{archivePath}\" -C \"{extractRoot}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            using var process = new Process
-            {
-                StartInfo = psi
-            };
+                if (reader.Entry.IsDirectory)
+                {
+                    continue;
+                }
 
-            process.Start();
+                var entryKey = reader.Entry.Key ?? "";
+                if (!IsSafeArchiveEntryPath(extractRoot, entryKey))
+                {
+                    throw new InvalidOperationException($"Unsafe archive entry path rejected: {entryKey}");
+                }
 
-            var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-
-            await process.WaitForExitAsync(cancellationToken);
-
-            var stdOut = await stdOutTask;
-            var stdErr = await stdErrTask;
-
-            if (process.ExitCode != 0)
-            {
-                throw new InvalidOperationException(
-                    $"tar.exe extraction failed with exit code {process.ExitCode}. stdout={stdOut} stderr={stdErr}");
+                await reader.WriteEntryToDirectoryAsync(
+                    extractRoot,
+                    new ExtractionOptions
+                    {
+                        ExtractFullPath = true,
+                        Overwrite = true
+                    },
+                    cancellationToken);
             }
+        }
+
+        private static bool IsSafeArchiveEntryPath(string extractRoot, string entryKey)
+        {
+            if (string.IsNullOrWhiteSpace(entryKey) ||
+                Path.IsPathRooted(entryKey))
+            {
+                return false;
+            }
+
+            var root = Path.GetFullPath(extractRoot);
+            var normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var destination = Path.GetFullPath(Path.Combine(root, entryKey));
+            return destination.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
         }
     }
 

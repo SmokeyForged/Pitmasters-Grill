@@ -12,9 +12,7 @@ namespace PitmastersGrill.Persistence
 
         public static string GetDefaultKillmailDataDirectory()
         {
-            var path = ExpandPathTokens(DefaultDisplayPath);
-            Directory.CreateDirectory(path);
-            return path;
+            return AppPaths.EnsureSubdirectory("KillmailDb");
         }
 
         public static string GetDefaultKillmailDataDirectoryDisplayPath()
@@ -153,7 +151,7 @@ namespace PitmastersGrill.Persistence
 
         public static bool IsUsingConfiguredOverride()
         {
-            return !string.IsNullOrWhiteSpace(TryGetConfiguredKillmailDataDirectoryRaw());
+            return !string.IsNullOrWhiteSpace(TryGetConfiguredKillmailDataDirectory());
         }
 
         public static string GetKillmailDataDirectorySourceDescription()
@@ -195,7 +193,11 @@ namespace PitmastersGrill.Persistence
                 return string.Empty;
             }
 
-            return Environment.ExpandEnvironmentVariables(path.Trim());
+            var expanded = Environment.ExpandEnvironmentVariables(path.Trim());
+            expanded = ExpandKnownFolderToken(expanded, "%LOCALAPPDATA%", Environment.SpecialFolder.LocalApplicationData);
+            expanded = ExpandKnownFolderToken(expanded, "%USERPROFILE%", Environment.SpecialFolder.UserProfile);
+
+            return expanded;
         }
 
         public static string CollapsePathTokens(string path)
@@ -209,7 +211,7 @@ namespace PitmastersGrill.Persistence
 
             try
             {
-                var fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(trimmed));
+                var fullPath = Path.GetFullPath(ExpandPathTokens(trimmed));
 
                 var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -232,6 +234,61 @@ namespace PitmastersGrill.Persistence
             {
                 return trimmed;
             }
+        }
+
+        private static string ExpandKnownFolderToken(string path, string token, Environment.SpecialFolder specialFolder)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(token))
+            {
+                return path;
+            }
+
+            if (!path.Contains(token, StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+
+            var folderPath = Environment.GetFolderPath(specialFolder);
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return path;
+            }
+
+            return ReplaceTokenIgnoreCase(
+                path,
+                token,
+                folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        }
+
+        private static string ReplaceTokenIgnoreCase(string value, string token, string replacement)
+        {
+            var result = value;
+            var index = result.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+
+            while (index >= 0)
+            {
+                result = result.Substring(0, index) + replacement + result.Substring(index + token.Length);
+                index = result.IndexOf(token, index + replacement.Length, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return result;
+        }
+
+        private static bool ContainsUnexpandedEnvironmentToken(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var firstPercent = path.IndexOf("%", StringComparison.Ordinal);
+            if (firstPercent < 0)
+            {
+                return false;
+            }
+
+            var secondPercent = path.IndexOf("%", firstPercent + 1, StringComparison.Ordinal);
+            return secondPercent > firstPercent;
         }
 
         private static void TryDeleteArchiveFileIfExpired(string archivePath, string excludeDayUtc, DateTime nowUtc)
@@ -376,7 +433,7 @@ namespace PitmastersGrill.Persistence
             try
             {
                 var expanded = ExpandPathTokens(raw);
-                if (string.IsNullOrWhiteSpace(expanded))
+                if (string.IsNullOrWhiteSpace(expanded) || ContainsUnexpandedEnvironmentToken(expanded))
                 {
                     return string.Empty;
                 }

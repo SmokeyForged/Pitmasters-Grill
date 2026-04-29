@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -29,6 +30,9 @@ namespace PitmastersGrill
         private const int ClipboardDebounceMilliseconds = 250;
         private const int DefaultBoardPopulationRetryDelaySeconds = 12;
         private const int MaxBoardPopulationRetryAttempts = 5;
+        private const int CompactDragHoldMilliseconds = 300;
+        private const int TripleEscapeWindowMilliseconds = 1500;
+        private const double DetailWindowGap = 8;
 
         private readonly BackgroundIntelUpdateService _backgroundIntelUpdateService;
         private AppSettings _appSettings = new();
@@ -51,6 +55,7 @@ namespace PitmastersGrill
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
         private readonly DispatcherTimer _clipboardDebounceTimer;
+        private readonly DispatcherTimer _compactDragHoldTimer;
         private readonly CancellationTokenSource _windowShutdownCts = new();
         private readonly SystemTrayIconService _systemTrayIconService;
         private IgnoreAllianceListView? _ignoreAllianceListView;
@@ -63,6 +68,10 @@ namespace PitmastersGrill
         private PilotDetailWindow? _activePilotDetailWindow;
         private bool _isApplyingSettings;
         private bool _isShuttingDown;
+        private bool _compactDragPending;
+        private Point _compactDragStartPoint;
+        private DateTime _lastEscapeTapUtc = DateTime.MinValue;
+        private int _escapeTapCount;
         private int _processingGeneration;
 
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
@@ -76,6 +85,7 @@ namespace PitmastersGrill
 
             _isApplyingSettings = true;
             InitializeComponent();
+            RegisterCompactBoardDragHandlers();
 
             _diagnostics = new MainWindowDiagnostics(Dispatcher);
             _systemTrayIconService = new SystemTrayIconService(
@@ -86,6 +96,11 @@ namespace PitmastersGrill
                 Interval = TimeSpan.FromMilliseconds(ClipboardDebounceMilliseconds)
             };
             _clipboardDebounceTimer.Tick += ClipboardDebounceTimer_Tick;
+            _compactDragHoldTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(CompactDragHoldMilliseconds)
+            };
+            _compactDragHoldTimer.Tick += CompactDragHoldTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
@@ -156,6 +171,7 @@ namespace PitmastersGrill
                 LogLevelComboBox);
 
             InitializeBoardColumnVisibilityUi();
+            InitializePilotDetailPlacementUi();
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
 
@@ -172,6 +188,7 @@ namespace PitmastersGrill
             UpdateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
             HideDetailPane();
             UpdateOpenDetailsButtonState();
+            ApplyCompactModeUi();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
 
             AppLogger.DatabaseInfo(
@@ -213,6 +230,8 @@ namespace PitmastersGrill
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
             _clipboardDebounceTimer.Stop();
             _clipboardDebounceTimer.Tick -= ClipboardDebounceTimer_Tick;
+            _compactDragHoldTimer.Stop();
+            _compactDragHoldTimer.Tick -= CompactDragHoldTimer_Tick;
             _systemTrayIconService.Dispose();
             _diagnostics.Dispose();
 
@@ -227,6 +246,47 @@ namespace PitmastersGrill
         private void ExitApplicationButton_Click(object sender, RoutedEventArgs e)
         {
             RequestApplicationShutdown("Exit button");
+        }
+
+
+        private void CompactModeToggleButton_Changed(object sender, RoutedEventArgs e)
+        {
+            ApplyCompactModeUi();
+        }
+
+        private void ApplyCompactModeUi()
+        {
+            if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null)
+            {
+                return;
+            }
+
+            var compact = CompactModeToggleButton.IsChecked == true;
+
+            if (compact)
+            {
+                MainTabControl.SelectedIndex = 0;
+                CloseActiveDetailWindow();
+            }
+
+            TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            BoardStatusFooter.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12);
+            MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1);
+            MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0);
+
+            AppLogger.UiInfo($"Compact mode changed. enabled={compact}");
+        }
+
+        private void ToggleCompactModeFromHotkey()
+        {
+            if (CompactModeToggleButton == null)
+            {
+                return;
+            }
+
+            CompactModeToggleButton.IsChecked = CompactModeToggleButton.IsChecked != true;
+            ApplyCompactModeUi();
         }
 
         private void RequestApplicationShutdown(string reason)
@@ -357,6 +417,7 @@ namespace PitmastersGrill
                 this,
                 WindowOpacityValueText,
                 Resources);
+            _activePilotDetailWindow?.ApplyThemeResources(Resources);
         }
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -402,6 +463,34 @@ namespace PitmastersGrill
             PilotBoard?.Items.Refresh();
         }
 
+
+        private void InitializePilotDetailPlacementUi()
+        {
+            if (PilotDetailPlacementComboBox == null)
+            {
+                return;
+            }
+
+            var preference = GetPilotDetailPlacementPreference();
+            PilotDetailPlacementComboBox.SelectedIndex = preference == PilotDetailPlacementPreference.AutoPreferLeft ? 1 : 0;
+        }
+
+        private void PilotDetailPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isApplyingSettings || PilotDetailPlacementComboBox == null)
+            {
+                return;
+            }
+
+            _appSettings.PilotDetailPlacementPreference =
+                PilotDetailPlacementComboBox.SelectedIndex == 1
+                    ? PilotDetailPlacementPreference.AutoPreferLeft.ToString()
+                    : PilotDetailPlacementPreference.AutoPreferRight.ToString();
+
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+            AppLogger.UiInfo($"Pilot detail placement preference changed. preference={_appSettings.PilotDetailPlacementPreference}");
+        }
+
         private void InitializeBoardColumnVisibilityUi()
         {
             ApplyBoardColumnSettingsToCheckBoxes();
@@ -421,6 +510,20 @@ namespace PitmastersGrill
 
             AppLogger.UiInfo(
                 $"Board column visibility changed. sig={IsEnabled(ShowSigColumnCheckBox)} alliance={IsEnabled(ShowAllianceColumnCheckBox)} corp={IsEnabled(ShowCorpColumnCheckBox)} kills={IsEnabled(ShowKillsColumnCheckBox)} losses={IsEnabled(ShowLossesColumnCheckBox)} avgFleet={IsEnabled(ShowAvgFleetSizeColumnCheckBox)} lastShip={IsEnabled(ShowLastShipSeenColumnCheckBox)} lastSeen={IsEnabled(ShowLastSeenColumnCheckBox)} cynoHull={IsEnabled(ShowCynoHullSeenColumnCheckBox)}");
+        }
+
+        private void ShowCorpAllianceCountsCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            _appSettings.ShowCorpAllianceCounts = ShowCorpAllianceCountsCheckBox.IsChecked == true;
+            RecomputeCorpAllianceCounts();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo($"Corp/alliance board counts changed. enabled={_appSettings.ShowCorpAllianceCounts}");
         }
 
         private void ShowAllBoardColumnsButton_Click(object sender, RoutedEventArgs e)
@@ -464,6 +567,7 @@ namespace PitmastersGrill
                 ShowLastShipSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLastShipSeenColumn);
                 ShowLastSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLastSeenColumn);
                 ShowCynoHullSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowCynoHullSeenColumn);
+                ShowCorpAllianceCountsCheckBox.IsChecked = _appSettings.ShowCorpAllianceCounts;
             }
             finally
             {
@@ -820,11 +924,13 @@ namespace PitmastersGrill
             {
                 row.KnownCynoOverride = _notesRepository.GetKnownCynoOverride(row.CharacterName);
                 row.BaitOverride = _notesRepository.GetBaitOverride(row.CharacterName);
+                row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
                 _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
                 _currentRows.Add(row);
             }
 
             ApplyIgnoredAllianceRowsToCurrentBoard();
+            RecomputeCorpAllianceCounts();
 
             PilotBoard.SelectedItem = null;
             HideDetailPane();
@@ -859,6 +965,7 @@ namespace PitmastersGrill
             }
 
             AppLogger.UiInfo($"Ignored alliance filter removed a resolved row from current board. character='{row.CharacterName}' allianceId='{row.AllianceId}'");
+            RecomputeCorpAllianceCounts();
         }
 
         private void ApplyIgnoredAllianceRowsToCurrentBoard()
@@ -875,6 +982,8 @@ namespace PitmastersGrill
             {
                 _currentRows.Remove(removedRow);
             }
+
+            RecomputeCorpAllianceCounts();
 
             if (applyResult.SelectedRowRemoved)
             {
@@ -894,6 +1003,7 @@ namespace PitmastersGrill
         private void RefreshDetailWindowIfSelected(PilotBoardRow row)
         {
             _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
+            RecomputeCorpAllianceCounts();
 
             if (_activePilotDetailWindow != null &&
                 string.Equals(_activePilotDetailWindow.CharacterName, row.CharacterName, StringComparison.OrdinalIgnoreCase))
@@ -917,6 +1027,63 @@ namespace PitmastersGrill
             }
         }
 
+        private void RecomputeCorpAllianceCounts()
+        {
+            var showCounts = _appSettings.ShowCorpAllianceCounts;
+
+            var corpCounts = _currentRows
+                .Select(row => new { Row = row, Key = GetCorpCountKey(row) })
+                .Where(item => !string.IsNullOrWhiteSpace(item.Key))
+                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var allianceCounts = _currentRows
+                .Select(row => new { Row = row, Key = GetAllianceCountKey(row) })
+                .Where(item => !string.IsNullOrWhiteSpace(item.Key))
+                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in _currentRows)
+            {
+                row.ShowCorpAllianceCounts = showCounts;
+
+                var corpKey = GetCorpCountKey(row);
+                row.CorpLocalCount = !string.IsNullOrWhiteSpace(corpKey) && corpCounts.TryGetValue(corpKey, out var corpCount)
+                    ? corpCount
+                    : 0;
+
+                var allianceKey = GetAllianceCountKey(row);
+                row.AllianceLocalCount = !string.IsNullOrWhiteSpace(allianceKey) && allianceCounts.TryGetValue(allianceKey, out var allianceCount)
+                    ? allianceCount
+                    : 0;
+            }
+        }
+
+        private static string GetCorpCountKey(PilotBoardRow row)
+        {
+            return BuildAffiliationCountKey(row.CorpId, row.CorpName);
+        }
+
+        private static string GetAllianceCountKey(PilotBoardRow row)
+        {
+            return BuildAffiliationCountKey(row.AllianceId, row.AllianceName);
+        }
+
+        private static string BuildAffiliationCountKey(string id, string name)
+        {
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                return $"id:{id.Trim()}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return $"name:{name.Trim().ToUpperInvariant()}";
+            }
+
+            return string.Empty;
+        }
+
         private void PilotBoard_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             SaveCurrentNotesAndTags();
@@ -933,13 +1100,182 @@ namespace PitmastersGrill
 
         private void PilotBoard_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (PilotBoard.SelectedItem is not PilotBoardRow selectedRow)
+            if (e.ChangedButton != MouseButton.Left)
             {
                 return;
             }
 
+            if (FindVisualParent<ButtonBase>(e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            var rowContainer = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (rowContainer?.Item is not PilotBoardRow selectedRow)
+            {
+                return;
+            }
+
+            CancelCompactBoardDrag();
+            PilotBoard.SelectedItem = selectedRow;
             OpenZkillForRow(selectedRow);
             e.Handled = true;
+        }
+
+        private void PilotBoard_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (FindVisualParent<ButtonBase>(e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            var rowContainer = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (rowContainer?.Item is not PilotBoardRow selectedRow)
+            {
+                return;
+            }
+
+            PilotBoard.SelectedItem = selectedRow;
+            OpenDetailsWindow(selectedRow);
+            e.Handled = true;
+        }
+
+        private void RegisterCompactBoardDragHandlers()
+        {
+            // DataGrid rows and column headers can mark normal mouse events as handled for
+            // selection/sorting before our XAML handlers see them. Register handledEventsToo
+            // so compact-mode click-hold dragging works even when the board is full.
+            PilotBoard.AddHandler(UIElement.PreviewMouseDownEvent, new MouseButtonEventHandler(PilotBoard_PreviewMouseDownHandledToo), true);
+            PilotBoard.AddHandler(UIElement.PreviewMouseUpEvent, new MouseButtonEventHandler(PilotBoard_PreviewMouseUpHandledToo), true);
+            PilotBoard.AddHandler(UIElement.PreviewMouseMoveEvent, new MouseEventHandler(PilotBoard_PreviewMouseMoveHandledToo), true);
+        }
+
+        private void PilotBoard_PreviewMouseDownHandledToo(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                BeginCompactBoardDragIfAllowed(e);
+            }
+        }
+
+        private void PilotBoard_PreviewMouseUpHandledToo(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                CancelCompactBoardDrag();
+            }
+        }
+
+        private void PilotBoard_PreviewMouseMoveHandledToo(object sender, MouseEventArgs e)
+        {
+            if (_compactDragPending && e.LeftButton != MouseButtonState.Pressed)
+            {
+                CancelCompactBoardDrag();
+            }
+        }
+
+        private void PilotBoard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            BeginCompactBoardDragIfAllowed(e);
+        }
+
+        private void PilotBoard_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            CancelCompactBoardDrag();
+        }
+
+        private void PilotBoard_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_compactDragPending && e.LeftButton != MouseButtonState.Pressed)
+            {
+                CancelCompactBoardDrag();
+            }
+        }
+
+        private void BeginCompactBoardDragIfAllowed(MouseButtonEventArgs e)
+        {
+            if (_compactDragPending || CompactModeToggleButton?.IsChecked != true)
+            {
+                return;
+            }
+
+            if (e.ClickCount > 1)
+            {
+                CancelCompactBoardDrag();
+                return;
+            }
+
+            if (IsFromCompactDragBlockedElement(e.OriginalSource as DependencyObject))
+            {
+                return;
+            }
+
+            _compactDragPending = true;
+            _compactDragStartPoint = e.GetPosition(this);
+            _compactDragHoldTimer.Stop();
+            _compactDragHoldTimer.Start();
+        }
+
+        private void CancelCompactBoardDrag()
+        {
+            _compactDragPending = false;
+            _compactDragHoldTimer.Stop();
+        }
+
+        private void CompactDragHoldTimer_Tick(object? sender, EventArgs e)
+        {
+            _compactDragHoldTimer.Stop();
+
+            if (!_compactDragPending || CompactModeToggleButton?.IsChecked != true || Mouse.LeftButton != MouseButtonState.Pressed)
+            {
+                _compactDragPending = false;
+                return;
+            }
+
+            _compactDragPending = false;
+
+            try
+            {
+                Mouse.Capture(null);
+                DragMove();
+            }
+            catch (InvalidOperationException)
+            {
+                // DragMove can throw if the mouse button is released during the hold boundary.
+            }
+        }
+
+        private void PilotNoteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not PilotBoardRow row)
+            {
+                return;
+            }
+
+            OpenPilotNotesWindow(row);
+            e.Handled = true;
+        }
+
+        private void OpenPilotNotesWindow(PilotBoardRow row)
+        {
+            var notesWindow = new PilotNotesWindow(row, _notesRepository)
+            {
+                Owner = this,
+                Topmost = Topmost
+            };
+
+            notesWindow.Resources.MergedDictionaries.Clear();
+            foreach (var key in Resources.Keys)
+            {
+                notesWindow.Resources[key] = Resources[key];
+            }
+            notesWindow.ShowDialog();
+
+            row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
+            PilotBoard.Items.Refresh();
+            RefreshDetailWindowIfSelected(row);
+
+            AppLogger.UiInfo($"Pilot notes window closed. character='{row.CharacterName}' hasNotes={row.HasNotes}");
         }
 
         private void CloseDetailsButton_Click(object sender, RoutedEventArgs e)
@@ -955,6 +1291,11 @@ namespace PitmastersGrill
 
         private void ClearBoardButton_Click(object sender, RoutedEventArgs e)
         {
+            ClearBoard("Clear button");
+        }
+
+        private void ClearBoard(string reason)
+        {
             var clearedRowCount = _currentRows.Count;
 
             _diagnostics.ClearBoardStart(clearedRowCount);
@@ -966,13 +1307,14 @@ namespace PitmastersGrill
 
             PilotBoard.SelectedItem = null;
             _currentRows.Clear();
+            RecomputeCorpAllianceCounts();
             CloseActiveDetailWindow();
             UpdateOpenDetailsButtonState();
 
             UpdateLastRefreshed();
             UpdateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
 
-            AppLogger.UiInfo($"Board cleared. removedRows={clearedRowCount}");
+            AppLogger.UiInfo($"Board cleared. reason='{reason}' removedRows={clearedRowCount}");
             _diagnostics.ClearBoardComplete();
         }
 
@@ -1180,7 +1522,7 @@ namespace PitmastersGrill
             }
 
             var confirm = MessageBox.Show(
-                "Rebuild killmail derived intel from local extracted killmail archives?\n\nThis only rebuilds derived confirmed cyno-module observations. It does not clear notes, settings, themes, ignore lists, manual overrides, or unrelated cache data.",
+                "Rebuild killmail derived intel from local extracted killmail archives?\n\nThis only rebuilds derived confirmed cyno-module and industrial-cyno bait observations. It does not clear notes, settings, themes, ignore lists, manual overrides, or unrelated cache data.",
                 "PMG Killmail Derived Intel",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
@@ -1353,7 +1695,55 @@ namespace PitmastersGrill
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Details now live in their own window; Escape handling belongs there.
+            if (IsTextEditingElement(e.OriginalSource as DependencyObject))
+            {
+                return;
+            }
+
+            switch (e.Key)
+            {
+                case Key.Insert:
+                    ToggleCompactModeFromHotkey();
+                    e.Handled = true;
+                    return;
+
+                case Key.Delete:
+                    ClearBoard("Delete hotkey");
+                    e.Handled = true;
+                    return;
+
+                case Key.Home:
+                    AppLogger.UiInfo("Manual clipboard refresh requested from Home hotkey.");
+                    _boardPopulationEntryController.InvalidateLastProcessedClipboard();
+                    _ = ProcessClipboardIfValidAsync();
+                    e.Handled = true;
+                    return;
+
+                case Key.Escape:
+                    HandleEscapeHotkey();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        private void HandleEscapeHotkey()
+        {
+            var now = DateTime.UtcNow;
+            if ((now - _lastEscapeTapUtc).TotalMilliseconds <= TripleEscapeWindowMilliseconds)
+            {
+                _escapeTapCount++;
+            }
+            else
+            {
+                _escapeTapCount = 1;
+            }
+
+            _lastEscapeTapUtc = now;
+
+            if (_escapeTapCount >= 3)
+            {
+                RequestApplicationShutdown("Triple Escape hotkey");
+            }
         }
 
         private void OpenDetailsWindow(PilotBoardRow row)
@@ -1379,9 +1769,71 @@ namespace PitmastersGrill
                 Owner = this
             };
             _activePilotDetailWindow.ApplyThemeResources(Resources);
+            _activePilotDetailWindow.Topmost = Topmost;
+            PositionDetailWindow(_activePilotDetailWindow);
             _activePilotDetailWindow.Closed += ActivePilotDetailWindow_Closed;
             _activePilotDetailWindow.Show();
             AppLogger.UiInfo($"Details window opened. character='{row.CharacterName}'");
+        }
+
+
+        private void PositionDetailWindow(PilotDetailWindow detailWindow)
+        {
+            if (detailWindow == null)
+            {
+                return;
+            }
+
+            detailWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+
+            var detailWidth = detailWindow.Width > 0 ? detailWindow.Width : 430;
+            var detailHeight = detailWindow.Height > 0 ? detailWindow.Height : 360;
+            var ownerWidth = ActualWidth > 0 ? ActualWidth : Width;
+            var ownerHeight = ActualHeight > 0 ? ActualHeight : Height;
+
+            var virtualLeft = SystemParameters.VirtualScreenLeft;
+            var virtualTop = SystemParameters.VirtualScreenTop;
+
+            var ownerLeft = double.IsNaN(Left) ? virtualLeft : Left;
+            var ownerTop = double.IsNaN(Top) ? virtualTop : Top;
+
+            var ownerRect = new System.Drawing.Rectangle(
+                (int)Math.Round(ownerLeft),
+                (int)Math.Round(ownerTop),
+                Math.Max(1, (int)Math.Round(ownerWidth)),
+                Math.Max(1, (int)Math.Round(ownerHeight)));
+
+            var workArea = System.Windows.Forms.Screen.FromRectangle(ownerRect).WorkingArea;
+            var workLeft = (double)workArea.Left;
+            var workTop = (double)workArea.Top;
+            var workRight = (double)workArea.Right;
+            var workBottom = (double)workArea.Bottom;
+
+            var rightX = ownerLeft + ownerWidth + DetailWindowGap;
+            var leftX = ownerLeft - detailWidth - DetailWindowGap;
+            var canRight = rightX + detailWidth <= workRight;
+            var canLeft = leftX >= workLeft;
+
+            var preferLeft = GetPilotDetailPlacementPreference() == PilotDetailPlacementPreference.AutoPreferLeft;
+            var placeLeft = preferLeft
+                ? canLeft || !canRight
+                : !canRight && canLeft;
+
+            var targetLeft = placeLeft ? leftX : rightX;
+            var targetTop = ownerTop;
+
+            detailWindow.Left = Clamp(targetLeft, workLeft, Math.Max(workLeft, workRight - detailWidth));
+            detailWindow.Top = Clamp(targetTop, workTop, Math.Max(workTop, workBottom - detailHeight));
+        }
+
+        private PilotDetailPlacementPreference GetPilotDetailPlacementPreference()
+        {
+            return Enum.TryParse<PilotDetailPlacementPreference>(
+                _appSettings.PilotDetailPlacementPreference,
+                ignoreCase: true,
+                out var parsed)
+                ? parsed
+                : PilotDetailPlacementPreference.AutoPreferRight;
         }
 
         private void ActivePilotDetailWindow_Closed(object? sender, EventArgs e)
@@ -1488,6 +1940,7 @@ namespace PitmastersGrill
         private void IgnoreAllianceListView_IgnoreListChanged(object? sender, EventArgs e)
         {
             ApplyIgnoredAllianceRowsToCurrentBoard();
+            RecomputeCorpAllianceCounts();
         }
 
         private void IgnoreAllianceButton_Click(object sender, RoutedEventArgs e)
@@ -1536,6 +1989,7 @@ namespace PitmastersGrill
 
             _ignoreAllianceListView?.RefreshFromCoordinator();
             ApplyIgnoredAllianceRowsToCurrentBoard();
+            RecomputeCorpAllianceCounts();
             return true;
         }
 
@@ -1626,6 +2080,83 @@ namespace PitmastersGrill
             }
 
             OpenDetailsButton.IsEnabled = PilotBoard?.SelectedItem is PilotBoardRow;
+        }
+
+
+        private static bool IsTextEditingElement(DependencyObject? source)
+        {
+            return FindVisualParent<TextBox>(source) != null ||
+                   FindVisualParent<ComboBox>(source) != null;
+        }
+
+        private static bool IsFromCompactDragBlockedElement(DependencyObject? source)
+        {
+            // Rows and column headers are valid compact-mode drag surfaces.
+            // Only block elements where click/hold has a separate interactive meaning.
+            // DataGridColumnHeader derives from ButtonBase in WPF, so allow it before the generic button check.
+            if (FindVisualParent<DataGridColumnHeader>(source) != null)
+            {
+                return FindVisualParent<Thumb>(source) != null;
+            }
+
+            return FindVisualParent<ButtonBase>(source) != null ||
+                   FindVisualParent<ScrollBar>(source) != null ||
+                   FindVisualParent<TextBox>(source) != null ||
+                   FindVisualParent<ComboBox>(source) != null ||
+                   FindVisualParent<Thumb>(source) != null;
+        }
+
+        private static T? FindVisualParent<T>(DependencyObject? source)
+            where T : DependencyObject
+        {
+            while (source != null)
+            {
+                if (source is T match)
+                {
+                    return match;
+                }
+
+                source = GetParentObject(source);
+            }
+
+            return null;
+        }
+
+        private static DependencyObject? GetParentObject(DependencyObject source)
+        {
+            if (source is FrameworkElement frameworkElement && frameworkElement.Parent != null)
+            {
+                return frameworkElement.Parent;
+            }
+
+            if (source is FrameworkContentElement frameworkContentElement && frameworkContentElement.Parent != null)
+            {
+                return frameworkContentElement.Parent;
+            }
+
+            try
+            {
+                return VisualTreeHelper.GetParent(source);
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        private static double Clamp(double value, double min, double max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+
+            if (value > max)
+            {
+                return max;
+            }
+
+            return value;
         }
 
         private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)

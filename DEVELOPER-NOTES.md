@@ -79,9 +79,11 @@ Scoring summary:
 
 Confirmed module observations are stored in the killmail intel database table `pilot_cyno_module_observations_day`. The importer scans victim item lists recursively and records only module metadata: pilot ID, killmail ID/time, victim ship type ID, module type/name, destroyed/dropped quantities, item state, and source.
 
-Use **Diagnostics > Cache Maintenance > Rebuild Killmail Derived Intel** after schema/backfill changes. It rebuilds only derived confirmed cyno-module observations from local extracted killmail archive data. It does not clear settings, notes, ignore lists, themes, manual overrides, resolver cache, or unrelated cache data. If local extracted archives are unavailable, run Enable KillMail DB Pull or refresh the killmail cache first.
+Industrial-cyno bait observations are stored separately in `pilot_bait_observations_day`. PMG records these only when the same public loss victim item list contains `Industrial Cynosural Field Generator` plus a warp scrambler or warp disruptor. Attacker-only appearances are not fitted-module evidence and must not create bait observations. Current tackle detection uses exact known T1/T2 type IDs where available and conservative item-name matching for names containing `Warp Scrambler` or `Warp Disruptor`.
 
-Diagnostics export includes safe Cyno Signal summaries recorded during detail-window analysis. It does not export full raw killmail dumps.
+Use **Diagnostics > Cache Maintenance > Rebuild Killmail Derived Intel** after schema/backfill changes. It rebuilds only derived confirmed cyno-module observations and industrial-cyno bait observations from local extracted killmail archive data. It does not clear settings, notes, ignore lists, themes, manual overrides, resolver cache, or unrelated cache data. If local extracted archives are unavailable, run Enable KillMail DB Pull or refresh the killmail cache first.
+
+Diagnostics export includes safe Cyno Signal summaries and derived bait counts/examples. It does not export full raw killmail dumps.
 
 Future work: if PMG keeps richer cached killmail detail records, use them cache-first and lazily from the details window. Do not fetch full killmails for every board row blindly.
 
@@ -94,7 +96,8 @@ Future work: if PMG keeps richer cached killmail detail records, use them cache-
 - Change Settings > General > PMG Theme across all three themes and confirm the board remains readable.
 - Confirm detail panel text says Recent Public Kill/Loss Activity and does not imply live movement.
 - Confirm Cyno Signal is Unknown with no evidence and cannot show Confirmed without module evidence.
-- Run Rebuild Killmail Derived Intel when testing confirmed cyno module backfill from existing local archive data.
+- Run Rebuild Killmail Derived Intel when testing confirmed cyno module or industrial-cyno bait backfill from existing local archive data.
+- Verify industrial cyno + scram/disruptor victim-item evidence gives Sig `B`, while industrial cyno alone, tackle alone, and attacker-only appearances do not.
 - Export Diagnostics Package and inspect the ZIP contents for safe summaries, logs, provider health, timings, and cache stats.
 - Refresh cache stats, clear expired cache, and verify clear-all/compact require confirmation.
 - Run `.\tools\publish-release.ps1` only when local release artifacts are desired.

@@ -2,138 +2,145 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="PMG Details"
-        Width="540"
-        Height="661"
-        MinWidth="460"
-        MinHeight="420"
-        WindowStartupLocation="CenterOwner"
+        Width="430"
+        Height="360"
+        MinWidth="380"
+        MinHeight="280"
+        WindowStartupLocation="Manual"
         Background="{DynamicResource WindowBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown">
-    <Grid Margin="14">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Window.Resources>
+        <Style x:Key="DetailLinkButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,14,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock x:Name="Text"
+                                   Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   FontWeight="{TemplateBinding FontWeight}"
+                                   TextDecorations="{x:Null}"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Text" Property="TextDecorations" Value="Underline"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Text" Property="Foreground" Value="{DynamicResource ErrorRedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-        <ScrollViewer Grid.Row="0"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,8,0">
+    <Border Margin="8"
+            Padding="10"
+            Background="{DynamicResource SurfaceAltBrush}"
+            BorderBrush="{DynamicResource PanelBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="4">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0">
                 <TextBlock x:Name="PilotNameText"
                            FontSize="20"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource HeaderTextBrush}"
-                           Margin="0,0,0,6"/>
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,4"/>
 
-                <WrapPanel Margin="0,0,0,12">
-                    <CheckBox x:Name="KnownCynoOverrideCheckBox"
-                              Content="Known-Cyno Override"
-                              Foreground="{DynamicResource BodyTextBrush}"
-                              Margin="0,0,12,6"/>
-                    <CheckBox x:Name="BaitOverrideCheckBox"
-                              Content="Bait"
-                              Foreground="{DynamicResource BodyTextBrush}"
-                              Margin="0,0,12,6"/>
+                <TextBlock x:Name="AffiliationText"
+                           Foreground="{DynamicResource BodyTextBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,2"/>
+
+                <TextBlock x:Name="ActivityText"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,2"/>
+
+                <TextBlock x:Name="KillLossText"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10"/>
+
+                <WrapPanel Margin="0,0,0,8">
+                    <Button x:Name="KnownCynoOverrideLink"
+                            Style="{StaticResource DetailLinkButtonStyle}"
+                            Content="Known-Cyno Override"
+                            Click="KnownCynoOverrideLink_Click"/>
+                    <Button x:Name="BaitOverrideLink"
+                            Style="{StaticResource DetailLinkButtonStyle}"
+                            Content="Bait"
+                            Click="BaitOverrideLink_Click"/>
                 </WrapPanel>
 
-                <TextBlock Text="Pilot"
+                <TextBlock x:Name="BaitSignalText"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource AccentEmberBrush}"/>
-                <TextBlock x:Name="PilotSummaryText"
-                           Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,2,0,10"/>
+                           Foreground="{DynamicResource BoardSignalBaitBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,2"/>
 
-                <TextBlock Text="Recent Public Kill/Loss"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource AccentEmberBrush}"/>
-                <TextBlock x:Name="RecentActivityText"
-                           Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,2,0,10"/>
-
-                <TextBlock Text="Cyno Signal"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource AccentEmberBrush}"/>
                 <TextBlock x:Name="CynoSignalText"
-                           FontSize="16"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource AccentAshBrush}"
-                           Margin="0,2,0,4"/>
-                <ProgressBar x:Name="CynoConfidenceBar"
-                             Height="8"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="0"
-                             Foreground="{DynamicResource AccentAshBrush}"
-                             Background="{DynamicResource SurfaceBrush}"
-                             Margin="0,0,0,8"/>
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,2"/>
 
-                <TextBlock Text="Evidence"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource AccentEmberBrush}"/>
                 <TextBlock x:Name="EvidenceText"
                            Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,2,0,10"/>
+                           TextWrapping="Wrap"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,0,2"/>
 
-                <TextBlock Text="Limitations"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource AccentEmberBrush}"/>
                 <TextBlock x:Name="LimitationsText"
-                           Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,2,0,10"/>
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,8"/>
 
-                <TextBlock Text="Notes / Tags"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource AccentEmberBrush}"/>
-                <TextBox x:Name="NotesTagsBox"
-                         Height="72"
-                         TextWrapping="Wrap"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto"
-                         Margin="0,4,0,8"/>
-
+                <TextBlock x:Name="BottomFreshnessText"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,0"/>
             </StackPanel>
-        </ScrollViewer>
 
-        <Grid Grid.Row="1"
-              Margin="0,10,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <WrapPanel Grid.Row="0"
-                       HorizontalAlignment="Right">
-                <Button x:Name="IgnorePilotButton"
-                        Padding="12,6"
-                        Margin="0,0,8,0"
+            <WrapPanel Grid.Row="1"
+                       HorizontalAlignment="Right"
+                       Margin="0,10,0,0">
+                <Button x:Name="IgnorePilotLink"
+                        Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Ignore Pilot"
-                        Click="IgnorePilotButton_Click"/>
-                <Button x:Name="IgnoreCorpButton"
-                        Padding="12,6"
-                        Margin="0,0,8,0"
+                        Click="IgnorePilotLink_Click"/>
+                <Button x:Name="IgnoreCorpLink"
+                        Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Ignore Corp"
-                        Click="IgnoreCorpButton_Click"/>
-                <Button x:Name="IgnoreAllianceButton"
-                        Padding="12,6"
-                        Margin="0,0,8,0"
+                        Click="IgnoreCorpLink_Click"/>
+                <Button x:Name="IgnoreAllianceLink"
+                        Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Ignore Alliance"
-                        Click="IgnoreAllianceButton_Click"/>
-                <Button Padding="12,6"
-                        Margin="0,0,8,0"
+                        Click="IgnoreAllianceLink_Click"/>
+                <Button x:Name="OpenZkillLink"
+                        Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Open zKill"
-                        Click="OpenZkillButton_Click"/>
-                <Button Padding="12,6"
+                        Click="OpenZkillLink_Click"/>
+                <Button x:Name="CloseLink"
+                        Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Close"
-                        Click="CloseButton_Click"/>
+                        Click="CloseLink_Click"/>
             </WrapPanel>
-
-            <TextBlock Grid.Row="1"
-                       x:Name="BottomFreshnessText"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource MutedTextBrush}"
-                       FontSize="12"
-                       TextWrapping="Wrap"
-                       Margin="0,8,0,0"/>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

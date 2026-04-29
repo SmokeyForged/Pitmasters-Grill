@@ -2,37 +2,12 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Data;
+using PitmastersGrill.Providers;
 
 namespace PitmastersGrill
 {
     public class LastShipMatchesCynoHullConverter : IMultiValueConverter
     {
-        private static readonly HashSet<string> ApprovedRedHighlightCynoShips =
-            new(StringComparer.OrdinalIgnoreCase)
-            {
-                "Arazu",
-                "Pilgrim",
-                "Falcon",
-                "Rapier",
-                "Proteus",
-                "Legion",
-                "Loki",
-                "Tengu",
-                "Hound",
-                "Purifier",
-                "Manticore",
-                "Nemesis",
-                "Cheetah",
-                "Anathema",
-                "Buzzard",
-                "Helios",
-                "Pacifier",
-                "Broadsword",
-                "Devoter",
-                "Onyx",
-                "Phobos"
-            };
-
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
         {
             if (values == null || values.Length < 3)
@@ -54,13 +29,8 @@ namespace PitmastersGrill
                 return true;
             }
 
-            if (string.IsNullOrWhiteSpace(lastShipSeen) || string.IsNullOrWhiteSpace(cynoHullSeen))
-            {
-                return false;
-            }
-
-            return ApprovedRedHighlightCynoShips.Contains(lastShipSeen.Trim()) &&
-                   ApprovedRedHighlightCynoShips.Contains(cynoHullSeen.Trim());
+            return CynoShipCatalog.IsKnownCynoShipName(lastShipSeen) &&
+                   CynoShipCatalog.IsKnownCynoShipName(cynoHullSeen);
         }
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)

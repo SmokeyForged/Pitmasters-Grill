@@ -20,6 +20,8 @@ namespace PitmastersGrill.Services
         private readonly PilotFleetObservationDayRepository _pilotFleetObservationDayRepository;
         private readonly PilotShipObservationDayRepository _pilotShipObservationDayRepository;
         private readonly PilotCynoModuleObservationDayRepository _pilotCynoModuleObservationDayRepository;
+        private readonly PilotBaitObservationDayRepository _pilotBaitObservationDayRepository;
+        private readonly PilotCynoTackleObservationDayRepository _pilotCynoTackleObservationDayRepository;
         private readonly CynoShipCatalog _cynoShipCatalog;
 
         public KillmailDayImportService(
@@ -36,6 +38,8 @@ namespace PitmastersGrill.Services
             _pilotFleetObservationDayRepository = new PilotFleetObservationDayRepository(killmailDbPath);
             _pilotShipObservationDayRepository = new PilotShipObservationDayRepository(killmailDbPath);
             _pilotCynoModuleObservationDayRepository = new PilotCynoModuleObservationDayRepository(killmailDbPath);
+            _pilotBaitObservationDayRepository = new PilotBaitObservationDayRepository(killmailDbPath);
+            _pilotCynoTackleObservationDayRepository = new PilotCynoTackleObservationDayRepository(killmailDbPath);
             _cynoShipCatalog = new CynoShipCatalog();
         }
 
@@ -144,6 +148,8 @@ namespace PitmastersGrill.Services
             var fleetAccumulators = new Dictionary<string, PilotFleetObservationDayRecord>(StringComparer.OrdinalIgnoreCase);
             var shipAccumulators = new Dictionary<string, PilotShipObservationDayRecord>(StringComparer.OrdinalIgnoreCase);
             var cynoModuleObservations = new List<PilotCynoModuleObservationDayRecord>();
+            var baitObservations = new List<PilotBaitObservationDayRecord>();
+            var cynoTackleObservations = new List<PilotCynoTackleObservationDayRecord>();
 
             var importedKillmailCount = 0;
             var parseStopwatch = Stopwatch.StartNew();
@@ -267,12 +273,32 @@ namespace PitmastersGrill.Services
                     AppLogger.DatabaseInfo(
                         $"Confirmed cyno module observed on public loss. character_id={cynoModule.CharacterId} killmail_id={cynoModule.KillmailId} killmail_time={cynoModule.KillmailTimeUtc} module_type_id={cynoModule.ModuleTypeId} module_name='{cynoModule.ModuleName}' victim_ship_type_id={cynoModule.VictimShipTypeId?.ToString(CultureInfo.InvariantCulture) ?? ""}");
                 }
+
+                foreach (var bait in parsed.BaitObservations)
+                {
+                    bait.DayUtc = remoteDay.DayUtc;
+                    bait.UpdatedAtUtc = utcNow;
+                    baitObservations.Add(bait);
+
+                    AppLogger.DatabaseInfo(
+                        $"Derived industrial-cyno bait observed on public loss. character_id={bait.CharacterId} killmail_id={bait.KillmailId} killmail_time={bait.KillmailTimeUtc} victim_ship='{bait.VictimShipName}' industrial_cyno='{bait.IndustrialCynoModuleName}' tackle_module='{bait.TackleModuleName}' tackle_type={bait.TackleType}");
+                }
+
+                foreach (var tackle in parsed.CynoTackleObservations)
+                {
+                    tackle.DayUtc = remoteDay.DayUtc;
+                    tackle.UpdatedAtUtc = utcNow;
+                    cynoTackleObservations.Add(tackle);
+
+                    AppLogger.DatabaseInfo(
+                        $"Cyno-capable hull tackle observed on public loss. character_id={tackle.CharacterId} killmail_id={tackle.KillmailId} killmail_time={tackle.KillmailTimeUtc} victim_ship='{tackle.VictimShipName}' tackle_module='{tackle.TackleModuleName}' tackle_type={tackle.TackleType}");
+                }
             }
 
             parseStopwatch.Stop();
 
             DebugTraceWriter.WriteLine(
-                $"killmail import aggregate summary: day={remoteDay.DayUtc}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, cynoModuleObservations={cynoModuleObservations.Count}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}");
+                $"killmail import aggregate summary: day={remoteDay.DayUtc}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, cynoModuleObservations={cynoModuleObservations.Count}, baitObservations={baitObservations.Count}, cynoTackleObservations={cynoTackleObservations.Count}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}");
 
             var writeStopwatch = Stopwatch.StartNew();
 
@@ -280,11 +306,13 @@ namespace PitmastersGrill.Services
             _pilotFleetObservationDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotFleetObservationDayRecord>(fleetAccumulators.Values));
             _pilotShipObservationDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotShipObservationDayRecord>(shipAccumulators.Values));
             _pilotCynoModuleObservationDayRepository.ReplaceDay(remoteDay.DayUtc, cynoModuleObservations);
+            _pilotBaitObservationDayRepository.ReplaceDay(remoteDay.DayUtc, baitObservations);
+            _pilotCynoTackleObservationDayRepository.ReplaceDay(remoteDay.DayUtc, cynoTackleObservations);
 
             writeStopwatch.Stop();
 
             DebugTraceWriter.WriteLine(
-                $"killmail import write summary: day={remoteDay.DayUtc}, uniquePilotsWritten={registryAccumulators.Count}, fleetPilotsWritten={fleetAccumulators.Count}, shipPilotsWritten={shipAccumulators.Count}, cynoModuleObservationsWritten={cynoModuleObservations.Count}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}");
+                $"killmail import write summary: day={remoteDay.DayUtc}, uniquePilotsWritten={registryAccumulators.Count}, fleetPilotsWritten={fleetAccumulators.Count}, shipPilotsWritten={shipAccumulators.Count}, cynoModuleObservationsWritten={cynoModuleObservations.Count}, baitObservationsWritten={baitObservations.Count}, cynoTackleObservationsWritten={cynoTackleObservations.Count}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}");
 
             dayState.LocalImportedCount = importedKillmailCount;
             dayState.ImportedAtUtc = DateTime.UtcNow.ToString("o");
@@ -316,7 +344,7 @@ namespace PitmastersGrill.Services
                 totalStopwatch.Stop();
 
                 DebugTraceWriter.WriteLine(
-                    $"killmail import complete: day={remoteDay.DayUtc}, archiveBytes={downloadResult.ArchiveLengthBytes}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, cynoModuleObservations={cynoModuleObservations.Count}, extractElapsedMs={extractResult.ExtractElapsedMs}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}, totalElapsedMs={totalStopwatch.ElapsedMilliseconds}");
+                    $"killmail import complete: day={remoteDay.DayUtc}, archiveBytes={downloadResult.ArchiveLengthBytes}, jsonFiles={relativePaths.Count}, killmailsImported={importedKillmailCount}, uniquePilots={registryAccumulators.Count}, fleetPilots={fleetAccumulators.Count}, shipPilots={shipAccumulators.Count}, cynoModuleObservations={cynoModuleObservations.Count}, baitObservations={baitObservations.Count}, cynoTackleObservations={cynoTackleObservations.Count}, extractElapsedMs={extractResult.ExtractElapsedMs}, parseElapsedMs={parseStopwatch.ElapsedMilliseconds}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}, totalElapsedMs={totalStopwatch.ElapsedMilliseconds}");
 
                 return new KillmailDayImportResult
                 {
@@ -382,6 +410,40 @@ namespace PitmastersGrill.Services
             return parsed.CynoModuleObservations;
         }
 
+        internal static List<PilotBaitObservationDayRecord> ParseDerivedBaitObservations(string jsonContent, string dayUtc = "", string updatedAtUtc = "")
+        {
+            var parsed = ParseKillmailEntry(jsonContent);
+            if (parsed == null)
+            {
+                return new List<PilotBaitObservationDayRecord>();
+            }
+
+            foreach (var observation in parsed.BaitObservations)
+            {
+                observation.DayUtc = dayUtc;
+                observation.UpdatedAtUtc = updatedAtUtc;
+            }
+
+            return parsed.BaitObservations;
+        }
+
+        internal static List<PilotCynoTackleObservationDayRecord> ParseCynoHullTackleObservations(string jsonContent, string dayUtc = "", string updatedAtUtc = "")
+        {
+            var parsed = ParseKillmailEntry(jsonContent);
+            if (parsed == null)
+            {
+                return new List<PilotCynoTackleObservationDayRecord>();
+            }
+
+            foreach (var observation in parsed.CynoTackleObservations)
+            {
+                observation.DayUtc = dayUtc;
+                observation.UpdatedAtUtc = updatedAtUtc;
+            }
+
+            return parsed.CynoTackleObservations;
+        }
+
         private static ParsedKillmailEntry? ParseKillmailEntry(string jsonContent)
         {
             if (string.IsNullOrWhiteSpace(jsonContent))
@@ -411,6 +473,8 @@ namespace PitmastersGrill.Services
             var fleetPilots = new Dictionary<string, FleetPilotSeen>(StringComparer.OrdinalIgnoreCase);
             var shipPilots = new Dictionary<string, ShipPilotSeen>(StringComparer.OrdinalIgnoreCase);
             var cynoModuleObservations = new List<PilotCynoModuleObservationDayRecord>();
+            var baitObservations = new List<PilotBaitObservationDayRecord>();
+            var cynoTackleObservations = new List<PilotCynoTackleObservationDayRecord>();
 
             var attackerIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var attackerShipUpdates = new List<(string CharacterId, int? ShipTypeId)>();
@@ -485,13 +549,25 @@ namespace PitmastersGrill.Services
                     if (victim.TryGetProperty("items", out var victimItems) &&
                         victimItems.ValueKind == JsonValueKind.Array)
                     {
-                        ScanVictimItemsForCynoModules(
+                        var victimShipName = TryReadString(victim, "ship_name") ??
+                                             TryReadString(victim, "ship_type_name") ??
+                                             TryReadString(victim, "type_name") ??
+                                             "";
+                        var solarSystemId = TryReadInt(root, "solar_system_id");
+                        var solarSystemName = TryReadString(root, "solar_system_name") ?? "";
+
+                        ScanVictimItemsForDerivedIntel(
                             victimItems,
                             victimCharacterId,
                             killmailId,
                             killmailTimeText,
                             victimShipTypeId,
-                            cynoModuleObservations);
+                            victimShipName,
+                            solarSystemId,
+                            solarSystemName,
+                            cynoModuleObservations,
+                            baitObservations,
+                            cynoTackleObservations);
                     }
                 }
             }
@@ -501,17 +577,108 @@ namespace PitmastersGrill.Services
                 RegistryPilots = new List<RegistryPilotSeen>(registryPilots.Values),
                 FleetPilots = new List<FleetPilotSeen>(fleetPilots.Values),
                 ShipPilots = new List<ShipPilotSeen>(shipPilots.Values),
-                CynoModuleObservations = cynoModuleObservations
+                CynoModuleObservations = cynoModuleObservations,
+                BaitObservations = baitObservations,
+                CynoTackleObservations = cynoTackleObservations
             };
         }
 
-        private static void ScanVictimItemsForCynoModules(
+        private static void ScanVictimItemsForDerivedIntel(
             JsonElement items,
             string victimCharacterId,
             string killmailId,
             string killmailTimeUtc,
             int? victimShipTypeId,
-            List<PilotCynoModuleObservationDayRecord> observations)
+            string victimShipName,
+            int? solarSystemId,
+            string solarSystemName,
+            List<PilotCynoModuleObservationDayRecord> cynoModuleObservations,
+            List<PilotBaitObservationDayRecord> baitObservations,
+            List<PilotCynoTackleObservationDayRecord> cynoTackleObservations)
+        {
+            var foundModules = new List<VictimItemModule>();
+            CollectVictimItemModules(items, foundModules);
+
+            foreach (var module in foundModules.Where(x => x.CynoSignalType != CynoSignalType.Unknown))
+            {
+                cynoModuleObservations.Add(new PilotCynoModuleObservationDayRecord
+                {
+                    CharacterId = victimCharacterId,
+                    KillmailId = killmailId,
+                    KillmailTimeUtc = killmailTimeUtc,
+                    VictimShipTypeId = victimShipTypeId,
+                    ModuleTypeId = module.TypeId,
+                    ModuleName = module.ModuleName,
+                    QuantityDestroyed = module.QuantityDestroyed,
+                    QuantityDropped = module.QuantityDropped,
+                    ItemState = GetItemState(module.QuantityDestroyed, module.QuantityDropped),
+                    Source = "public loss victim item list"
+                });
+            }
+
+            var industrialCynos = foundModules
+                .Where(x => x.TypeId == CynoSignalAnalyzer.IndustrialCynoModuleTypeId)
+                .ToList();
+            var tackleModules = foundModules
+                .Where(x => x.TackleType != TackleModuleType.UnknownTackle)
+                .ToList();
+
+            if (tackleModules.Count > 0 &&
+                CynoShipCatalog.TryGetCynoShipNameByTypeId(victimShipTypeId, out var cynoHullName))
+            {
+                var displayedVictimShipName = string.IsNullOrWhiteSpace(victimShipName)
+                    ? cynoHullName
+                    : victimShipName;
+
+                foreach (var tackle in tackleModules)
+                {
+                    cynoTackleObservations.Add(new PilotCynoTackleObservationDayRecord
+                    {
+                        CharacterId = victimCharacterId,
+                        KillmailId = killmailId,
+                        KillmailTimeUtc = killmailTimeUtc,
+                        VictimShipTypeId = victimShipTypeId,
+                        VictimShipName = displayedVictimShipName,
+                        TackleModuleTypeId = tackle.TypeId,
+                        TackleModuleName = tackle.ModuleName,
+                        TackleType = tackle.TackleType,
+                        QuantityDestroyed = tackle.QuantityDestroyed,
+                        QuantityDropped = tackle.QuantityDropped,
+                        Source = "public loss victim item list"
+                    });
+                }
+            }
+
+            if (industrialCynos.Count == 0 || tackleModules.Count == 0)
+            {
+                return;
+            }
+
+            var industrialCyno = industrialCynos[0];
+            foreach (var tackle in tackleModules)
+            {
+                baitObservations.Add(new PilotBaitObservationDayRecord
+                {
+                    CharacterId = victimCharacterId,
+                    KillmailId = killmailId,
+                    KillmailTimeUtc = killmailTimeUtc,
+                    VictimShipTypeId = victimShipTypeId,
+                    VictimShipName = victimShipName,
+                    SolarSystemId = solarSystemId,
+                    SolarSystemName = solarSystemName,
+                    IndustrialCynoModuleTypeId = industrialCyno.TypeId,
+                    IndustrialCynoModuleName = industrialCyno.ModuleName,
+                    TackleModuleTypeId = tackle.TypeId,
+                    TackleModuleName = tackle.ModuleName,
+                    TackleType = tackle.TackleType,
+                    QuantityDestroyed = tackle.QuantityDestroyed,
+                    QuantityDropped = tackle.QuantityDropped,
+                    Source = "public loss victim item list"
+                });
+            }
+        }
+
+        private static void CollectVictimItemModules(JsonElement items, List<VictimItemModule> modules)
         {
             if (items.ValueKind != JsonValueKind.Array)
             {
@@ -526,38 +693,80 @@ namespace PitmastersGrill.Services
                 }
 
                 var typeId = TryReadInt(item, "item_type_id") ?? TryReadInt(item, "type_id");
+                var itemName = TryReadString(item, "type_name") ??
+                               TryReadString(item, "item_name") ??
+                               TryReadString(item, "name") ??
+                               "";
+
+                var signalType = CynoSignalType.Unknown;
+                var moduleName = itemName;
                 if (typeId.HasValue &&
-                    CynoSignalAnalyzer.TryGetModuleSignalType(typeId.Value, out _, out var moduleName))
+                    CynoSignalAnalyzer.TryGetModuleSignalType(typeId.Value, out signalType, out var knownModuleName))
                 {
-                    var quantityDestroyed = TryReadInt(item, "quantity_destroyed") ?? 0;
-                    var quantityDropped = TryReadInt(item, "quantity_dropped") ?? 0;
-                    observations.Add(new PilotCynoModuleObservationDayRecord
+                    moduleName = knownModuleName;
+                }
+
+                var tackleType = TackleModuleType.UnknownTackle;
+                if (typeId.HasValue && TryGetKnownTackleModule(typeId.Value, out tackleType, out var knownTackleName))
+                {
+                    moduleName = knownTackleName;
+                }
+                else if (TryGetTackleTypeFromName(itemName, out tackleType))
+                {
+                    moduleName = itemName;
+                    AppLogger.DatabaseInfo(
+                        $"Tackle module detected by item-name fallback during victim item scan. item_type_id={typeId?.ToString(CultureInfo.InvariantCulture) ?? ""} item_name='{itemName}' tackle_type={tackleType}");
+                }
+
+                if (typeId.HasValue && (signalType != CynoSignalType.Unknown || tackleType != TackleModuleType.UnknownTackle))
+                {
+                    modules.Add(new VictimItemModule
                     {
-                        CharacterId = victimCharacterId,
-                        KillmailId = killmailId,
-                        KillmailTimeUtc = killmailTimeUtc,
-                        VictimShipTypeId = victimShipTypeId,
-                        ModuleTypeId = typeId.Value,
-                        ModuleName = moduleName,
-                        QuantityDestroyed = quantityDestroyed,
-                        QuantityDropped = quantityDropped,
-                        ItemState = GetItemState(quantityDestroyed, quantityDropped),
-                        Source = "public loss victim item list"
+                        TypeId = typeId.Value,
+                        ModuleName = string.IsNullOrWhiteSpace(moduleName)
+                            ? $"type_id {typeId.Value.ToString(CultureInfo.InvariantCulture)}"
+                            : moduleName,
+                        CynoSignalType = signalType,
+                        TackleType = tackleType,
+                        QuantityDestroyed = TryReadInt(item, "quantity_destroyed") ?? 0,
+                        QuantityDropped = TryReadInt(item, "quantity_dropped") ?? 0
                     });
                 }
 
                 if (item.TryGetProperty("items", out var nestedItems) &&
                     nestedItems.ValueKind == JsonValueKind.Array)
                 {
-                    ScanVictimItemsForCynoModules(
-                        nestedItems,
-                        victimCharacterId,
-                        killmailId,
-                        killmailTimeUtc,
-                        victimShipTypeId,
-                        observations);
+                    CollectVictimItemModules(nestedItems, modules);
                 }
             }
+        }
+
+        private static bool TryGetKnownTackleModule(int typeId, out TackleModuleType tackleType, out string moduleName)
+        {
+            return TackleModuleCatalog.TryGetKnownTackleModule(typeId, out tackleType, out moduleName);
+        }
+
+        private static bool TryGetTackleTypeFromName(string itemName, out TackleModuleType tackleType)
+        {
+            tackleType = TackleModuleType.UnknownTackle;
+            if (string.IsNullOrWhiteSpace(itemName))
+            {
+                return false;
+            }
+
+            if (itemName.Contains("Warp Scrambler", StringComparison.OrdinalIgnoreCase))
+            {
+                tackleType = TackleModuleType.WarpScrambler;
+                return true;
+            }
+
+            if (itemName.Contains("Warp Disruptor", StringComparison.OrdinalIgnoreCase))
+            {
+                tackleType = TackleModuleType.WarpDisruptor;
+                return true;
+            }
+
+            return false;
         }
 
         private static string GetItemState(int quantityDestroyed, int quantityDropped)
@@ -628,6 +837,17 @@ namespace PitmastersGrill.Services
             return longValue?.ToString(CultureInfo.InvariantCulture) ?? "";
         }
 
+        private static string? TryReadString(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var value) ||
+                value.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return value.GetString();
+        }
+
         private static DateTime? TryReadDateTime(JsonElement element, string propertyName)
         {
             if (!element.TryGetProperty(propertyName, out var value))
@@ -658,6 +878,18 @@ namespace PitmastersGrill.Services
             public List<FleetPilotSeen> FleetPilots { get; set; } = new();
             public List<ShipPilotSeen> ShipPilots { get; set; } = new();
             public List<PilotCynoModuleObservationDayRecord> CynoModuleObservations { get; set; } = new();
+            public List<PilotBaitObservationDayRecord> BaitObservations { get; set; } = new();
+            public List<PilotCynoTackleObservationDayRecord> CynoTackleObservations { get; set; } = new();
+        }
+
+        private class VictimItemModule
+        {
+            public int TypeId { get; set; }
+            public string ModuleName { get; set; } = "";
+            public CynoSignalType CynoSignalType { get; set; } = CynoSignalType.Unknown;
+            public TackleModuleType TackleType { get; set; } = TackleModuleType.UnknownTackle;
+            public int QuantityDestroyed { get; set; }
+            public int QuantityDropped { get; set; }
         }
 
         private class RegistryPilotSeen

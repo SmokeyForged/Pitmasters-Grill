@@ -94,9 +94,13 @@ namespace PitmastersGrill.Services
             var databaseBootstrap = new DatabaseBootstrap(databasePath);
             var notesRepository = new NotesRepository(databasePath);
             var cynoModuleObservationRepository = new PilotCynoModuleObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
+            var baitObservationRepository = new PilotBaitObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
+            var cynoTackleObservationRepository = new PilotCynoTackleObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
             var pilotBoardRowDetailFormatter = new PilotBoardRowDetailFormatter(
                 boardPopulationRetryPolicy,
-                cynoModuleObservationRepository);
+                cynoModuleObservationRepository,
+                baitObservationRepository,
+                cynoTackleObservationRepository);
             var pilotBoardRowEnrichmentApplier = new PilotBoardRowEnrichmentApplier(defaultBoardPopulationRetryDelaySeconds);
             var detailPaneController = new DetailPaneController(notesRepository, pilotBoardRowDetailFormatter);
 

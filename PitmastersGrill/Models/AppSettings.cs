@@ -8,11 +8,15 @@
 
         public string ColorBlindMode { get; set; } = "Standard";
 
+        public string PilotDetailPlacementPreference { get; set; } = "AutoPreferRight";
+
         public bool AlwaysOnTopEnabled { get; set; } = false;
 
         public double WindowOpacityPercent { get; set; } = 100;
 
         public bool PanelModeEnabled { get; set; } = false;
+
+        public bool ShowCorpAllianceCounts { get; set; } = false;
 
         public bool? ShowSigColumn { get; set; } = true;
 
