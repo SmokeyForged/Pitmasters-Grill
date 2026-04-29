@@ -6,9 +6,9 @@ Pitmaster's Grill (PMG) is a Windows desktop intel companion for turning copied 
 
 PMG is still a **technical preview**. It is useful today, but behavior, UI details, and data coverage can continue to change between releases.
 
-Current release: **Pitmasters Grill 0.9.5**  
-Tag: **v0.9.5**  
-Release commit: **a3fa467**
+Current release: **Pitmasters Grill 0.9.5.1**  
+Tag: **v0.9.5.1**  
+Release commit: **172c810**
 
 ---
 
@@ -17,8 +17,8 @@ Release commit: **a3fa467**
 
 New here? Start with these:
 
-1. **[Latest Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**  
-   Download current builds, read patch notes, and check upgrade notes for each technical-preview release.
+1. **[Latest Release: v0.9.5.1](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v0.9.5.1)**  
+   Current hotfix build with compact/panel mode stability fixes, sidecar placement improvements, and saved-note flag visibility polish. For older builds and full release history, see **[all releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**.
 
 2. **[Current Feature Snapshot](./PMG-FEATURES.md)**  
    Detailed overview of what PMG can do right now, including compact mode, board interactions, cyno/tackle evidence, killmail-derived intel, and known limitations.
@@ -59,6 +59,24 @@ Current PMG builds can:
 PMG works from user-provided local lists and public data. It does **not** read client memory, inspect network traffic, automate gameplay, use EVE SSO, or claim live grid/location/cloak visibility.
 
 ---
+
+## v0.9.5.1 Highlights
+
+### Hotfix focus
+
+v0.9.5.1 is a focused hotfix on top of the v0.9.5 community-feedback release.
+
+This patch improves:
+
+- compact/panel mode stability
+- custom shell behavior
+- transparency preservation
+- pilot detail sidecar placement near monitor edges
+- saved-note flag visibility on colored rows
+
+No killmail-derived intel rebuild is required solely for this hotfix.
+
+### v0.9.5 community-feedback foundation
 
 ## v0.9.5 Highlights
 
