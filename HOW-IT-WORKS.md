@@ -1,208 +1,273 @@
-# Pitmaster's Grill — How It Works
+# Pitmaster's Grill - How It Works
 
-This document explains, at a practical level, how **Pitmaster's Grill (PMG)** works during the current tech-preview period.
+This document explains, at a practical level, how **Pitmaster's Grill (PMG)** works in the current released technical-preview build, **v0.9.5.1**.
 
 It is written to answer a simple question:
 
 **How does PMG take a local list of pilot names and turn it into usable intel?**
 
-This is not meant to be a full low-level engineering specification. It is a technical overview of the current working model.
+This is not a full low-level engineering specification. It is a technical overview of the current working model.
 
 ---
 
 ## Core idea
 
-PMG is built around a straightforward workflow:
+PMG is built around a straightforward human-in-the-loop workflow:
 
-1. a user provides a list of pilot names
-2. PMG resolves that list against external/public intel sources and local cached data
-3. PMG normalizes the results into a consistent internal view
-4. PMG displays the result as a fast-scanning board with pilot-level context
-5. the user can drill into a pilot or jump out to deeper source material when needed
+1. a user provides a local-style pilot list
+2. PMG classifies and accepts only plausible intel input
+3. PMG resolves pilot identity and public context through cache and public providers
+4. PMG adds killmail-derived signals where public evidence supports them
+5. PMG layers in user-owned notes, overrides, and ignores
+6. PMG presents the result as a fast-scanning board plus a sidecar detail view
 
 The goal is not to replace player judgment.
 The goal is to reduce the time between **"local spiked"** and **"I understand what I am looking at."**
 
 ---
 
-## Input model
+## Board flow
 
-PMG starts with a pilot list.
+The current board flow is easiest to understand as a staged pipeline.
 
-In practice, that means the tool is built around the reality of EVE usage:
+### 1. Clipboard or local-list intake
 
-* names arrive in batches
-* the user wants answers quickly
-* the input needs to support real gameplay flow, not an idealized workflow
+PMG starts with a pilot list, usually from copied local-style text.
 
-The current design direction is centered on processing a local population into a board view rather than forcing one-pilot-at-a-time manual lookups.
+The app is designed around the reality of actual use:
 
----
+- names arrive in batches
+- the user wants answers quickly
+- the input needs to support real gameplay flow rather than idealized one-pilot-at-a-time lookup
 
-## Processing model
+PMG can also handle large local-list shaped inputs well in current testing, though that should still be treated as observed test behavior rather than an absolute performance guarantee.
 
-Once PMG has a list of pilot names, it begins resolving useful context for each pilot.
+### 2. Guardrails and classification
 
-At a high level, the processing flow looks like this:
+Before enrichment starts, PMG applies intake guardrails so it does not treat arbitrary clipboard noise as a local list.
 
-### 1. Name intake
+That means it tries to reject obvious non-local content such as:
 
-PMG receives the pilot list and prepares it for lookup.
+- code
+- markup
+- stack traces
+- shell output
+- logs
+- file paths
+- oversized unrelated text
 
-This stage exists to make sure the tool is operating on a clean set of pilots before enrichment begins.
+The goal is to keep the board pipeline focused on plausible pilot-name input instead of blindly trusting every clipboard payload.
 
-### 2. Data resolution
+### 3. Name resolution
 
-PMG resolves pilot-related context from the sources available to it.
+Once PMG accepts the input, it resolves identity context for each pilot.
 
-This includes practical information such as:
+That stage can include:
 
-* character identity context
-* corporation affiliation
-* alliance affiliation
-* recent kill/loss-derived activity context
-* fleet-size pattern context
-* recent cyno-hull-related context where available
+- character identity
+- corporation affiliation
+- alliance affiliation
 
-### 3. Normalization
+PMG uses local cache where possible so repeat lookups are faster and less dependent on external timing.
 
-The raw source data is not useful if it stays fragmented.
+### 4. Public and cached enrichment
 
-PMG converts source responses into a consistent internal representation so the board can display a clean, readable summary across all pilots.
+After identity resolution, PMG enriches rows with readable board context such as:
 
-This is important because the user is not trying to inspect multiple different source formats during a live moment. They are trying to answer questions quickly.
+- kill counts
+- loss counts
+- average fleet-size context
+- recent ship observations
+- recent cyno-capable hull observations
+- freshness/retry state
 
-### 4. Board population
+The purpose is not to mirror raw provider output one-for-one. The purpose is to normalize those results into a consistent operational view.
 
-Once pilot data has been resolved and normalized, PMG populates the board.
+### 5. Killmail-derived intel
 
-The board is designed to support rapid visual scanning so the user can:
+PMG also maintains local derived intel built from public killmail archive data.
 
-* spot familiar alliances or corps
-* identify active or dangerous pilots
-* recognize likely support patterns
-* notice possible cyno-related escalation indicators
+That derived layer can provide:
 
-### 5. Detail and follow-up
+- confirmed cyno-module observations
+- industrial cyno plus tackle bait observations
+- cyno-capable hull tackle observations
+- supporting recent-activity context used by the board and detail views
 
-When a pilot needs a closer look, PMG supports a more focused view through the detail pane and direct follow-up actions such as opening the selected pilot in zKill.
+This lets PMG surface useful historical evidence without pretending it has live fit or location visibility.
 
-This lets the main board stay fast while still supporting deeper manual investigation.
+### 6. Manual notes, overrides, and ignores
 
----
+PMG intentionally keeps user-owned judgment separate from public-data-backed evidence.
 
-## Data sources and source philosophy
+That means the user can apply:
 
-PMG is built around pulling useful context from public data sources rather than making the user manually chase the same information across multiple tabs.
+- pilot notes
+- Known-Cyno override
+- Bait override
+- typed ignore entries for pilots, corporations, or alliances
 
-The exact source mix may continue to evolve during tech preview, but the operating idea is consistent:
+Notes and overrides are manual context. They are not the same thing as public evidence extracted from killmail-derived data.
 
-* use public data sources that provide meaningful pilot activity context
-* resolve corp and alliance identity where useful
-* reduce repeated lookups through local caching where practical
-* keep the user close to the source of truth when deeper inspection is needed
+Ignore entries suppress matching rows from the visible board after resolution.
 
-That is why PMG includes direct handoff to deeper source material instead of pretending the board itself should be the only thing a user ever needs.
+### 7. Board presentation
+
+Once those layers are combined, PMG presents the result as a board built for quick scanning under pressure.
+
+The board is designed to let the user quickly notice:
+
+- recognizable groupings
+- active pilots
+- suspicious public-evidence patterns
+- likely escalation signals worth opening in details or zKill
 
 ---
 
 ## What the board is actually showing
 
-The board is not just a list of names.
-It is a summarized operational view.
+The board is not just a list of names. It is a summarized operational view.
 
-In the current tech-preview shape, it is built to surface fields such as:
+In the current release, it can surface fields such as:
 
-* **Character**
-* **Alliance**
-* **Corp**
-* **Kills**
-* **Losses**
-* **Avg Fleet Size**
-* **Cyno Hull Seen**
+- **Character**
+- **Sig**
+- **Alliance**
+- **Corp**
+- **Kills**
+- **Losses**
+- **Avg Fleet Size**
+- **Last Ship Seen**
+- **Last Seen**
+- **Cyno Hull Seen**
 
-These fields are intended to answer practical questions like:
+These fields help answer practical questions like:
 
-* Who is affiliated together?
-* Which pilots appear active?
-* Do any of these names suggest escalation risk?
-* Are these likely solo players, small-gang pilots, or people who tend to arrive with support?
-
-The board is meant to compress useful signal into something a player can read quickly.
-
----
-
-## Why caching matters
-
-PMG is being built for a situation where speed matters.
-
-Repeatedly resolving the same information from scratch is slower, noisier, and more dependent on external timing. Local caching helps by:
-
-* reducing repeated lookups
-* improving responsiveness
-* supporting faster board population
-* making the tool more practical during real use
-
-The intent is not to hide source freshness. The intent is to balance speed with enough visibility into how current the visible board data is.
+- who is affiliated together?
+- which pilots appear active?
+- who looks likely to matter?
+- what public evidence suggests escalation risk?
 
 ---
 
-## Freshness and trust
+## Compact mode and panel mode
 
-Intel has a shelf life.
+PMG supports a board-first compact mode and a lighter panel/custom-shell style.
 
-PMG therefore includes board freshness and refresh context so the user can understand how current the displayed board is.
+At a high level, compact/panel mode exists to keep PMG usable as a quick operational companion rather than a bulky desktop app.
 
-That matters because a fast board only helps if the user can also judge whether the information is fresh enough to trust for the moment they are in.
+In the current released build:
 
----
+- the board remains the main surface
+- compact mode is layout-driven rather than a separate feature fork
+- panel-mode transparency should still be preserved
+- normal row interactions should remain intact
 
-## What PMG is optimized for
-
-PMG is optimized for:
-
-* fast transition from raw names to useful context
-* readable summaries over raw source browsing
-* real gameplay usability over perfect theoretical completeness
-* preserving the player's role in interpretation and decision-making
-
-This means PMG is intentionally biased toward **useful and timely** rather than **maximally exhaustive**.
+That means left-click selection, right-click details, double-click zKill, and note access should continue to work even when PMG is running in a tighter board-first shape.
 
 ---
 
-## What PMG is not trying to be
+## Detail sidecar behavior
 
-PMG is not trying to be:
+PMG opens pilot details in a sidecar inspector rather than taking over the whole board.
 
-* a replacement for player judgment
-* a giant wall of every possible data point
-* a one-screen substitute for every deep source
-* a claim that raw data alone is the same thing as good intel
+The current sidecar behavior is:
 
-The board is a front-end for faster understanding, not a promise that every question is solved at a glance.
+- open beside the board when there is room
+- honor the saved left/right preference when possible
+- flip or clamp placement near monitor edges when necessary
+- keep the board visible while the user reads evidence and freshness context
+
+This keeps PMG usable as a fast-scanning tool first, while still supporting closer inspection of a selected pilot.
 
 ---
 
-## Current limitations of this overview
+## Evidence model
 
-Because PMG is still in tech preview, some implementation details are still evolving.
+PMG is careful about the distinction between confirmed evidence and inference.
 
-That means this document intentionally does **not** lock in every internal mechanism such as:
+### Confirmed cyno module evidence
 
-* exact provider wiring
-* exact cache implementation details
-* exact internal processing orchestration
-* exact future feature boundaries
+Confirmed cyno-module evidence comes from public victim item data on killmails.
 
-Those are better documented once they settle.
+If a public victim/loss item list shows a cyno module, PMG can treat that as strong evidence for that historical fit state.
 
-This document is meant to describe the working technical shape of the tool without pretending the internal design is already final.
+### Hull context as inference
+
+A cyno-capable hull observation is useful context, but it is still inference.
+
+A pilot being seen in a cyno-capable hull does **not** prove that they fit or used a cyno.
+
+### Industrial cyno plus tackle as derived bait evidence
+
+PMG separately tracks public losses where industrial cyno and tackle appear together on the same victim item list.
+
+That combination supports a derived bait signal because it is stronger than hull context alone.
+
+### Tackle markers on cyno-capable hulls
+
+PMG can also surface tackle context on cyno-capable hulls.
+
+That can matter operationally, but it does **not** mean every cyno-capable hull with tackle should automatically be treated as bait.
+
+This distinction is important because PMG is trying to be useful without overstating what public evidence actually proves.
+
+---
+
+## Caching and freshness
+
+PMG is built for a situation where speed matters.
+
+Repeatedly resolving the same information from scratch is slower and more dependent on external timing. Local caching helps by:
+
+- reducing repeated lookups
+- improving responsiveness
+- supporting faster board population
+- making the tool more practical during real use
+
+PMG also surfaces freshness and retry context so the user can judge whether visible intel is current enough for the moment they are in.
+
+---
+
+## Human-in-the-loop model
+
+A core design rule is that PMG supports the player's judgment instead of replacing it.
+
+PMG can:
+
+- summarize
+- highlight
+- sort
+- surface patterns
+- hand off to zKill or deeper review
+
+PMG should not be treated as:
+
+- a live-visibility oracle
+- a claim of current location or current fit
+- a replacement for player interpretation
+
+The board helps a pilot think faster. It does not eliminate the need to think.
+
+---
+
+## Current limitations
+
+Because PMG is still a technical preview, some practical limitations remain:
+
+- public killmail evidence can be delayed or incomplete
+- provider lookups can fail, throttle, or return partial data
+- cache rebuilds may be needed after derived-intel schema/backfill changes
+- some sidecar and compact-mode behavior is intentionally conservative to stay stable
+- Proton compatibility looks good through current tester feedback, but native Linux polish remains deferred
+
+This overview is meant to describe the current working shape of PMG without pretending that the technical design is already final.
 
 ---
 
 ## Summary
 
-PMG works by taking a local pilot list, enriching it with useful public intel context, normalizing that information into a consistent internal model, and presenting it as a board built for quick operational reading.
+PMG works by taking a local pilot list, classifying it, enriching it with cached and public intel context, applying killmail-derived evidence where supported, layering in user-owned notes and ignores, and presenting the result as a board plus sidecar built for quick operational reading.
 
 In plain language:
 

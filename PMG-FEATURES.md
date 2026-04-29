@@ -1,12 +1,31 @@
 # Pitmaster's Grill - Current Feature Snapshot
 
-Public snapshot for **Pitmasters Grill Technical Preview v0.9.5**.
+Public snapshot for **Pitmasters Grill Technical Preview v0.9.5.1**.
 
-This document describes what PMG can do in the current public release. It is not a roadmap and does not describe planned features as if they already exist.
+This document describes what PMG can do in the current released build. It is not a roadmap and does not describe main-branch-only work as if it were already released.
 
-Release: **Pitmasters Grill 0.9.5**  
-Tag: **v0.9.5**  
-Release commit: **a3fa467**
+Release: **Pitmasters Grill 0.9.5.1**  
+Tag: **v0.9.5.1**  
+Release commit: **172c810**
+
+---
+
+## Release framing
+
+`v0.9.5` was the larger community-feedback foundation release.
+
+`v0.9.5.1` is the current hotfix on top of that release. It keeps the same overall feature set while tightening stability and usability in a few important operational areas:
+
+- compact/panel mode stability
+- custom shell / panel mode behavior
+- transparency preservation in panel mode
+- pilot detail sidecar placement near monitor edges
+- saved-note flag visibility
+- minor version / diagnostic cleanup
+
+`v0.9.5.1` does not, by itself, require a killmail-derived intel rebuild.
+
+PMG remains a technical preview in the `0.9.x` stabilization period, not a `1.0` release.
 
 ---
 
@@ -41,6 +60,8 @@ The board population path resolves available:
 
 Resolution is cached locally where possible to improve repeat performance.
 
+Current testing feedback indicates PMG handles large local-list style inputs well, but that should still be treated as a practical test result rather than a hard performance guarantee.
+
 ---
 
 ## Board View
@@ -65,7 +86,7 @@ Optional columns can be configured in settings.
 ### Board interactions
 
 - Left click selects a row.
-- Right click opens PMG pilot details.
+- Right click opens the PMG pilot detail sidecar.
 - Double-click opens zKill for that pilot.
 - Board-level note/flag icons open pilot notes.
 
@@ -73,18 +94,20 @@ Note/flag icon clicks are separate from row zKill and compact-drag behavior.
 
 ---
 
-## Compact Mode
+## Compact Mode and Panel Mode
 
-v0.9.5 redesigned compact mode as a true board-first operational view.
+`v0.9.5` redesigned compact mode as a true board-first operational view, and `v0.9.5.1` hardened the shell behavior around that view.
 
-Compact mode:
+Compact/panel behavior now aims to:
 
-- keeps the board as the primary surface
-- preserves row colors and Sig icons
-- preserves board resizing behavior
-- preserves always-on-top behavior
-- supports delayed click-and-hold drag from rows, column headers, or blank board space
-- keeps row selection, right-click details, and double-click zKill behavior intact
+- keep the board as the primary surface
+- preserve row colors and Sig icons
+- preserve board resizing behavior
+- preserve always-on-top behavior
+- preserve configured transparency behavior in panel mode
+- avoid compact-toggle freezes or unstable native shell transitions
+- support delayed click-and-hold drag from rows, column headers, or blank board space
+- keep row selection, right-click details, and double-click zKill behavior intact
 
 App-local hotkeys:
 
@@ -99,12 +122,13 @@ These hotkeys are app-local and are intended for PMG operation, not gameplay aut
 
 ## Pilot Detail Sidecar
 
-Pilot details now open as a compact sidecar inspector instead of a large board overlay.
+Pilot details open as a compact sidecar inspector instead of a large board overlay.
 
 The sidecar:
 
 - opens beside the board when possible
 - follows the configured detail placement preference
+- clamps or flips placement near monitor edges when needed
 - inherits PMG theme and opacity
 - uses compact, evidence-first wording
 - keeps the board visible and usable
@@ -123,7 +147,7 @@ Current detail content can include:
 - ignore actions
 - Open zKill
 
-Notes were removed from the detail pane and moved to board-level note/flag icons.
+Notes are handled through the board-level note/flag icon rather than a bulky inline detail editor.
 
 ---
 
@@ -138,6 +162,8 @@ Current manual state can include:
 - pilot notes
 - Known-Cyno override
 - Bait override
+
+`v0.9.5.1` also improved saved-note flag visibility so board-level note state is easier to spot while scanning.
 
 Manual Bait remains a user-controlled signal and is not the same thing as derived industrial-cyno bait evidence.
 
@@ -190,7 +216,7 @@ Count behavior:
 
 PMG tracks public killmail-derived ship observations and surfaces recent cyno-capable hull context.
 
-v0.9.5 expanded and corrected the cyno-capable hull catalog, including missing covert/industrial-capable hulls, and fixed **Cyno Hull Seen** semantics.
+`v0.9.5` expanded and corrected the cyno-capable hull catalog, including missing covert/industrial-capable hulls, and fixed **Cyno Hull Seen** semantics.
 
 Current rule:
 
@@ -253,7 +279,9 @@ Current derived intel can include:
 - industrial-cyno bait observations
 - cyno-capable hull tackle observations
 
-Users with existing killmail data should run **Rebuild Killmail Derived Intel** after updating to v0.9.5. This backfills derived evidence from locally available killmail archives without clearing notes, themes, ignore entries, settings, or manual overrides.
+Run **Rebuild Killmail Derived Intel** after derived-intel schema changes, derived-evidence backfills, or when you need to rebuild existing local archive data into the current derived tables.
+
+That rebuild is **not required solely because of the `v0.9.5.1` hotfix**.
 
 ---
 
@@ -261,9 +289,11 @@ Users with existing killmail data should run **Rebuild Killmail Derived Intel** 
 
 PMG downloads and extracts public killmail archive data for local processing when configured.
 
-v0.9.5 improved Linux/Proton compatibility by removing the fragile dependency on launching external Windows `tar.exe` for archive extraction. Archive extraction now uses managed .NET library support already packaged with PMG.
+`v0.9.5` improved Linux/Proton compatibility by removing the fragile dependency on launching external Windows `tar.exe` for archive extraction. Archive extraction now uses managed .NET library support already packaged with PMG.
 
 This avoids assuming that `tar.exe` exists in System32 or in a Proton/Wine prefix.
+
+Current tester feedback indicates the Windows build works under Proton. Visual polish may not fully match native Windows, and a Linux-native release/polish pass remains deferred.
 
 ---
 
@@ -283,6 +313,9 @@ Current settings/configuration areas include:
 - killmail intel status/configuration
 - detail sidecar placement preference
 - killmail derived-intel rebuild
+- color-blind signal palettes
+
+Color-blind mode visibly changes board signal colors. It is a real accessibility setting, but deeper review from a color-blind tester is still pending.
 
 Settings are local to the app.
 
@@ -328,5 +361,7 @@ Known expectations:
 - cache rebuilds may be needed after derived-intel schema changes
 - compact signals are intentionally concise and may require opening details/zKill for context
 - cyno/tackle/bait indicators are based on public evidence and conservative inference, not live visibility
+- Proton compatibility is promising through the Windows build, but native Linux polish is still deferred
+- accessibility palettes are useful now, but broader user validation is still welcome
 
 The current goal is practical usefulness, not exhaustive automation.

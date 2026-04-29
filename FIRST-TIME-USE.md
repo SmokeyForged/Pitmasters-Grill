@@ -2,57 +2,53 @@
 
 Welcome to **Pitmasters Grill (PMG)**.
 
-This guide is for first-time setup and first-time use. It covers how to get the app running, what happens on startup, and how to get the most value out of the main intel workflow.
+This guide is for first-time setup and first-time use of the current released build, **v0.9.5.1**. It covers startup, the main intel loop, compact/panel behavior, and a few current release notes that are useful to know before you settle into normal use.
 
-## 1) Download the latest build
+## 1. Download the latest release build
 
 Go to the repository's **Releases** page and download the newest PMG build.
 
 After downloading:
 
-1. Extract the ZIP to its own folder
-2. Open the extracted folder
-3. Run PitmastersGrill.exe
+1. Extract the ZIP to its own folder.
+2. Open the extracted folder.
+3. Run `PitmastersGrill.exe`.
 
-> Keep all extracted files together in the same folder. Do not run the app directly from inside the ZIP.
+Keep all extracted files together in the same folder. Do not run the app directly from inside the ZIP.
 
 ---
 
-## 2) First launch
+## 2. First launch
 
-On first launch, PMG may need a moment to initialize its local data and prepare its working files.
+On first launch, PMG may need a moment to initialize its local app data, cache files, and local databases.
 
 Once open, the main goal is simple:
 
 - bring in a pilot list
 - let PMG resolve supporting intel
-- use the main grid and details panel to decide who deserves attention
+- use the board and sidecar details to decide who deserves attention
 
 PMG is built to help you move from raw local data to usable context without replacing player judgment.
 
 ---
 
-## 3) Automatic zKill update behavior
+## 3. Automatic killmail update behavior
 
-PMG includes an automatic update step for **yesterday's zKill data**.
-
-That means when you start the app, PMG will work to bring in the most recent completed day of zKill information so your local intel has a fresher baseline to work from.
+PMG includes an automatic update step for the most recent completed day of public killmail data.
 
 Why this matters:
 
 - it helps keep recent activity context current
 - it reduces the need to manually rebuild from scratch every time
-- it gives PMG a better starting point before you begin using it actively
+- it gives PMG a fresher baseline before you begin active use
 
-In normal use, just let this happen in the background as part of startup behavior.
+In normal use, let this happen in the background as part of startup behavior.
 
 ---
 
-## 4) 30-day zKill pull button
+## 4. Broader history pull
 
-PMG also includes a **30-day zKill pull** button.
-
-Use this when you want a broader recent history window than the automatic yesterday refresh provides.
+PMG also includes a larger killmail pull path for users who want a broader recent baseline than the normal startup refresh provides.
 
 Good times to use it:
 
@@ -61,90 +57,154 @@ Good times to use it:
 - when you want a stronger recent activity baseline
 - when you think your local intel history needs a manual catch-up pass
 
-Think of it as a stronger recent-history refresh, not something you need to mash constantly during normal use.
+Think of it as a stronger recent-history refresh, not something you need constantly during normal use.
 
 A good first-time pattern is:
 
 1. launch PMG
-2. let the normal startup behavior complete
-3. run the **30-day zKill pull** if you want a fuller recent baseline
+2. let normal startup work settle
+3. run the broader recent-history pull if you want fuller baseline context
 4. begin using local intel normally
 
 ---
 
-## 5) Using the details panel effectively
+## 5. Main board controls
 
-The details panel is where PMG becomes much more than a simple list.
+The main board is the primary scanning surface.
 
-The main grid is for fast scanning.  
-The details panel is for answering: **"Do I care about this pilot right now?"**
+Current row behavior:
+
+- Left click selects a row.
+- Right click opens the PMG pilot detail sidecar.
+- Double-click opens zKill for that pilot.
+- The note/flag icon opens pilot notes for that row.
+
+Those actions remain separate from each other, so opening notes should not trigger zKill, and row actions should still behave normally in compact mode.
+
+---
+
+## 6. Using the detail sidecar effectively
+
+PMG detail now opens as a compact sidecar inspector rather than taking over the whole board.
 
 Use it like this:
 
-### Start with the grid
-Scan the main intel view first to get your quick read on local.
+- scan the board first for names, corps, alliances, and signal states that stand out
+- right-click the row that matters
+- use the sidecar as a confirmation layer before deciding whether to escalate or dig deeper
 
-Use the grid to spot:
+The sidecar is designed to stay near the board so you can keep the main intel surface visible while reading the selected pilot.
 
-- suspicious or notable pilots
-- recognizable organizations
-- activity patterns that stand out
-- anyone you want to investigate further
+Placement behavior:
 
-### Then drill into a specific pilot
-When a row catches your attention, select that pilot and use the details panel to get a more focused read.
+- PMG opens the sidecar beside the board when there is room
+- PMG follows the saved left/right preference when possible
+- near monitor edges, PMG flips or clamps the sidecar so it stays on-screen
 
-The details panel is the place to slow down just enough to answer things like:
-
-- is this person active enough to matter?
-- do they look dangerous, familiar, or out of place?
-- what extra context changes how I should interpret them?
-- is this just noise, or someone worth escalation?
-
-### Treat the details panel as your confirmation layer
-Do not try to live in the details panel for every pilot.
-
-A better pattern is:
-
-- **grid for triage**
-- **details panel for confirmation**
-- **browser / deeper source checks only when needed**
-
-That keeps PMG fast and prevents you from over-investigating every name in local.
+That monitor-edge behavior was tightened in the `v0.9.5.1` hotfix.
 
 ---
 
-## 6) Suggested first-use workflow
+## 7. Compact and panel mode
+
+Compact mode is the board-first operational view. Panel mode keeps PMG in a slimmer custom-shell style for users who want it to behave more like a lightweight companion window.
+
+Current behavior in `v0.9.5.1`:
+
+- compact enter/exit should remain stable
+- panel/custom shell behavior is more reliable than earlier builds
+- configured transparency should still be preserved in panel mode
+- row selection, right-click sidecar, double-click zKill, and note access should continue to work
+
+App-local hotkeys:
+
+- `Insert` toggles compact/normal mode
+- `Delete` clears the board
+- `Home` refreshes or reprocesses clipboard intel
+- `Esc` three times exits PMG
+
+These hotkeys are app-local PMG controls. They are not gameplay automation.
+
+---
+
+## 8. Notes and manual overrides
+
+PMG supports pilot notes and a small set of manual overrides.
+
+Current expectations:
+
+- use the board note/flag icon to open pilot notes
+- treat notes as human judgment, not public-evidence automation
+- treat Known-Cyno and Bait overrides as manual operator context, separate from derived evidence
+
+The saved-note flag should now be easier to spot while scanning in the current released build.
+
+---
+
+## 9. Rebuild Killmail Derived Intel
+
+Use **Rebuild Killmail Derived Intel** when you need to rebuild derived tables from existing local killmail archive data.
+
+Typical reasons include:
+
+- derived-intel schema changes
+- derived-evidence backfills
+- rebuilding existing local data into a newer derived format
+
+Important release note:
+
+**A rebuild is not required solely because of the `v0.9.5.1` hotfix.**
+
+If you already had usable derived intel before `v0.9.5.1`, the hotfix itself is not the reason to rebuild.
+
+---
+
+## 10. Proton note
+
+Current tester feedback indicates the Windows PMG build works under Proton.
+
+Practical expectations:
+
+- functional compatibility looks promising
+- visual polish may not fully match native Windows
+- a Linux-native release and Linux-native polish pass are still deferred
+
+If you are using Proton, treat current support as validated enough to try, but still technical-preview quality rather than polished native Linux packaging.
+
+---
+
+## 11. Suggested first-use workflow
 
 If you are opening PMG for the first time, this is a good starting pattern:
 
-1. Download the latest release
-2. Extract the ZIP fully
-3. Run PitmastersGrill.exe
-4. Let startup complete
-5. Allow the automatic yesterday-zKill update to do its work
-6. Use the **30-day zKill pull** if you want a broader recent baseline
-7. Paste or import your pilot list
-8. Scan the main grid first
-9. Use the details panel on the pilots that actually stand out
+1. Download the latest release.
+2. Extract the ZIP fully.
+3. Run `PitmastersGrill.exe`.
+4. Let startup complete.
+5. Allow the automatic recent killmail refresh to do its work.
+6. Run the broader recent-history pull if you want a fuller baseline.
+7. Paste or import your pilot list.
+8. Scan the main board first.
+9. Right-click only the pilots that actually stand out.
+10. Use notes and deeper source checks selectively.
 
-That will give you the intended PMG experience much faster than clicking around everything at random.
+That gives you the intended PMG flow much faster than trying to inspect every row in depth.
 
 ---
 
-## 7) Good habits
+## 12. Good habits
 
-A few simple habits will make PMG more useful:
+A few simple habits make PMG more useful:
 
 - keep the app in its extracted folder
-- let the app finish its update work before judging first-run behavior
-- use the 30-day pull when you want a stronger recent history baseline
-- use the details panel selectively, not constantly
+- let startup/update work finish before judging first-run behavior
+- use rebuild tools only when there is a real reason
+- use the board for triage and the sidecar for confirmation
 - treat PMG as decision support, not decision replacement
 
 ---
 
-## 8) If something looks off
+## 13. If something looks off
 
 If PMG behaves strangely on first use:
 
@@ -160,12 +220,12 @@ Useful bug reports are things like:
 - what you expected
 - what actually happened
 - whether it was first launch or later use
-- whether the issue happened during startup, refresh, or pilot review
+- whether the issue happened during startup, refresh, compact-mode switching, or pilot review
 
 ---
 
-## 9) Final note
+## 14. Final note
 
-PMG is still growing, but the goal is already clear:
+PMG is still in technical preview, but the goal is already clear:
 
 take the noise of local, reduce the friction, and help you get to the useful part faster.
