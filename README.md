@@ -12,6 +12,32 @@ Release commit: **a3fa467**
 
 ---
 
+
+## How to Navigate This Repo
+
+New here? Start with these:
+
+1. **[Latest Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**  
+   Download current builds, read patch notes, and check upgrade notes for each technical-preview release.
+
+2. **[Current Feature Snapshot](./PMG-FEATURES.md)**  
+   Detailed overview of what PMG can do right now, including compact mode, board interactions, cyno/tackle evidence, killmail-derived intel, and known limitations.
+
+3. **[Application Source](./PitmastersGrill/)**  
+   Main WPF application code. This is where the PMG UI, resolver services, persistence, providers, models, and killmail-derived intel logic live.
+
+4. **[Developer Notes](./DEVELOPER-NOTES.md)**  
+   Technical notes for maintainers and contributors. Useful for understanding current implementation decisions, design constraints, and project direction.
+
+5. **[Issues](https://github.com/SmokeyForged/Pitmasters-Grill/issues)**  
+   Active bug reports, enhancement requests, community feedback, and work tracking.
+
+6. **[README](./README.md)**  
+   High-level project overview, basic usage, safety framing, feedback guidance, and release status.
+
+
+---
+
 ## What PMG Does
 
 PMG helps answer the immediate local-spike question:
@@ -38,6 +64,10 @@ PMG works from user-provided local lists and public data. It does **not** read c
 
 ### Board-first compact mode
 
+<img width="768" height="756" alt="image" src="https://github.com/user-attachments/assets/f60ac21a-a54b-4317-b5b3-a2be0f5e9feb" />
+
+
+
 Compact mode was redesigned as a true operational board view. It preserves row colors, board resizing, and always-on-top behavior while removing unnecessary chrome.
 
 App-local hotkeys:
@@ -56,7 +86,7 @@ Board interactions:
 
 ### Compact pilot detail sidecar
 
-Pilot details now open as a compact sidecar inspector beside the board when possible. The sidecar inherits PMG theme and opacity, uses compact evidence wording, and keeps the board usable while details are open.
+Pilot details now open as a compact sidecar inspector beside the board when possible. The sidecar inherits PMG theme, uses compact evidence wording, and keeps the board usable while details are open.
 
 Notes were moved out of the detail pane and into board-level note/flag icons.
 
