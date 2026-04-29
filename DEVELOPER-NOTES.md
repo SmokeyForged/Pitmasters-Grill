@@ -2,15 +2,15 @@
 
 ## Release posture
 
-The current released build is **v0.9.5.1**, a hotfix on top of `v0.9.5`.
+The latest tagged release is **v0.9.5.1**, a hotfix on top of `v0.9.5`.
 
-This repo may contain newer main-branch-only work, but supporting documentation for release behavior should stay aligned to the latest tagged release unless a doc is explicitly marked as unreleased or forward-looking.
+This repo currently also contains **unreleased 0.9.6 candidate** work on main. Supporting docs must keep that distinction explicit:
 
-Current public framing:
+- `v0.9.5.1` is the latest tagged release
+- current main includes unreleased candidate work
+- do not describe `0.9.6` candidate features as already released unless a tag and release pass actually happen
 
-- `v0.9.5` is the broader community-feedback foundation release
-- `v0.9.5.1` is a stabilization hotfix
-- PMG remains technical preview / `0.9.x` stabilization, not `1.0`
+PMG remains technical preview / `0.9.x` stabilization, not `1.0`.
 
 ## Diagnostics Export
 
@@ -49,6 +49,20 @@ Run the local release helper from the repo root:
 
 It publishes locally, creates `PMG-tech-preview-vX_Y_Z.zip`, writes a SHA256 checksum, and creates a release notes template under `artifacts\release`. It does not push, tag, upload, or sign anything.
 
+## Watchlist Implementation Notes
+
+Current main includes an unreleased watchlist feature. Maintain these rules:
+
+- watch state is local/manual state, not threat semantics
+- key watch state by pilot/character ID when available
+- do not promote display name to the primary key when an ID exists
+- unresolved rows should not allow watch toggles as if they were safely keyed
+- watchlist persistence is local repository/database state
+- row state application should happen after row identity is known
+- board ordering should treat watched-first as a pinned partition
+- later column sorts must sort inside watched/non-watched groups rather than mixing them
+- watchlist must not affect cyno, bait, tackle, or killmail evidence semantics
+
 ## Compact and Panel Shell Rules
 
 `v0.9.5.1` tightened compact/panel mode stability. Treat these as maintainer guardrails:
@@ -59,7 +73,66 @@ It publishes locally, creates `PMG-tech-preview-vX_Y_Z.zip`, writes a SHA256 che
 - compact enter/exit should not freeze the app
 - row interactions must remain intact in compact mode
 
-If a future UI change requires deep native-shell mutation during compact-mode toggles, treat that as a risk area and validate it aggressively before release.
+Current main also persists compact-mode state across restart. Preserve that behavior unless there is a very strong reason to redesign it.
+
+## Window Persistence Notes
+
+Current main persists:
+
+- main window position
+- main window size
+- compact-mode state
+- panel-mode startup behavior
+
+Maintain these rules:
+
+- save/restore must use one coordinate system consistently
+- WPF window bounds are DIPs; monitor/work-area comparisons must also be converted into DIPs before comparison
+- do not assume the primary monitor
+- valid negative coordinates are expected on multi-monitor setups
+- only clamp when saved bounds are no longer visible on any current monitor work area
+- avoid off-screen restore after monitor-layout changes
+- avoid saving minimized junk bounds
+- avoid startup ordering where later shell/layout behavior overwrites saved `Left`/`Top`
+
+Low-noise logging around restore/clamp decisions is acceptable if needed for future debugging.
+
+## Column Layout Persistence
+
+Current main includes board column layout save/reset.
+
+Maintain these rules:
+
+- use stable column keys
+- treat layout persistence separately from column visibility
+- ignore missing/unknown saved columns safely
+- do not let stale saved layout data break startup if columns are renamed or removed
+- reset should restore default order/width without requiring the user to hand-rebuild the board layout
+
+## Summary Banner
+
+Current main includes a lightweight board composition summary banner.
+
+Important behavior:
+
+- compute from currently visible rows
+- compute after ignore filtering
+- update when board content changes
+- update when watch state changes
+- keep it concise and low-noise
+- avoid turning it into a second dashboard
+
+## Hover Explanation
+
+Current main includes concise hover explanations for row/signal reasoning.
+
+Maintain these rules:
+
+- keep them short
+- derive them from existing row evidence/state rather than inventing a second logic path
+- do not let them overstate certainty
+- do not let them replace the detail sidecar
+- keep them low-noise and delayed enough that normal board movement is still comfortable
 
 ## Pilot Explainability
 
@@ -67,7 +140,7 @@ The pilot detail pane includes a compact explainability line showing known sourc
 
 ## Detail Sidecar Placement Notes
 
-Pilot detail now behaves like a sidecar inspector rather than a full-board takeover.
+Pilot detail behaves like a sidecar inspector rather than a full-board takeover.
 
 Maintainer expectations:
 
@@ -133,7 +206,7 @@ Industrial-cyno bait observations are stored separately in `pilot_bait_observati
 
 Use **Diagnostics > Cache Maintenance > Rebuild Killmail Derived Intel** after schema/backfill changes or when rebuilding derived intel from existing local extracted killmail archive data. It rebuilds only derived confirmed cyno-module observations and industrial-cyno bait observations from local extracted killmail archive data. It does not clear settings, notes, ignore lists, themes, manual overrides, resolver cache, or unrelated cache data.
 
-Important release note: `v0.9.5.1` does not require this rebuild by itself.
+Important release note: `v0.9.5.1` does not require this rebuild by itself, and current watchlist/window/layout/hover UI work is not expected to require it by itself either.
 
 Diagnostics export includes safe Cyno Signal summaries and derived bait counts/examples. It does not export full raw killmail dumps.
 
@@ -156,10 +229,16 @@ Avoid overselling Proton support as equivalent to a finished native Linux releas
 - Build with `dotnet build PitmastersGrill.slnx --no-restore -m:1`.
 - Launch PMG and confirm existing settings, dark mode, tray/icon behavior, and ignore list behavior still load.
 - Copy an EVE local list to the clipboard and confirm board population still works.
+- Confirm watchlist persists and watched-first sorting survives board-column sorts.
 - Confirm compact enter/exit does not freeze.
 - Confirm panel/custom shell behavior still preserves intended transparency.
+- Confirm main window position/size restore correctly on a two-monitor setup.
+- Confirm compact/panel persistence survives restart.
 - Confirm pilot detail sidecar placement respects monitor edges.
 - Confirm the saved-note flag remains visually distinct while scanning.
+- Confirm summary banner counts update as visible rows, ignores, and watch state change.
+- Confirm board column layout save/reset works and ignores stale saved columns safely.
+- Confirm hover explanations do not interfere with row selection, right-click detail, double-click zKill, note clicks, or compact drag.
 - Select a pilot and confirm the detail sidecar still opens and double-click still opens zKill.
 - Change Settings > General > PMG Theme across all three themes and confirm the board remains readable.
 - Confirm detail text says Recent Public Kill/Loss Activity and does not imply live movement.
@@ -173,8 +252,7 @@ Avoid overselling Proton support as equivalent to a finished native Linux releas
 
 ## v0.9.4 and v0.9.5.x Notes
 
-- Known-Cyno Override is a manual high-confidence board signal and should render as the confirmed covert/lavender Sig state with the `✦` icon.
+- Known-Cyno Override is a manual high-confidence board signal and should render as the confirmed covert/lavender Sig state.
 - Ignore entries are typed by ID: Pilot, Corporation, or Alliance. Existing `ignore-alliances.json` alliance IDs migrate automatically into typed Alliance entries, and matching precedence is Pilot, then Corporation, then Alliance.
-- `resolver_cache` schema version 10 adds `corp_id` so corporation ignores can match by ID after affiliation is known. Existing rows backfill naturally as affiliation refreshes.
 - Window opacity is applied to background/surface/board background brushes only; foreground text and grid borders should remain opaque/readable.
 - Clipboard local-list regression fixture: `test-fixtures/clipboard-large-local-list-valid.txt`. It should be accepted as an EVE local-list shaped payload while code, markup, stack traces, shell output, paths, and logs remain rejected.

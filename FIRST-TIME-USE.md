@@ -2,11 +2,11 @@
 
 Welcome to **Pitmasters Grill (PMG)**.
 
-This guide is for first-time setup and first-time use of the current released build, **v0.9.5.1**. It covers startup, the main intel loop, compact/panel behavior, and a few current release notes that are useful to know before you settle into normal use.
+This guide is for first-time setup and first-time use of PMG. The latest tagged release is **v0.9.5.1**, but this document also calls out **current main / 0.9.6 candidate** behavior where that is helpful for new users.
 
 ## 1. Download the latest release build
 
-Go to the repository's **Releases** page and download the newest PMG build.
+Go to the repository's **Releases** page and download the newest tagged PMG build.
 
 After downloading:
 
@@ -59,13 +59,6 @@ Good times to use it:
 
 Think of it as a stronger recent-history refresh, not something you need constantly during normal use.
 
-A good first-time pattern is:
-
-1. launch PMG
-2. let normal startup work settle
-3. run the broader recent-history pull if you want fuller baseline context
-4. begin using local intel normally
-
 ---
 
 ## 5. Main board controls
@@ -85,7 +78,7 @@ Those actions remain separate from each other, so opening notes should not trigg
 
 ## 6. Using the detail sidecar effectively
 
-PMG detail now opens as a compact sidecar inspector rather than taking over the whole board.
+PMG detail opens as a compact sidecar inspector rather than taking over the whole board.
 
 Use it like this:
 
@@ -93,28 +86,33 @@ Use it like this:
 - right-click the row that matters
 - use the sidecar as a confirmation layer before deciding whether to escalate or dig deeper
 
-The sidecar is designed to stay near the board so you can keep the main intel surface visible while reading the selected pilot.
-
 Placement behavior:
 
 - PMG opens the sidecar beside the board when there is room
 - PMG follows the saved left/right preference when possible
 - near monitor edges, PMG flips or clamps the sidecar so it stays on-screen
 
-That monitor-edge behavior was tightened in the `v0.9.5.1` hotfix.
+---
+
+## 7. Watchlist on current main
+
+Current main branch includes an **unreleased 0.9.6 candidate** watchlist feature.
+
+Practical behavior:
+
+- use **Watch** or **Unwatch** from the pilot detail sidecar
+- watched pilots show a star to the left of the pilot name
+- the notes flag remains on the right
+- watched pilots stay pinned above non-watched pilots
+- board column sorts still preserve watched-first grouping
+
+Watchlist is local/manual attention state. It is not a threat color or evidence signal.
 
 ---
 
-## 7. Compact and panel mode
+## 8. Compact and panel mode
 
 Compact mode is the board-first operational view. Panel mode keeps PMG in a slimmer custom-shell style for users who want it to behave more like a lightweight companion window.
-
-Current behavior in `v0.9.5.1`:
-
-- compact enter/exit should remain stable
-- panel/custom shell behavior is more reliable than earlier builds
-- configured transparency should still be preserved in panel mode
-- row selection, right-click sidecar, double-click zKill, and note access should continue to work
 
 App-local hotkeys:
 
@@ -123,11 +121,31 @@ App-local hotkeys:
 - `Home` refreshes or reprocesses clipboard intel
 - `Esc` three times exits PMG
 
-These hotkeys are app-local PMG controls. They are not gameplay automation.
+Current main branch also includes **unreleased 0.9.6 candidate** persistence for:
+
+- main window position
+- main window size
+- compact-mode state across restart
+- panel-mode startup behavior across restart
+
+Multi-monitor restore has been validated in operator testing, with off-screen clamping only when saved bounds are no longer visible.
 
 ---
 
-## 8. Notes and manual overrides
+## 9. Summary banner and hover explanation
+
+Current main branch includes two small **0.9.6 candidate** board-readability features:
+
+- a bottom-board summary banner for visible composition
+- concise hover explanations for row/signal reasoning
+
+The summary banner gives a quick read of the currently visible board after filtering.
+
+Hover explanations are meant to explain a color or flag briefly. They are useful for fast scanning, but they are not a replacement for the full detail sidecar.
+
+---
+
+## 10. Notes and manual overrides
 
 PMG supports pilot notes and a small set of manual overrides.
 
@@ -137,11 +155,24 @@ Current expectations:
 - treat notes as human judgment, not public-evidence automation
 - treat Known-Cyno and Bait overrides as manual operator context, separate from derived evidence
 
-The saved-note flag should now be easier to spot while scanning in the current released build.
+The saved-note flag is intended to remain easy to spot while scanning.
 
 ---
 
-## 9. Rebuild Killmail Derived Intel
+## 11. Column layout save and reset
+
+Current main branch includes **unreleased 0.9.6 candidate** board layout save/reset controls.
+
+Use them when you want PMG to remember:
+
+- column order
+- column width
+
+Reset returns the board layout to defaults. This is separate from the existing column visibility settings.
+
+---
+
+## 12. Rebuild Killmail Derived Intel
 
 Use **Rebuild Killmail Derived Intel** when you need to rebuild derived tables from existing local killmail archive data.
 
@@ -151,15 +182,14 @@ Typical reasons include:
 - derived-evidence backfills
 - rebuilding existing local data into a newer derived format
 
-Important release note:
+Important guidance:
 
-**A rebuild is not required solely because of the `v0.9.5.1` hotfix.**
-
-If you already had usable derived intel before `v0.9.5.1`, the hotfix itself is not the reason to rebuild.
+- a rebuild is **not required solely because of `v0.9.5.1`**
+- a rebuild is also **not expected solely because of the current `0.9.6` candidate UI/manual-state features**
 
 ---
 
-## 10. Proton note
+## 13. Proton note
 
 Current tester feedback indicates the Windows PMG build works under Proton.
 
@@ -173,11 +203,11 @@ If you are using Proton, treat current support as validated enough to try, but s
 
 ---
 
-## 11. Suggested first-use workflow
+## 14. Suggested first-use workflow
 
 If you are opening PMG for the first time, this is a good starting pattern:
 
-1. Download the latest release.
+1. Download the latest tagged release.
 2. Extract the ZIP fully.
 3. Run `PitmastersGrill.exe`.
 4. Let startup complete.
@@ -186,13 +216,11 @@ If you are opening PMG for the first time, this is a good starting pattern:
 7. Paste or import your pilot list.
 8. Scan the main board first.
 9. Right-click only the pilots that actually stand out.
-10. Use notes and deeper source checks selectively.
-
-That gives you the intended PMG flow much faster than trying to inspect every row in depth.
+10. Use notes, watchlist, and deeper source checks selectively.
 
 ---
 
-## 12. Good habits
+## 15. Good habits
 
 A few simple habits make PMG more useful:
 
@@ -204,7 +232,7 @@ A few simple habits make PMG more useful:
 
 ---
 
-## 13. If something looks off
+## 16. If something looks off
 
 If PMG behaves strangely on first use:
 
@@ -224,7 +252,7 @@ Useful bug reports are things like:
 
 ---
 
-## 14. Final note
+## 17. Final note
 
 PMG is still in technical preview, but the goal is already clear:
 

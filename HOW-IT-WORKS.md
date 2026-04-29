@@ -1,12 +1,12 @@
 # Pitmaster's Grill - How It Works
 
-This document explains, at a practical level, how **Pitmaster's Grill (PMG)** works in the current released technical-preview build, **v0.9.5.1**.
+This document explains, at a practical level, how **Pitmaster's Grill (PMG)** works in the current main branch.
+
+The latest tagged release is **v0.9.5.1**. Some UI/manual-state features described here are **unreleased 0.9.6 candidate** behavior from the current main branch.
 
 It is written to answer a simple question:
 
 **How does PMG take a local list of pilot names and turn it into usable intel?**
-
-This is not a full low-level engineering specification. It is a technical overview of the current working model.
 
 ---
 
@@ -18,7 +18,7 @@ PMG is built around a straightforward human-in-the-loop workflow:
 2. PMG classifies and accepts only plausible intel input
 3. PMG resolves pilot identity and public context through cache and public providers
 4. PMG adds killmail-derived signals where public evidence supports them
-5. PMG layers in user-owned notes, overrides, and ignores
+5. PMG layers in user-owned notes, watchlist state, overrides, and ignores
 6. PMG presents the result as a fast-scanning board plus a sidecar detail view
 
 The goal is not to replace player judgment.
@@ -96,20 +96,26 @@ That derived layer can provide:
 
 This lets PMG surface useful historical evidence without pretending it has live fit or location visibility.
 
-### 6. Manual notes, overrides, and ignores
+### 6. Manual user-state layer
 
 PMG intentionally keeps user-owned judgment separate from public-data-backed evidence.
 
-That means the user can apply:
+The manual or local state layer can include:
 
 - pilot notes
+- Watchlist state
 - Known-Cyno override
 - Bait override
-- typed ignore entries for pilots, corporations, or alliances
+- typed ignores
 
-Notes and overrides are manual context. They are not the same thing as public evidence extracted from killmail-derived data.
+These are not all the same kind of thing:
 
-Ignore entries suppress matching rows from the visible board after resolution.
+- notes are operator memory
+- watchlist is manual attention state
+- overrides are operator judgment
+- ignores are visibility suppression rules
+
+This matters because PMG is trying to keep evidence, local memory, and display behavior distinct.
 
 ### 7. Board presentation
 
@@ -120,6 +126,7 @@ The board is designed to let the user quickly notice:
 - recognizable groupings
 - active pilots
 - suspicious public-evidence patterns
+- manually watched pilots
 - likely escalation signals worth opening in details or zKill
 
 ---
@@ -128,7 +135,7 @@ The board is designed to let the user quickly notice:
 
 The board is not just a list of names. It is a summarized operational view.
 
-In the current release, it can surface fields such as:
+It can surface fields such as:
 
 - **Character**
 - **Sig**
@@ -150,18 +157,55 @@ These fields help answer practical questions like:
 
 ---
 
+## Watched-first sorting
+
+Current main branch includes an unreleased watchlist behavior where watched pilots stay pinned above non-watched pilots.
+
+The important system rule is:
+
+**watched-first is a pinned partition, not a cosmetic sort trick**
+
+That means:
+
+- watched rows are grouped first
+- non-watched rows follow
+- manual board-column sorting applies inside each group
+- the groups should not be mixed together by a later column sort
+
+This keeps watchlist state usable even when the operator temporarily sorts by corp, alliance, kills, losses, or character.
+
+---
+
+## Summary banner
+
+Current main branch includes an unreleased bottom-board composition summary banner.
+
+At the system level, it summarizes the currently visible board after filtering, not the raw unfiltered intake.
+
+That means the banner is based on:
+
+- current visible rows
+- current ignore suppression
+- current watchlist state
+- current board refresh state
+
+It is intentionally lightweight and meant to provide a fast composition read, not a second dashboard.
+
+---
+
 ## Compact mode and panel mode
 
 PMG supports a board-first compact mode and a lighter panel/custom-shell style.
 
 At a high level, compact/panel mode exists to keep PMG usable as a quick operational companion rather than a bulky desktop app.
 
-In the current released build:
+In the current main branch:
 
 - the board remains the main surface
 - compact mode is layout-driven rather than a separate feature fork
 - panel-mode transparency should still be preserved
 - normal row interactions should remain intact
+- compact/panel UI state can persist across restart
 
 That means left-click selection, right-click details, double-click zKill, and note access should continue to work even when PMG is running in a tighter board-first shape.
 
@@ -171,7 +215,7 @@ That means left-click selection, right-click details, double-click zKill, and no
 
 PMG opens pilot details in a sidecar inspector rather than taking over the whole board.
 
-The current sidecar behavior is:
+The sidecar behavior is:
 
 - open beside the board when there is room
 - honor the saved left/right preference when possible
@@ -179,6 +223,41 @@ The current sidecar behavior is:
 - keep the board visible while the user reads evidence and freshness context
 
 This keeps PMG usable as a fast-scanning tool first, while still supporting closer inspection of a selected pilot.
+
+Current main branch also allows Watch/Unwatch from this sidecar.
+
+---
+
+## Saved UI state
+
+Current main branch persists several pieces of local UI state:
+
+- main window position
+- main window size
+- compact-mode state
+- panel-mode startup state
+- saved board column layout
+
+Window persistence is intended to support real multi-monitor use. Saved bounds are treated as valid if they still intersect a visible monitor work area. If monitor layout changes and the saved bounds are no longer visible, PMG clamps them back onto a visible work area while preserving size as much as practical.
+
+Board layout persistence is separate from board visibility settings. Column order and width can be restored independently from which columns are shown.
+
+---
+
+## Hover explanation
+
+Current main branch includes concise hover explanations for row/signal reasoning.
+
+At the system level, these are derived display text built from the same row evidence/state PMG already uses for:
+
+- board signal kind
+- notes and watchlist state
+- confirmed cyno evidence
+- derived bait evidence
+- tackle context
+- manual override state
+
+The goal is to expose a short explanation layer without replacing the detail sidecar.
 
 ---
 
@@ -239,7 +318,7 @@ PMG can:
 - highlight
 - sort
 - surface patterns
-- hand off to zKill or deeper review
+- link out to zKill or deeper review
 
 PMG should not be treated as:
 
@@ -259,15 +338,16 @@ Because PMG is still a technical preview, some practical limitations remain:
 - provider lookups can fail, throttle, or return partial data
 - cache rebuilds may be needed after derived-intel schema/backfill changes
 - some sidecar and compact-mode behavior is intentionally conservative to stay stable
+- hover explanations are intentionally concise and may still require opening details or zKill
 - Proton compatibility looks good through current tester feedback, but native Linux polish remains deferred
 
-This overview is meant to describe the current working shape of PMG without pretending that the technical design is already final.
+This overview is meant to describe the current working shape of PMG without pretending that the technical design is already final or that unreleased main-branch behavior is already tagged.
 
 ---
 
 ## Summary
 
-PMG works by taking a local pilot list, classifying it, enriching it with cached and public intel context, applying killmail-derived evidence where supported, layering in user-owned notes and ignores, and presenting the result as a board plus sidecar built for quick operational reading.
+PMG works by taking a local pilot list, classifying it, enriching it with cached and public intel context, applying killmail-derived evidence where supported, layering in user-owned notes/watchlist/ignores/overrides, and presenting the result as a board plus sidecar built for quick operational reading.
 
 In plain language:
 

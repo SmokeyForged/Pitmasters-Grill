@@ -1,29 +1,21 @@
 # Pitmaster's Grill - Current Feature Snapshot
 
-Public snapshot for **Pitmasters Grill Technical Preview v0.9.5.1**.
+This document separates the latest tagged release from the current main branch.
 
-This document describes what PMG can do in the current released build. It is not a roadmap and does not describe main-branch-only work as if it were already released.
+- Latest tagged release: **v0.9.5.1**
+- Current main branch: includes **unreleased 0.9.6 candidate work**
 
-Release: **Pitmasters Grill 0.9.5.1**  
-Tag: **v0.9.5.1**  
-Release commit: **172c810**
+Unless a section explicitly says otherwise, release-specific statements below refer to the current main branch feature snapshot, not a released build.
 
 ---
 
-## Release framing
+## Release posture
 
 `v0.9.5` was the larger community-feedback foundation release.
 
-`v0.9.5.1` is the current hotfix on top of that release. It keeps the same overall feature set while tightening stability and usability in a few important operational areas:
+`v0.9.5.1` is the latest tagged hotfix on top of that release.
 
-- compact/panel mode stability
-- custom shell / panel mode behavior
-- transparency preservation in panel mode
-- pilot detail sidecar placement near monitor edges
-- saved-note flag visibility
-- minor version / diagnostic cleanup
-
-`v0.9.5.1` does not, by itself, require a killmail-derived intel rebuild.
+Current main branch includes additional **0.9.6 candidate** quality-of-life work that is planned for the next technical preview but is not yet tagged as released.
 
 PMG remains a technical preview in the `0.9.x` stabilization period, not a `1.0` release.
 
@@ -47,7 +39,7 @@ PMG can process copied local-style pilot lists and populate a board of pilot row
 
 Current guardrails are designed to reject obvious non-local clipboard content such as code, markup, stack traces, shell output, logs, paths, and oversized unrelated text while still accepting realistic EVE pilot names.
 
-The board population path resolves available:
+The board population path resolves or derives:
 
 - pilot identity
 - corporation
@@ -94,11 +86,30 @@ Note/flag icon clicks are separate from row zKill and compact-drag behavior.
 
 ---
 
+## Pilot Watchlist
+
+Current main branch includes an **unreleased 0.9.6 candidate** watchlist system.
+
+Watchlist is a local, manual attention marker. It is **not** a threat signal and does not change cyno, bait, tackle, or row-evidence semantics.
+
+Current behavior:
+
+- Watch/Unwatch is available from the pilot detail sidecar.
+- Watched pilots show a star marker to the **left** of the pilot name.
+- The existing notes flag remains on the **right**.
+- Watched pilots stay pinned above non-watched pilots.
+- Column sorting preserves the watched-first partition and sorts within watched/non-watched groups.
+- Watch state is local app state keyed by pilot ID where available.
+
+This feature is current-main-branch-only and should not be read as part of `v0.9.5.1`.
+
+---
+
 ## Compact Mode and Panel Mode
 
 `v0.9.5` redesigned compact mode as a true board-first operational view, and `v0.9.5.1` hardened the shell behavior around that view.
 
-Compact/panel behavior now aims to:
+Compact/panel behavior aims to:
 
 - keep the board as the primary surface
 - preserve row colors and Sig icons
@@ -108,6 +119,13 @@ Compact/panel behavior now aims to:
 - avoid compact-toggle freezes or unstable native shell transitions
 - support delayed click-and-hold drag from rows, column headers, or blank board space
 - keep row selection, right-click details, and double-click zKill behavior intact
+
+Current main branch also includes **unreleased 0.9.6 candidate** UI-state persistence for compact/panel workflows:
+
+- PMG remembers main window position and size
+- PMG restores compact mode state across restart
+- PMG preserves panel-mode startup behavior across restart
+- PMG restores sane placement on multi-monitor setups and clamps only when saved bounds are no longer visible
 
 App-local hotkeys:
 
@@ -146,48 +164,76 @@ Current detail content can include:
 - limitations/freshness/source text
 - ignore actions
 - Open zKill
+- Watch / Unwatch on current main branch
 
 Notes are handled through the board-level note/flag icon rather than a bulky inline detail editor.
 
 ---
 
-## Notes and Manual Overrides
+## Notes, Manual Overrides, and Ignore State
 
-PMG supports pilot notes through board-level note/flag icons.
+PMG intentionally keeps user-owned judgment separate from public-data-backed evidence.
 
-Manual flags/overrides remain separate from derived public evidence. This keeps user judgment distinct from data PMG extracted from public killmail/cache sources.
-
-Current manual state can include:
+Current manual or local state can include:
 
 - pilot notes
+- Watchlist state on current main branch
 - Known-Cyno override
 - Bait override
+- typed ignores
 
-`v0.9.5.1` also improved saved-note flag visibility so board-level note state is easier to spot while scanning.
+`v0.9.5.1` improved saved-note flag visibility so board-level note state is easier to spot while scanning.
 
 Manual Bait remains a user-controlled signal and is not the same thing as derived industrial-cyno bait evidence.
 
+Ignored rows are suppressed from the current board. Watchlist only affects visible rows and sort priority; it does not bypass ignores.
+
 ---
 
-## Ignore List
+## Local Composition Summary Banner
 
-PMG supports typed ignore entries.
+Current main branch includes an **unreleased 0.9.6 candidate** summary banner at the bottom of the board.
 
-Ignore entries can target:
+It provides a fast, one-line read of the currently visible board composition after filtering. Depending on the visible rows, it can surface:
 
-- Pilot IDs
-- Corporation IDs
-- Alliance IDs
+- visible pilot count
+- watched count
+- possible cyno count
+- confirmed cyno count
+- bait count
+- top visible corp or alliance concentration
 
-Ignore matching is ID-based. Resolved names are display/help text and do not control suppression.
+It is primarily useful in normal mode where there is room to keep a lightweight board summary visible without crowding the main grid.
 
-Ignore precedence:
+---
 
-1. Pilot
-2. Corporation
-3. Alliance
+## Board Column Layout Save and Reset
 
-Ignored rows are suppressed from the current board. Corp/alliance board counts are calculated after ignore filtering.
+Current main branch includes **unreleased 0.9.6 candidate** board layout persistence.
+
+Users can now:
+
+- save board column order
+- save board column widths
+- restore that layout on startup
+- reset the layout back to defaults
+
+This is separate from column visibility settings. The feature is intended as a cockpit quality-of-life improvement for users who tune PMG to specific monitor widths or compact layouts.
+
+---
+
+## Hover Explanation
+
+Current main branch includes **unreleased 0.9.6 candidate** concise hover explanations for row/signal reasoning.
+
+These tooltips are intended to:
+
+- explain why a row is colored or flagged
+- summarize the signal/evidence briefly
+- stay concise and low-noise
+- help scanning without replacing the full detail pane
+
+This is an explanation aid, not a replacement for the evidence-first sidecar or zKill follow-up.
 
 ---
 
@@ -281,7 +327,7 @@ Current derived intel can include:
 
 Run **Rebuild Killmail Derived Intel** after derived-intel schema changes, derived-evidence backfills, or when you need to rebuild existing local archive data into the current derived tables.
 
-That rebuild is **not required solely because of the `v0.9.5.1` hotfix**.
+That rebuild is **not required solely because of the `v0.9.5.1` hotfix**, and none of the current `0.9.6` candidate UI/manual-state features are expected to require it by themselves.
 
 ---
 
@@ -306,6 +352,7 @@ Current settings/configuration areas include:
 - compact mode
 - always-on-top behavior
 - board column visibility
+- board column layout save/reset on current main branch
 - corp/alliance count visibility
 - typed ignore list
 - diagnostics export
@@ -359,7 +406,7 @@ Known expectations:
 - public killmail evidence can be delayed or incomplete
 - provider lookups can fail, throttle, or return partial data
 - cache rebuilds may be needed after derived-intel schema changes
-- compact signals are intentionally concise and may require opening details/zKill for context
+- compact signals and hover explanations are intentionally concise and may still require opening details or zKill for context
 - cyno/tackle/bait indicators are based on public evidence and conservative inference, not live visibility
 - Proton compatibility is promising through the Windows build, but native Linux polish is still deferred
 - accessibility palettes are useful now, but broader user validation is still welcome
