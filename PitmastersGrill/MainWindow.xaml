@@ -13,8 +13,7 @@
         MinWidth="420"
         Icon="Assets/PMGIcon.ico"
         Background="{DynamicResource WindowBackgroundBrush}"
-        PreviewKeyDown="Window_PreviewKeyDown"
-        StateChanged="Window_StateChanged">
+        PreviewKeyDown="Window_PreviewKeyDown">
 
     <Window.Resources>
         <local:ThreatCynoHullHighlightConverter x:Key="ThreatCynoHullHighlightConverter" />
@@ -48,7 +47,6 @@
         <SolidColorBrush x:Key="BoardSignalInferredCynoBrush" Color="#F28C28"/>
         <SolidColorBrush x:Key="BoardSignalPossibleBrush" Color="#F6B94B"/>
         <SolidColorBrush x:Key="BoardSignalBaitBrush" Color="#B8915E"/>
-        <SolidColorBrush x:Key="PilotNoteFlagBrush" Color="#00E5FF"/>
 
         <Style TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap"/>
@@ -221,44 +219,6 @@
             </Setter>
         </Style>
 
-        <Style x:Key="WindowControlButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="28"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="RootBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="#2A2A2A"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="RootBorder" Property="Opacity" Value="0.6"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="OpenDetailsActionButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
             <Setter Property="Background" Value="#0891B2"/>
             <Setter Property="Foreground" Value="White"/>
@@ -339,7 +299,7 @@
                 Padding="12"
                 BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="0,0,0,1"
-                MouseLeftButtonDown="WindowHeader_MouseLeftButtonDown">
+                MouseLeftButtonDown="WindowDragHandle_MouseLeftButtonDown">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Visible"/>
@@ -361,7 +321,6 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0"
@@ -372,29 +331,6 @@
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource HeaderTextBrush}"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="2"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Top">
-                        <Button x:Name="MinimizeWindowButton"
-                                Style="{StaticResource WindowControlButtonStyle}"
-                                Margin="0,0,6,0"
-                                ToolTip="Minimize PMG"
-                                Content="_"
-                                Click="MinimizeWindowButton_Click"/>
-                        <Button x:Name="MaximizeRestoreWindowButton"
-                                Style="{StaticResource WindowControlButtonStyle}"
-                                Margin="0,0,6,0"
-                                ToolTip="Maximize PMG"
-                                Content="[]"
-                                Click="MaximizeRestoreWindowButton_Click"/>
-                        <Button x:Name="CloseWindowButton"
-                                Style="{StaticResource WindowControlButtonStyle}"
-                                ToolTip="Close PMG"
-                                Content="X"
-                                Click="CloseWindowButton_Click"/>
                     </StackPanel>
 
                 </Grid>
@@ -502,7 +438,7 @@
                         BorderThickness="1"
                         Cursor="SizeAll"
                         ToolTip="Drag to move PMG while Compact Mode is enabled."
-                        MouseLeftButtonDown="CompactWindowDragHandle_MouseLeftButtonDown">
+                        MouseLeftButtonDown="WindowDragHandle_MouseLeftButtonDown">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -618,7 +554,7 @@
                                                     <DataTrigger Binding="{Binding HasNotes}" Value="True">
                                                         <Setter TargetName="PilotNoteButton" Property="Content" Value="⚑"/>
                                                         <Setter TargetName="PilotNoteButton" Property="ToolTip" Value="View/edit note"/>
-                                                        <Setter TargetName="PilotNoteButton" Property="Foreground" Value="{DynamicResource PilotNoteFlagBrush}"/>
+                                                        <Setter TargetName="PilotNoteButton" Property="Foreground" Value="{DynamicResource WarningAmberBrush}"/>
                                                     </DataTrigger>
                                                 </DataTemplate.Triggers>
                                             </DataTemplate>
@@ -1097,7 +1033,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="Technical Preview-v0.9.5.1"/>
+                                                       Text="Technical Preview-v0.9.5"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"

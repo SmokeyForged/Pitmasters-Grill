@@ -21,7 +21,6 @@ using System.Windows.Media;
 using System.Windows.Navigation;
 using System.Windows.Threading;
 using PitmastersGrill.Views;
-using FormsScreen = System.Windows.Forms.Screen;
 
 namespace PitmastersGrill
 {
@@ -210,7 +209,6 @@ namespace PitmastersGrill
             source?.AddHook(WndProc);
 
             _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
-            UpdateWindowStateUi();
 
             AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
         }
@@ -291,25 +289,6 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
         }
 
-        private void ToggleMaximizeRestore()
-        {
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-        }
-
-        private void UpdateWindowStateUi()
-        {
-            if (MaximizeRestoreWindowButton == null)
-            {
-                return;
-            }
-
-            var isMaximized = WindowState == WindowState.Maximized;
-            MaximizeRestoreWindowButton.Content = isMaximized ? "O" : "[]";
-            MaximizeRestoreWindowButton.ToolTip = isMaximized ? "Restore PMG" : "Maximize PMG";
-        }
-
         private void RequestApplicationShutdown(string reason)
         {
             if (_isShuttingDown)
@@ -344,10 +323,9 @@ namespace PitmastersGrill
             }
         }
 
-        private void WindowHeader_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void WindowDragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ButtonState != MouseButtonState.Pressed ||
-                FindVisualParent<ButtonBase>(e.OriginalSource as DependencyObject) != null)
+            if (!_appSettings.PanelModeEnabled || e.ButtonState != MouseButtonState.Pressed)
             {
                 return;
             }
@@ -366,45 +344,8 @@ namespace PitmastersGrill
             }
             catch (InvalidOperationException ex)
             {
-                AppLogger.UiWarn($"Window header drag ignored. reason={ex.Message}");
+                AppLogger.UiWarn($"Panel mode drag ignored. reason={ex.Message}");
             }
-        }
-
-        private void CompactWindowDragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ButtonState != MouseButtonState.Pressed)
-            {
-                return;
-            }
-
-            try
-            {
-                DragMove();
-            }
-            catch (InvalidOperationException ex)
-            {
-                AppLogger.UiWarn($"Compact drag handle ignored. reason={ex.Message}");
-            }
-        }
-
-        private void MinimizeWindowButton_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
-        private void MaximizeRestoreWindowButton_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleMaximizeRestore();
-        }
-
-        private void CloseWindowButton_Click(object sender, RoutedEventArgs e)
-        {
-            RequestApplicationShutdown("Window close button");
-        }
-
-        private void Window_StateChanged(object? sender, EventArgs e)
-        {
-            UpdateWindowStateUi();
         }
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1849,24 +1790,24 @@ namespace PitmastersGrill
             var detailHeight = detailWindow.Height > 0 ? detailWindow.Height : 360;
             var ownerWidth = ActualWidth > 0 ? ActualWidth : Width;
             var ownerHeight = ActualHeight > 0 ? ActualHeight : Height;
-            var ownerLeft = double.IsNaN(Left) ? 0 : Left;
-            var ownerTop = double.IsNaN(Top) ? 0 : Top;
-            var ownerHandle = new WindowInteropHelper(this).Handle;
-            var monitor = ownerHandle != IntPtr.Zero
-                ? FormsScreen.FromHandle(ownerHandle)
-                : FormsScreen.FromPoint(new System.Drawing.Point(
-                    (int)Math.Round(ownerLeft),
-                    (int)Math.Round(ownerTop)));
 
-            var presentationSource = PresentationSource.FromVisual(this);
-            var transformFromDevice = presentationSource?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
-            var workAreaPixels = monitor.WorkingArea;
-            var workTopLeft = transformFromDevice.Transform(new Point(workAreaPixels.Left, workAreaPixels.Top));
-            var workBottomRight = transformFromDevice.Transform(new Point(workAreaPixels.Right, workAreaPixels.Bottom));
-            var workLeft = workTopLeft.X;
-            var workTop = workTopLeft.Y;
-            var workRight = workBottomRight.X;
-            var workBottom = workBottomRight.Y;
+            var virtualLeft = SystemParameters.VirtualScreenLeft;
+            var virtualTop = SystemParameters.VirtualScreenTop;
+
+            var ownerLeft = double.IsNaN(Left) ? virtualLeft : Left;
+            var ownerTop = double.IsNaN(Top) ? virtualTop : Top;
+
+            var ownerRect = new System.Drawing.Rectangle(
+                (int)Math.Round(ownerLeft),
+                (int)Math.Round(ownerTop),
+                Math.Max(1, (int)Math.Round(ownerWidth)),
+                Math.Max(1, (int)Math.Round(ownerHeight)));
+
+            var workArea = System.Windows.Forms.Screen.FromRectangle(ownerRect).WorkingArea;
+            var workLeft = (double)workArea.Left;
+            var workTop = (double)workArea.Top;
+            var workRight = (double)workArea.Right;
+            var workBottom = (double)workArea.Bottom;
 
             var rightX = ownerLeft + ownerWidth + DetailWindowGap;
             var leftX = ownerLeft - detailWidth - DetailWindowGap;
@@ -1874,35 +1815,15 @@ namespace PitmastersGrill
             var canLeft = leftX >= workLeft;
 
             var preferLeft = GetPilotDetailPlacementPreference() == PilotDetailPlacementPreference.AutoPreferLeft;
-            var preferredSide = preferLeft ? "left" : "right";
-            var finalSide = preferredSide;
+            var placeLeft = preferLeft
+                ? canLeft || !canRight
+                : !canRight && canLeft;
 
-            if (preferLeft)
-            {
-                if (!canLeft && canRight)
-                {
-                    finalSide = "right";
-                }
-            }
-            else if (!canRight && canLeft)
-            {
-                finalSide = "left";
-            }
-
-            var targetLeft = finalSide == "left" ? leftX : rightX;
+            var targetLeft = placeLeft ? leftX : rightX;
             var targetTop = ownerTop;
-            var clampedLeft = Clamp(targetLeft, workLeft, Math.Max(workLeft, workRight - detailWidth));
-            var clampedTop = Clamp(targetTop, workTop, Math.Max(workTop, workBottom - detailHeight));
-            var wasClamped = !AreClose(clampedLeft, targetLeft) || !AreClose(clampedTop, targetTop);
 
-            detailWindow.Left = clampedLeft;
-            detailWindow.Top = clampedTop;
-
-            if (!string.Equals(finalSide, preferredSide, StringComparison.Ordinal) || wasClamped)
-            {
-                AppLogger.UiInfo(
-                    $"Detail window placement adjusted. ownerBounds=({ownerLeft:0.##},{ownerTop:0.##},{ownerWidth:0.##},{ownerHeight:0.##}) workArea=({workLeft:0.##},{workTop:0.##},{workRight - workLeft:0.##},{workBottom - workTop:0.##}) preferredSide={preferredSide} finalSide={finalSide} finalBounds=({clampedLeft:0.##},{clampedTop:0.##},{detailWidth:0.##},{detailHeight:0.##})");
-            }
+            detailWindow.Left = Clamp(targetLeft, workLeft, Math.Max(workLeft, workRight - detailWidth));
+            detailWindow.Top = Clamp(targetTop, workTop, Math.Max(workTop, workBottom - detailHeight));
         }
 
         private PilotDetailPlacementPreference GetPilotDetailPlacementPreference()
@@ -2236,11 +2157,6 @@ namespace PitmastersGrill
             }
 
             return value;
-        }
-
-        private static bool AreClose(double left, double right)
-        {
-            return Math.Abs(left - right) < 0.5;
         }
 
         private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)

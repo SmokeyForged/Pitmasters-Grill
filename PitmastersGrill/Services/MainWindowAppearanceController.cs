@@ -8,7 +8,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Shell;
 
 namespace PitmastersGrill.Services
 {
@@ -17,7 +16,6 @@ namespace PitmastersGrill.Services
         private const int DwMWaUseImmersiveDarkMode = 20;
         private const double MinimumOpacityPercent = 35;
         private const double MaximumOpacityPercent = 100;
-        private static readonly Thickness CustomResizeBorderThickness = new(8);
 
         private readonly AppSettingsService _appSettingsService;
 
@@ -130,7 +128,7 @@ namespace PitmastersGrill.Services
             AppSettings settings,
             bool alwaysOnTopEnabled,
             Window window,
-            TextBlock? windowOpacityValueText,
+            TextBlock windowOpacityValueText,
             ResourceDictionary resources)
         {
             if (settings == null)
@@ -190,32 +188,8 @@ namespace PitmastersGrill.Services
                 throw new ArgumentNullException(nameof(resources));
             }
 
-            ApplyWindowShell(window, settings, resources);
-        }
-
-        public void ApplyWindowShell(
-            Window window,
-            AppSettings settings,
-            ResourceDictionary resources)
-        {
-            if (window == null)
-            {
-                throw new ArgumentNullException(nameof(window));
-            }
-
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
-
             if (settings.PanelModeEnabled)
             {
-                WindowChrome.SetWindowChrome(window, null);
                 window.WindowStyle = WindowStyle.None;
                 window.ResizeMode = ResizeMode.CanResizeWithGrip;
                 window.AllowsTransparency = true;
@@ -225,21 +199,12 @@ namespace PitmastersGrill.Services
                 return;
             }
 
-            window.WindowStyle = WindowStyle.None;
+            window.WindowStyle = WindowStyle.SingleBorderWindow;
             window.ResizeMode = ResizeMode.CanResize;
             window.AllowsTransparency = false;
             window.SetResourceReference(Window.BackgroundProperty, "WindowBackgroundBrush");
-            WindowChrome.SetWindowChrome(window, new WindowChrome
-            {
-                CaptionHeight = 0,
-                CornerRadius = new CornerRadius(0),
-                GlassFrameThickness = new Thickness(0),
-                NonClientFrameEdges = NonClientFrameEdges.None,
-                ResizeBorderThickness = CustomResizeBorderThickness,
-                UseAeroCaptionButtons = false
-            });
 
-            AppLogger.UiInfo("Custom startup shell applied. windowStyle=None allowsTransparency=false resizeMode=CanResize captionHeight=0");
+            AppLogger.UiInfo("Standard window shell applied. windowStyle=SingleBorderWindow allowsTransparency=false resizeMode=CanResize");
         }
 
         public double HandleWindowOpacityChanged
@@ -247,7 +212,7 @@ namespace PitmastersGrill.Services
             AppSettings settings,
             double sliderValue,
             Window window,
-            TextBlock? windowOpacityValueText,
+            TextBlock windowOpacityValueText,
             ResourceDictionary resources)
         {
             if (settings == null)
@@ -388,7 +353,7 @@ namespace PitmastersGrill.Services
         public void ApplyWindowSettings(
             Window window,
             AppSettings settings,
-            TextBlock? windowOpacityValueText,
+            TextBlock windowOpacityValueText,
             ResourceDictionary resources)
         {
             if (window == null)

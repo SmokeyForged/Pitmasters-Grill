@@ -2,213 +2,199 @@
 
 > Fast, readable local intel for EVE Online.
 
-Pitmaster's Grill (PMG) is a Windows desktop intel companion built to turn a copied local list into useful pilot context quickly. The goal is simple: get the useful part of local without fighting your tools while space is getting loud.
+Pitmaster's Grill (PMG) is a Windows desktop intel companion for turning copied EVE local lists into a board of useful public pilot context. It is built for quick, practical reads during live play: paste local, let PMG resolve what it can, scan the board, and open deeper intel only when needed.
 
-PMG is built for practical use during real gameplay. Paste the names, let the app resolve what it can, and get back a board that is readable at a glance.
+PMG is still a **technical preview**. It is useful today, but behavior, UI details, and data coverage can continue to change between releases.
 
----
-
-## Project Status
-
-**Current status:** Technical Preview / active development.
-
-PMG is in active development and the public repository is its current home. The project is already usable in tech preview form, but it is still evolving, and the UI, feature set, and implementation details may continue to change as testing and feedback continue.
+Current release: **Pitmasters Grill 0.9.5**  
+Tag: **v0.9.5**  
+Release commit: **a3fa467**
 
 ---
 
-## What PMG does today
 
-PMG is designed to help with a live local spike by giving you a cleaner view of who is present and what kind of attention they deserve.
+## How to Navigate This Repo
 
-Current workflow and capabilities include:
+New here? Start with these:
 
-- paste or otherwise feed a local list into the app
-- resolve pilot identity and affiliation context
-- surface recent activity and other fast-read pilot intel
-- use local caching to improve repeat performance
-- open deeper source intel when you need it
-- keep the board readable during live use instead of burying everything in browser tabs
+1. **[Latest Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**  
+   Download current builds, read patch notes, and check upgrade notes for each technical-preview release.
 
-The emphasis is speed, clarity, and practical value.
+2. **[Current Feature Snapshot](./PMG-FEATURES.md)**  
+   Detailed overview of what PMG can do right now, including compact mode, board interactions, cyno/tackle evidence, killmail-derived intel, and known limitations.
 
----
+3. **[Application Source](./PitmastersGrill/)**  
+   Main WPF application code. This is where the PMG UI, resolver services, persistence, providers, models, and killmail-derived intel logic live.
 
-## Screenshot Gallery
+4. **[Developer Notes](./DEVELOPER-NOTES.md)**  
+   Technical notes for maintainers and contributors. Useful for understanding current implementation decisions, design constraints, and project direction.
 
-> Replace the placeholder paths below with your real screenshots when you are ready.
+5. **[Issues](https://github.com/SmokeyForged/Pitmasters-Grill/issues)**  
+   Active bug reports, enhancement requests, community feedback, and work tracking.
 
-### Main board
-
-<img width="818" height="645" alt="image" src="https://github.com/user-attachments/assets/1e7e2f1e-7762-46b2-afe4-60337b8ba95a" />
-
-
-### Pilot details pane
-
-<img width="821" height="639" alt="image" src="https://github.com/user-attachments/assets/1d16b53e-e233-4c59-b269-d0d2adc5da0a" />
-
-
-### Compact mode
-
-<img width="820" height="635" alt="image" src="https://github.com/user-attachments/assets/fe89801a-9cf6-400c-a24f-d41ad5167e76" />
-
-
-### Settings / intel configuration
-
-<img width="813" height="635" alt="image" src="https://github.com/user-attachments/assets/1b76eb73-1c01-4315-9757-6adf568f89c3" />
-
-
-
-### Settings / Ingore List
-
-<img width="947" height="613" alt="image" src="https://github.com/user-attachments/assets/26ef4131-12ad-4ee3-ad9e-09168d6569fe" />
+6. **[README](./README.md)**  
+   High-level project overview, basic usage, safety framing, feedback guidance, and release status.
 
 
 ---
 
-## Why PMG exists
+## What PMG Does
 
-When local spikes, the first question is usually not *"how many tabs can I open?"* It is:
+PMG helps answer the immediate local-spike question:
 
-> Who are these people, and which ones matter right now?
+**Who is here, and what matters right now?**
 
-PMG exists to shorten the distance between that question and a useful answer.
+Current PMG builds can:
 
-This project is inspired in part by the older spirit of community-made EVE tools that were practical, shared, and built because somebody cared enough to make something useful for other players.
+- parse copied EVE local-style pilot lists
+- resolve pilot identities, corporations, and alliances where available
+- show public kill/loss context and recent ship observations
+- highlight cyno-related public evidence and cyno-capable hull history
+- surface compact bait/tackle evidence from public victim killmail item data
+- cache results locally to reduce repeated lookup cost
+- open zKill for deeper manual review
+- let you ignore pilots, corporations, or alliances by typed ID
+- export diagnostics for troubleshooting without including secrets or raw unrelated user files
 
----
-
-## Design Goals
-
-PMG is being shaped around a few working rules:
-
-### Fast enough to matter
-If intel shows up after the fight, it is garnish.
-
-### Clear over clever
-The UI should help you make a decision, not demand your attention for its own sake.
-
-### Tools should support judgment
-PMG should help players think faster, not stop thinking for them.
-
-### Keep it useful
-If a feature adds noise, friction, or delay, it probably does not belong.
+PMG works from user-provided local lists and public data. It does **not** read client memory, inspect network traffic, automate gameplay, use EVE SSO, or claim live grid/location/cloak visibility.
 
 ---
 
-## Current UI / Workflow Notes
+## v0.9.5 Highlights
 
-Recent UI work has focused on keeping the app practical during live use:
+### Board-first compact mode
 
-- compact mode remains available for tighter layouts
-- clear-board access remains visible during compact mode
-- board status and last-refresh information remain visible in the persistent top strip
-- settings have been broken into cleaner tabs for general controls, version info, diagnostics, and intel configuration
+<img width="768" height="756" alt="image" src="https://github.com/user-attachments/assets/f60ac21a-a54b-4317-b5b3-a2be0f5e9feb" />
 
-These changes are aimed at keeping the app readable under pressure instead of merely looking organized in a static screenshot.
 
----
 
-## Feature Direction
+Compact mode was redesigned as a true operational board view. It preserves row colors, board resizing, and always-on-top behavior while removing unnecessary chrome.
 
-The exact long-term release scope may still shift, but PMG is being developed around a few core needs:
+App-local hotkeys:
 
-- fast pilot list processing
-- readable pilot-intel presentation
-- corporation and alliance context
-- recent activity context from public sources
-- direct links to deeper source intel when needed
-- local caching to reduce redundant lookups and improve responsiveness
+- **Insert** - toggle compact/normal mode
+- **Delete** - clear board
+- **Home** - refresh/reprocess clipboard intel
+- **Esc three times** - exit PMG
 
-The priority is not to do everything at once. The priority is to do the useful things well.
+Board interactions:
 
----
+- left click selects a row
+- right click opens PMG pilot details
+- double-click opens zKill
+- in compact mode, delayed left-click-hold can drag the window from rows, column headers, or blank board space
 
-## Installation
+### Compact pilot detail sidecar
 
-> Update this section with the exact release download and install steps you want people to follow.
+Pilot details now open as a compact sidecar inspector beside the board when possible. The sidecar inherits PMG theme, uses compact evidence wording, and keeps the board usable while details are open.
 
-Suggested structure:
+Notes were moved out of the detail pane and into board-level note/flag icons.
 
-1. Download the latest pre-release from the GitHub Releases page.
-2. Extract the release zip to a folder of your choice.
-3. Launch the application.
-4. Review any included release notes or known limitations before first use.
+### Better board grouping context
+
+Optional corp/alliance concentration counts can be enabled on the board. Counts are based only on visible rows after ignore filtering and hide solo `[1]` counts.
+
+Example:
+
+- `Some Corp [3]`
+- `Some Alliance [8]`
+
+### Cyno, tackle, and bait evidence
+
+The cyno-capable hull catalog was expanded and corrected. **Cyno Hull Seen** now uses newest-observation semantics, so the board shows the most recent public killmail-derived cyno-capable hull observation for each pilot.
+
+PMG recognizes Warp Scrambler and Warp Disruptor modules from public victim killmail item lists as part of threat analysis.
+
+Evidence terminology is intentionally short:
+
+- `hard` = standard Cynosural Field Generator I
+- `covert` = Covert Cynosural Field Generator I
+- `indi` = Industrial Cynosural Field Generator
+
+Industrial cyno + tackle still supports PMG's bait evidence signal. Broader tackle evidence can also surface for cyno-capable hulls without automatically marking every cyno-capable hull with tackle as bait.
+
+### Killmail update compatibility
+
+PMG no longer depends on launching external Windows `tar.exe` for killmail archive extraction. This improves Linux/Proton compatibility and avoids fragile assumptions about System32 tools existing in a Wine prefix.
+
+Users with existing killmail data should run **Rebuild Killmail Derived Intel** after updating so PMG can populate the latest derived cyno/tackle/bait evidence tables.
 
 ---
 
 ## Basic Use
 
-A simple operating pattern for PMG is:
+1. Download the latest release zip from the GitHub Releases page.
+2. Extract it to a folder you control.
+3. Launch PMG.
+4. Copy an EVE local list.
+5. Use **Home** or the refresh/reprocess action if you want PMG to reprocess the clipboard.
+6. Scan the board.
+7. Right click a row for PMG details, or double-click a row to open zKill.
 
-1. Get a local list.
-2. Feed it into PMG.
-3. Let the board populate.
-4. Scan the board for the pilots that matter.
-5. Open deeper intel only when you actually need it.
-
-The app is meant to reduce context switching, not increase it.
-
----
-
-## Limitations / Expectations
-
-PMG is still in technical preview.
-
-That means:
-
-- behavior may continue to improve between releases
-- some UX details may continue to shift
-- feedback from active use is still shaping the product
-- this is a practical tool in development, not a finished polished platform release yet
-
-That is normal for where the project currently is.
+For best results, configure killmail intel/cache settings and let PMG build or refresh its local public killmail-derived intel.
 
 ---
 
-## Version Info
+## Settings Worth Checking
 
-For release downloads, patch notes, and source updates, visit the GitHub repository:
-
-**https://github.com/SmokeyForged/Pitmasters-Grill**
+- **Theme / dark mode / opacity**: PMG supports readable dark operational themes and opacity-aware backgrounds.
+- **Compact mode**: use Insert to switch between normal and board-first views.
+- **Detail placement**: the pilot detail sidecar placement preference is under Intel configuration.
+- **Ignore List**: typed ignore entries can suppress pilots, corporations, or alliances by ID.
+- **Corp/alliance counts**: optional board counts show visible local concentration after ignore filtering.
+- **Killmail intel**: refresh/update controls maintain the local public killmail-derived cache.
+- **Rebuild Killmail Derived Intel**: run this after updating from earlier builds with existing killmail data.
 
 ---
 
-## Why PMG is free
+## Limitations and Expectations
 
-PMG is intended to remain a free community tool.
+PMG is evidence-first. It can summarize public and cached evidence, but it does not know private or live state.
 
-No paywall. No required donation. No nonsense.
+PMG does not claim:
 
-If PMG ends up being useful to you and you want to give something back, the preferred gesture is not tipping the developer. A better tribute would be to do something good for somebody else: help feed someone, cook for someone, donate to a local food pantry, or otherwise pass something useful forward.
+- live jumps
+- current grid presence
+- current location
+- cloak status
+- private fitting visibility
+- private ESI character data
+- gameplay automation
 
-That is more in the spirit of the project.
+Public killmail data can be incomplete or delayed. Cyno, tackle, and bait indicators are based on available public evidence and should be treated as operational hints, not certainty.
+
+Technical-preview expectations:
+
+- UI and workflows may continue to evolve.
+- Provider availability and public data freshness can vary.
+- Cache rebuilds may be needed after schema or derived-intel changes.
+- Diagnostics are intended to help testers report issues clearly.
 
 ---
 
 ## Feedback
 
-During tech preview, the most useful thing you can provide is honest feedback.
+Useful feedback includes:
 
-Good feedback usually includes:
+- PMG version
+- what you pasted or tried to process, summarized safely
+- what you expected
+- what happened
+- whether the issue affected board population, details, compact mode, killmail intel, ignore behavior, or UI readability
+- diagnostics bundle if requested by a maintainer
 
-- what you were doing
-- what you expected to happen
-- what actually happened
-- whether the issue was cosmetic, workflow-related, or operationally disruptive
+Do not post private credentials, launcher data, browser data, raw logs with secrets, or unrelated local files.
 
-As the project matures, this repo can expand with more formal issue templates and contribution guidance.
+Repository and releases:
+
+**https://github.com/SmokeyForged/Pitmasters-Grill**
 
 ---
 
-## Road Ahead
+## Why PMG Is Free
 
-As PMG continues to mature, this repository can grow to include:
+PMG is intended to remain a free community tool.
 
-- refreshed screenshots
-- polished installation instructions
-- release downloads and patch notes
-- known limitations
-- configuration guidance
-- contribution guidance
+No paywall. No required donation. No nonsense.
 
-For now, the goal is still the same: keep the grill hot and make the tool more useful with each pass.
+If PMG is useful and you want to give something back, the preferred gesture is to do something useful for someone else: help feed someone, cook for someone, donate to a local food pantry, or otherwise pass something practical forward.
