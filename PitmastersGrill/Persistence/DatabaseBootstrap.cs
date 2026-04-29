@@ -35,6 +35,11 @@ namespace PitmastersGrill.Persistence
                     updated_at_utc TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS watched_pilots (
+                    character_id TEXT PRIMARY KEY,
+                    watched_at_utc TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS resolver_cache (
                     character_name TEXT PRIMARY KEY,
                     character_id TEXT NOT NULL DEFAULT '',
@@ -112,7 +117,7 @@ namespace PitmastersGrill.Persistence
                 metadataCommand.CommandText =
                 @"
                 INSERT OR REPLACE INTO app_metadata (key, value)
-                VALUES ('schema_version', '10');
+                VALUES ('schema_version', '11');
                 ";
                 metadataCommand.ExecuteNonQuery();
             }

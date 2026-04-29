@@ -85,6 +85,10 @@
                             Style="{StaticResource DetailLinkButtonStyle}"
                             Content="Bait"
                             Click="BaitOverrideLink_Click"/>
+                    <Button x:Name="WatchPilotLink"
+                            Style="{StaticResource DetailLinkButtonStyle}"
+                            Content="Watch"
+                            Click="WatchPilotLink_Click"/>
                 </WrapPanel>
 
                 <TextBlock x:Name="BaitSignalText"

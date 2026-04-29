@@ -49,6 +49,7 @@
         <SolidColorBrush x:Key="BoardSignalPossibleBrush" Color="#F6B94B"/>
         <SolidColorBrush x:Key="BoardSignalBaitBrush" Color="#B8915E"/>
         <SolidColorBrush x:Key="PilotNoteFlagBrush" Color="#00E5FF"/>
+        <SolidColorBrush x:Key="WatchedPilotMarkerBrush" Color="#FFF4C7"/>
 
         <Style TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap"/>
@@ -277,6 +278,36 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="ToolTip" Value="Add note"/>
+        </Style>
+
+        <Style x:Key="DetailActionLinkButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock x:Name="Text"
+                                   Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   FontWeight="{TemplateBinding FontWeight}"
+                                   TextDecorations="{x:Null}"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Text" Property="TextDecorations" Value="Underline"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Text" Property="Foreground" Value="{DynamicResource ErrorRedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="CompactAwareTabItemStyle" TargetType="TabItem">
@@ -577,6 +608,7 @@
                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      Sorting="PilotBoard_Sorting"
                                       SelectionChanged="PilotBoard_SelectionChanged"
                                       MouseDoubleClick="PilotBoard_MouseDoubleClick"
                                       PreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
@@ -605,6 +637,14 @@
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <DockPanel LastChildFill="True">
+                                                    <TextBlock x:Name="WatchedPilotMarker"
+                                                               DockPanel.Dock="Left"
+                                                               Margin="0,0,6,0"
+                                                               VerticalAlignment="Center"
+                                                               FontWeight="Bold"
+                                                               Foreground="{DynamicResource WatchedPilotMarkerBrush}"
+                                                               Text="★"
+                                                               Visibility="Collapsed"/>
                                                     <Button x:Name="PilotNoteButton"
                                                             DockPanel.Dock="Right"
                                                             Style="{StaticResource PilotNoteButtonStyle}"
@@ -615,6 +655,9 @@
                                                                TextTrimming="CharacterEllipsis"/>
                                                 </DockPanel>
                                                 <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsWatched}" Value="True">
+                                                        <Setter TargetName="WatchedPilotMarker" Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
                                                     <DataTrigger Binding="{Binding HasNotes}" Value="True">
                                                         <Setter TargetName="PilotNoteButton" Property="Content" Value="⚑"/>
                                                         <Setter TargetName="PilotNoteButton" Property="ToolTip" Value="View/edit note"/>
@@ -781,6 +824,11 @@
                                         <StackPanel Grid.Column="1"
                                                     Orientation="Horizontal"
                                                     VerticalAlignment="Center">
+                                            <Button x:Name="WatchPilotDetailAction"
+                                                    Style="{StaticResource DetailActionLinkButtonStyle}"
+                                                    Foreground="{DynamicResource SuccessGreenBrush}"
+                                                    Content="Watch"
+                                                    Click="WatchPilotDetailAction_Click"/>
                                             <CheckBox x:Name="BaitOverrideCheckBox"
                                                       VerticalAlignment="Center"
                                                       Foreground="{DynamicResource BodyTextBrush}"

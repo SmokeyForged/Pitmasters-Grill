@@ -15,6 +15,7 @@ namespace PitmastersGrill.Views
         private readonly PilotBoardRowDetailFormatter _formatter;
         private readonly NotesRepository _notesRepository;
         private readonly Func<PilotBoardRow, IgnoreEntryType, bool> _ignoreAction;
+        private readonly Action<PilotBoardRow> _toggleWatchAction;
         private readonly Action<PilotBoardRow> _openZkillAction;
         private bool _isApplyingState;
 
@@ -23,12 +24,14 @@ namespace PitmastersGrill.Views
             PilotBoardRowDetailFormatter formatter,
             NotesRepository notesRepository,
             Func<PilotBoardRow, IgnoreEntryType, bool> ignoreAction,
+            Action<PilotBoardRow> toggleWatchAction,
             Action<PilotBoardRow> openZkillAction)
         {
             _row = row ?? throw new ArgumentNullException(nameof(row));
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _notesRepository = notesRepository ?? throw new ArgumentNullException(nameof(notesRepository));
             _ignoreAction = ignoreAction ?? throw new ArgumentNullException(nameof(ignoreAction));
+            _toggleWatchAction = toggleWatchAction ?? throw new ArgumentNullException(nameof(toggleWatchAction));
             _openZkillAction = openZkillAction ?? throw new ArgumentNullException(nameof(openZkillAction));
 
             InitializeComponent();
@@ -129,6 +132,13 @@ namespace PitmastersGrill.Views
             ApplyRow();
         }
 
+        private void WatchPilotLink_Click(object sender, RoutedEventArgs e)
+        {
+            SaveCurrentState();
+            _toggleWatchAction(_row);
+            ApplyRow();
+        }
+
         private void IgnorePilotLink_Click(object sender, RoutedEventArgs e)
         {
             Ignore(IgnoreEntryType.Pilot, IgnorePilotLink);
@@ -186,11 +196,25 @@ namespace PitmastersGrill.Views
 
         private void UpdateActionLinkStates()
         {
+            UpdateWatchLinkState();
             SetActionLinkVisual(IgnorePilotLink, TryGetId(_row.CharacterId).HasValue, "Pilot ID unavailable.");
             SetActionLinkVisual(IgnoreCorpLink, TryGetId(_row.CorpId).HasValue, "Corporation ID unavailable.");
             SetActionLinkVisual(IgnoreAllianceLink, TryGetId(_row.AllianceId).HasValue, "Alliance ID unavailable.");
             SetActionLinkVisual(OpenZkillLink, CanOpenZkill(_row), "zKill link unavailable.");
             SetActionLinkVisual(CloseLink, true, "Close this detail window.");
+        }
+
+        private void UpdateWatchLinkState()
+        {
+            var canWatch = TryGetId(_row.CharacterId).HasValue;
+            WatchPilotLink.Content = _row.IsWatched ? "Unwatch" : "Watch";
+            WatchPilotLink.IsEnabled = canWatch;
+            WatchPilotLink.ToolTip = canWatch
+                ? (_row.IsWatched ? "Stop watching this pilot." : "Mark this pilot as watched.")
+                : "Pilot ID unavailable until identity resolves.";
+            WatchPilotLink.SetResourceReference(
+                Control.ForegroundProperty,
+                _row.IsWatched ? "WatchedPilotMarkerBrush" : "SuccessGreenBrush");
         }
 
         private void SetStateLinkVisual(Button button, bool enabledState, string tooltip)

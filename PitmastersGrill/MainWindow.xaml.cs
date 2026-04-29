@@ -6,6 +6,7 @@ using PitmastersGrill.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.IO;
@@ -15,6 +16,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -48,6 +50,7 @@ namespace PitmastersGrill
         private readonly BoardPopulationRetryController _boardPopulationRetryController;
         private readonly BoardPopulationEntryController _boardPopulationEntryController;
         private readonly NotesRepository _notesRepository;
+        private readonly WatchedPilotRepository _watchedPilotRepository;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
         private readonly MainWindowDiagnostics _diagnostics;
@@ -74,6 +77,8 @@ namespace PitmastersGrill
         private DateTime _lastEscapeTapUtc = DateTime.MinValue;
         private int _escapeTapCount;
         private int _processingGeneration;
+        private string? _activeBoardSortMemberPath;
+        private ListSortDirection? _activeBoardSortDirection;
 
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
@@ -116,6 +121,7 @@ namespace PitmastersGrill
 
             _boardRowFactory = composed.BoardRowFactory;
             _notesRepository = composed.NotesRepository;
+            _watchedPilotRepository = composed.WatchedPilotRepository;
             _pilotBoardRowDetailFormatter = composed.PilotBoardRowDetailFormatter;
             _detailPaneController = composed.DetailPaneController;
             _boardPopulationRowProcessor = composed.BoardPopulationRowProcessor;
@@ -943,6 +949,19 @@ namespace PitmastersGrill
                     (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message),
                     rowToEvaluate => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(rowToEvaluate));
 
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (generation != _processingGeneration)
+                    {
+                        return;
+                    }
+
+                    ApplyWatchedState(row);
+                    ApplyCurrentBoardOrdering();
+                    UpdateWatchPilotDetailActionState(GetSelectedOrDisplayedDetailRow());
+                    RefreshDetailWindowIfSelected(row);
+                });
+
                 if (_ignoreAllianceBoardController.ShouldRemoveResolvedRow(row))
                 {
                     await Dispatcher.InvokeAsync(() =>
@@ -977,6 +996,7 @@ namespace PitmastersGrill
             var buildStopwatch = Stopwatch.StartNew();
             var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
 
+            ResetManualBoardSort();
             _currentRows.Clear();
 
             foreach (var row in initialRows)
@@ -984,10 +1004,12 @@ namespace PitmastersGrill
                 row.KnownCynoOverride = _notesRepository.GetKnownCynoOverride(row.CharacterName);
                 row.BaitOverride = _notesRepository.GetBaitOverride(row.CharacterName);
                 row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
+                ApplyWatchedState(row);
                 _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
                 _currentRows.Add(row);
             }
 
+            ApplyCurrentBoardOrdering();
             ApplyIgnoredAllianceRowsToCurrentBoard();
             RecomputeCorpAllianceCounts();
 
@@ -1155,6 +1177,39 @@ namespace PitmastersGrill
             }
 
             AppLogger.UiInfo("Board selection cleared.");
+        }
+
+        private void PilotBoard_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            if (PilotBoard == null)
+            {
+                return;
+            }
+
+            e.Handled = true;
+
+            var sortMemberPath = e.Column.SortMemberPath;
+            if (string.IsNullOrWhiteSpace(sortMemberPath))
+            {
+                sortMemberPath = GetSortMemberPathFromColumn(e.Column);
+                if (string.IsNullOrWhiteSpace(sortMemberPath))
+                {
+                    return;
+                }
+            }
+
+            var nextDirection = _activeBoardSortMemberPath == sortMemberPath &&
+                                _activeBoardSortDirection == ListSortDirection.Ascending
+                ? ListSortDirection.Descending
+                : ListSortDirection.Ascending;
+
+            _activeBoardSortMemberPath = sortMemberPath;
+            _activeBoardSortDirection = nextDirection;
+
+            ApplySortIndicatorState(e.Column, nextDirection);
+            ApplyCurrentBoardOrdering();
+
+            AppLogger.UiInfo($"Board sort changed. member='{sortMemberPath}' direction={nextDirection}");
         }
 
         private void PilotBoard_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -1337,6 +1392,18 @@ namespace PitmastersGrill
             AppLogger.UiInfo($"Pilot notes window closed. character='{row.CharacterName}' hasNotes={row.HasNotes}");
         }
 
+        private void WatchPilotDetailAction_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedRow = GetSelectedOrDisplayedDetailRow();
+            if (selectedRow == null)
+            {
+                AppLogger.UiWarn("Watch requested with no selected or displayed detail row.");
+                return;
+            }
+
+            ToggleWatchForRow(selectedRow);
+        }
+
         private void CloseDetailsButton_Click(object sender, RoutedEventArgs e)
         {
             SaveCurrentNotesAndTags();
@@ -1363,6 +1430,7 @@ namespace PitmastersGrill
             CancelBoardPopulationRetry();
             _processingGeneration++;
             ResetEntryAndRetryTracking();
+            ResetManualBoardSort();
 
             PilotBoard.SelectedItem = null;
             _currentRows.Clear();
@@ -1823,6 +1891,7 @@ namespace PitmastersGrill
                 _pilotBoardRowDetailFormatter,
                 _notesRepository,
                 TryIgnoreForRow,
+                ToggleWatchForRow,
                 OpenZkillForRow)
             {
                 Owner = this
@@ -1958,6 +2027,7 @@ namespace PitmastersGrill
                 BaitOverrideCheckBox);
 
             UpdateIgnoreAllianceButtonState(row);
+            UpdateWatchPilotDetailActionState(row);
         }
 
         private void HideDetailPane()
@@ -1999,6 +2069,7 @@ namespace PitmastersGrill
             }
 
             UpdateIgnoreAllianceButtonState(null);
+            UpdateWatchPilotDetailActionState(null);
         }
 
         private void SaveCurrentNotesAndTags()
@@ -2151,6 +2222,33 @@ namespace PitmastersGrill
                 : $"Ignore alliance '{row.AllianceName}' ({allianceId.Value}).";
         }
 
+        private void UpdateWatchPilotDetailActionState(PilotBoardRow? row)
+        {
+            if (WatchPilotDetailAction == null)
+            {
+                return;
+            }
+
+            if (row == null)
+            {
+                WatchPilotDetailAction.IsEnabled = false;
+                WatchPilotDetailAction.Content = "Watch";
+                WatchPilotDetailAction.ToolTip = "Select a resolved pilot to watch.";
+                WatchPilotDetailAction.SetResourceReference(Control.ForegroundProperty, "SuccessGreenBrush");
+                return;
+            }
+
+            var canWatch = TryGetPilotId(row.CharacterId).HasValue;
+            WatchPilotDetailAction.IsEnabled = canWatch;
+            WatchPilotDetailAction.Content = row.IsWatched ? "Unwatch" : "Watch";
+            WatchPilotDetailAction.ToolTip = canWatch
+                ? (row.IsWatched ? "Stop watching this pilot." : "Mark this pilot as watched.")
+                : "Selected pilot does not have a known character ID yet.";
+            WatchPilotDetailAction.SetResourceReference(
+                Control.ForegroundProperty,
+                row.IsWatched ? "WatchedPilotMarkerBrush" : "SuccessGreenBrush");
+        }
+
         private void UpdateOpenDetailsButtonState()
         {
             if (OpenDetailsButton == null)
@@ -2286,6 +2384,252 @@ namespace PitmastersGrill
             }
 
             return allianceId;
+        }
+
+        private static long? TryGetPilotId(string? characterIdText)
+        {
+            if (string.IsNullOrWhiteSpace(characterIdText))
+            {
+                return null;
+            }
+
+            if (!long.TryParse(characterIdText.Trim(), out var characterId))
+            {
+                return null;
+            }
+
+            if (characterId <= 0)
+            {
+                return null;
+            }
+
+            return characterId;
+        }
+
+        private void ApplyWatchedState(PilotBoardRow row)
+        {
+            if (row == null)
+            {
+                return;
+            }
+
+            row.IsWatched = _watchedPilotRepository.IsWatched(row.CharacterId);
+        }
+
+        private void ToggleWatchForRow(PilotBoardRow row)
+        {
+            var pilotId = TryGetPilotId(row.CharacterId);
+            if (!pilotId.HasValue)
+            {
+                UpdateWatchPilotDetailActionState(row);
+                AppLogger.UiWarn($"Watch requested without a valid pilot ID. character='{row.CharacterName}'");
+                return;
+            }
+
+            var newWatchedState = !row.IsWatched;
+            if (!_watchedPilotRepository.SetWatched(row.CharacterId, newWatchedState))
+            {
+                UpdateWatchPilotDetailActionState(row);
+                AppLogger.UiWarn($"Watch state change failed. character='{row.CharacterName}' characterId='{row.CharacterId}'");
+                return;
+            }
+
+            row.IsWatched = newWatchedState;
+            ApplyCurrentBoardOrdering();
+            UpdateWatchPilotDetailActionState(row);
+            RefreshDetailWindowIfSelected(row);
+
+            AppLogger.UiInfo(
+                $"Watch state changed. character='{row.CharacterName}' characterId='{row.CharacterId}' watched={row.IsWatched}");
+        }
+
+        private void ApplyCurrentBoardOrdering()
+        {
+            if (_currentRows.Count <= 1)
+            {
+                return;
+            }
+
+            var selectedRow = PilotBoard.SelectedItem as PilotBoardRow;
+            var baseOrderIndexes = _currentRows
+                .Select((row, index) => new KeyValuePair<PilotBoardRow, int>(row, index))
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+
+            var reorderedRows = _currentRows
+                .OrderBy(row => row, Comparer<PilotBoardRow>.Create((leftRow, rightRow) =>
+                    CompareBoardRows(
+                        leftRow,
+                        baseOrderIndexes[leftRow],
+                        rightRow,
+                        baseOrderIndexes[rightRow])))
+                .ToList();
+
+            var changed = false;
+            for (var index = 0; index < reorderedRows.Count; index++)
+            {
+                if (!ReferenceEquals(_currentRows[index], reorderedRows[index]))
+                {
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+
+            _currentRows.Clear();
+            foreach (var row in reorderedRows)
+            {
+                _currentRows.Add(row);
+            }
+
+            if (selectedRow != null && _currentRows.Contains(selectedRow))
+            {
+                PilotBoard.SelectedItem = selectedRow;
+            }
+        }
+
+        private int CompareBoardRows(PilotBoardRow leftRow, int leftIndex, PilotBoardRow rightRow, int rightIndex)
+        {
+            var watchedCompare = Comparer<bool>.Default.Compare(rightRow.IsWatched, leftRow.IsWatched);
+            if (watchedCompare != 0)
+            {
+                return watchedCompare;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_activeBoardSortMemberPath) && _activeBoardSortDirection.HasValue)
+            {
+                var valueCompare = CompareSortValues(
+                    GetBoardSortValue(leftRow, _activeBoardSortMemberPath),
+                    GetBoardSortValue(rightRow, _activeBoardSortMemberPath));
+
+                if (valueCompare != 0)
+                {
+                    return _activeBoardSortDirection == ListSortDirection.Descending
+                        ? -valueCompare
+                        : valueCompare;
+                }
+            }
+
+            return leftIndex.CompareTo(rightIndex);
+        }
+
+        private static int CompareSortValues(object? leftValue, object? rightValue)
+        {
+            if (leftValue == null && rightValue == null)
+            {
+                return 0;
+            }
+
+            if (leftValue == null)
+            {
+                return -1;
+            }
+
+            if (rightValue == null)
+            {
+                return 1;
+            }
+
+            if (leftValue is string leftString && rightValue is string rightString)
+            {
+                return StringComparer.OrdinalIgnoreCase.Compare(leftString, rightString);
+            }
+
+            if (leftValue is IComparable comparable)
+            {
+                try
+                {
+                    return comparable.CompareTo(rightValue);
+                }
+                catch (ArgumentException)
+                {
+                    return StringComparer.OrdinalIgnoreCase.Compare(
+                        leftValue.ToString(),
+                        rightValue.ToString());
+                }
+            }
+
+            return StringComparer.OrdinalIgnoreCase.Compare(
+                leftValue.ToString(),
+                rightValue.ToString());
+        }
+
+        private static object? GetBoardSortValue(PilotBoardRow row, string? sortMemberPath)
+        {
+            if (row == null || string.IsNullOrWhiteSpace(sortMemberPath))
+            {
+                return null;
+            }
+
+            return sortMemberPath switch
+            {
+                nameof(PilotBoardRow.CharacterName) => row.CharacterName,
+                nameof(PilotBoardRow.AllianceNameDisplay) => row.AllianceNameDisplay,
+                nameof(PilotBoardRow.CorpNameDisplay) => row.CorpNameDisplay,
+                nameof(PilotBoardRow.KillCount) => row.KillCount,
+                nameof(PilotBoardRow.LossCount) => row.LossCount,
+                nameof(PilotBoardRow.AvgAttackersWhenAttacking) => row.AvgAttackersWhenAttacking,
+                nameof(PilotBoardRow.LastShipSeenName) => row.LastShipSeenName,
+                nameof(PilotBoardRow.LastShipSeenDateDisplay) => row.LastShipSeenDateDisplay,
+                nameof(PilotBoardRow.LastPublicCynoCapableHull) => row.LastPublicCynoCapableHull,
+                _ => GetBoardSortValueByReflection(row, sortMemberPath)
+            };
+        }
+
+        private static object? GetBoardSortValueByReflection(PilotBoardRow row, string sortMemberPath)
+        {
+            var property = typeof(PilotBoardRow).GetProperty(sortMemberPath);
+            return property?.GetValue(row);
+        }
+
+        private void ResetManualBoardSort()
+        {
+            _activeBoardSortMemberPath = null;
+            _activeBoardSortDirection = null;
+            ClearBoardSortIndicators();
+        }
+
+        private void ApplySortIndicatorState(DataGridColumn activeColumn, ListSortDirection direction)
+        {
+            if (PilotBoard == null)
+            {
+                return;
+            }
+
+            foreach (var column in PilotBoard.Columns)
+            {
+                column.SortDirection = ReferenceEquals(column, activeColumn)
+                    ? direction
+                    : null;
+            }
+        }
+
+        private void ClearBoardSortIndicators()
+        {
+            if (PilotBoard == null)
+            {
+                return;
+            }
+
+            foreach (var column in PilotBoard.Columns)
+            {
+                column.SortDirection = null;
+            }
+        }
+
+        private static string? GetSortMemberPathFromColumn(DataGridColumn column)
+        {
+            if (column is DataGridBoundColumn boundColumn &&
+                boundColumn.Binding is Binding binding &&
+                binding.Path != null)
+            {
+                return binding.Path.Path;
+            }
+
+            return null;
         }
 
         private static long? GetIgnoreId(PilotBoardRow row, IgnoreEntryType type)

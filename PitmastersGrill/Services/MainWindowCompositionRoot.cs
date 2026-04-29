@@ -12,6 +12,7 @@ namespace PitmastersGrill.Services
             DatabaseBootstrap databaseBootstrap,
             BoardRowFactory boardRowFactory,
             NotesRepository notesRepository,
+            WatchedPilotRepository watchedPilotRepository,
             PilotBoardRowDetailFormatter pilotBoardRowDetailFormatter,
             DetailPaneController detailPaneController,
             BoardPopulationRowProcessor boardPopulationRowProcessor,
@@ -27,6 +28,7 @@ namespace PitmastersGrill.Services
             DatabaseBootstrap = databaseBootstrap ?? throw new ArgumentNullException(nameof(databaseBootstrap));
             BoardRowFactory = boardRowFactory ?? throw new ArgumentNullException(nameof(boardRowFactory));
             NotesRepository = notesRepository ?? throw new ArgumentNullException(nameof(notesRepository));
+            WatchedPilotRepository = watchedPilotRepository ?? throw new ArgumentNullException(nameof(watchedPilotRepository));
             PilotBoardRowDetailFormatter = pilotBoardRowDetailFormatter ?? throw new ArgumentNullException(nameof(pilotBoardRowDetailFormatter));
             DetailPaneController = detailPaneController ?? throw new ArgumentNullException(nameof(detailPaneController));
             BoardPopulationRowProcessor = boardPopulationRowProcessor ?? throw new ArgumentNullException(nameof(boardPopulationRowProcessor));
@@ -43,6 +45,7 @@ namespace PitmastersGrill.Services
         public DatabaseBootstrap DatabaseBootstrap { get; }
         public BoardRowFactory BoardRowFactory { get; }
         public NotesRepository NotesRepository { get; }
+        public WatchedPilotRepository WatchedPilotRepository { get; }
         public PilotBoardRowDetailFormatter PilotBoardRowDetailFormatter { get; }
         public DetailPaneController DetailPaneController { get; }
         public BoardPopulationRowProcessor BoardPopulationRowProcessor { get; }
@@ -93,6 +96,7 @@ namespace PitmastersGrill.Services
             var databasePath = AppPaths.GetDatabasePath();
             var databaseBootstrap = new DatabaseBootstrap(databasePath);
             var notesRepository = new NotesRepository(databasePath);
+            var watchedPilotRepository = new WatchedPilotRepository(databasePath);
             var cynoModuleObservationRepository = new PilotCynoModuleObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
             var baitObservationRepository = new PilotBaitObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
             var cynoTackleObservationRepository = new PilotCynoTackleObservationDayRepository(KillmailPaths.GetKillmailDatabasePath());
@@ -150,6 +154,7 @@ namespace PitmastersGrill.Services
                 databaseBootstrap,
                 boardRowFactory,
                 notesRepository,
+                watchedPilotRepository,
                 pilotBoardRowDetailFormatter,
                 detailPaneController,
                 boardPopulationRowProcessor,

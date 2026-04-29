@@ -28,6 +28,7 @@ namespace PitmastersGrill.Models
         private bool _knownCynoOverride;
         private bool _baitOverride;
         private bool _hasNotes;
+        private bool _isWatched;
         private int _allianceLocalCount;
         private int _corpLocalCount;
         private bool _showCorpAllianceCounts;
@@ -192,6 +193,12 @@ namespace PitmastersGrill.Models
         {
             get => _hasNotes;
             set => SetField(ref _hasNotes, value);
+        }
+
+        public bool IsWatched
+        {
+            get => _isWatched;
+            set => SetField(ref _isWatched, value);
         }
 
         public int AllianceLocalCount
