@@ -314,14 +314,12 @@ namespace PitmastersGrill.Services
             DebugTraceWriter.WriteLine(
                 $"killmail import write summary: day={remoteDay.DayUtc}, uniquePilotsWritten={registryAccumulators.Count}, fleetPilotsWritten={fleetAccumulators.Count}, shipPilotsWritten={shipAccumulators.Count}, cynoModuleObservationsWritten={cynoModuleObservations.Count}, baitObservationsWritten={baitObservations.Count}, cynoTackleObservationsWritten={cynoTackleObservations.Count}, writeElapsedMs={writeStopwatch.ElapsedMilliseconds}");
 
+            var processedAtUtc = DateTime.UtcNow.ToString("o");
             dayState.LocalImportedCount = importedKillmailCount;
-            dayState.ImportedAtUtc = DateTime.UtcNow.ToString("o");
-            dayState.State = "imported";
+            dayState.ImportedAtUtc = processedAtUtc;
+            dayState.NormalizedAtUtc = processedAtUtc;
+            dayState.State = "processed";
             dayState.LastError = "";
-            _dayImportStateRepository.Upsert(dayState);
-
-            dayState.NormalizedAtUtc = DateTime.UtcNow.ToString("o");
-            dayState.State = "normalized";
             _dayImportStateRepository.Upsert(dayState);
 
             if (importedKillmailCount > 0 || remoteDay.RemoteTotalCount == 0)
