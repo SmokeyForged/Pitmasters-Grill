@@ -1572,6 +1572,189 @@ namespace PitmastersGrill
                         ? liveFeed.LastError
                         : $"{lastErrorTime} - {liveFeed.LastError}";
             }
+
+            var todaysFreshness = snapshot.TodaysFreshness ?? new TodaysFreshnessSnapshot();
+            if (TodaysFreshnessStatusText != null)
+            {
+                var statusText = string.IsNullOrWhiteSpace(todaysFreshness.Status)
+                    ? "Idle"
+                    : todaysFreshness.Status;
+
+                var nextRetryText = FormatIntelTimestamp(todaysFreshness.NextRetryAtUtc, "");
+                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
+                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
+                {
+                    statusText = $"{statusText} (retry {nextRetryText})";
+                }
+
+                TodaysFreshnessStatusText.Text = statusText;
+            }
+
+            if (TodaysFreshnessVisiblePilotsText != null)
+            {
+                TodaysFreshnessVisiblePilotsText.Text = todaysFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessEntitiesQueriedText != null)
+            {
+                TodaysFreshnessEntitiesQueriedText.Text = todaysFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessResultsFoundText != null)
+            {
+                TodaysFreshnessResultsFoundText.Text = todaysFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessKnownSkippedText != null)
+            {
+                TodaysFreshnessKnownSkippedText.Text = todaysFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessImportedText != null)
+            {
+                TodaysFreshnessImportedText.Text = todaysFreshness.NewKillmailsImported.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessFailedText != null)
+            {
+                TodaysFreshnessFailedText.Text = todaysFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessLastRunText != null)
+            {
+                TodaysFreshnessLastRunText.Text = FormatIntelTimestamp(
+                    todaysFreshness.LastRunAtUtc,
+                    "No Today's Freshness run recorded yet.");
+            }
+
+            if (TodaysFreshnessDetailText != null)
+            {
+                TodaysFreshnessDetailText.Text = string.IsNullOrWhiteSpace(todaysFreshness.DetailText)
+                    ? "Today's Freshness is idle."
+                    : todaysFreshness.DetailText;
+            }
+
+            if (TodaysFreshnessLastErrorText != null)
+            {
+                TodaysFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(todaysFreshness.LastError)
+                    ? "No Today's Freshness errors recorded."
+                    : todaysFreshness.LastError;
+            }
+
+            if (RunTodaysFreshnessButton != null)
+            {
+                var isRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
+                RunTodaysFreshnessButton.IsEnabled = !isRunning && !_isShuttingDown;
+                RunTodaysFreshnessButton.Content = isRunning
+                    ? "Today's Freshness Running..."
+                    : "Refresh Today's zKill Intel";
+            }
+
+            var historicalFreshness = snapshot.HistoricalFreshness ?? new HistoricalFreshnessSnapshot();
+            if (HistoricalFreshnessStatusText != null)
+            {
+                var statusText = string.IsNullOrWhiteSpace(historicalFreshness.Status)
+                    ? "Idle"
+                    : historicalFreshness.Status;
+
+                var nextRetryText = FormatIntelTimestamp(historicalFreshness.NextRetryAtUtc, "");
+                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
+                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
+                {
+                    statusText = $"{statusText} (retry {nextRetryText})";
+                }
+
+                HistoricalFreshnessStatusText.Text = statusText;
+            }
+
+            if (HistoricalFreshnessModeText != null)
+            {
+                HistoricalFreshnessModeText.Text = string.IsNullOrWhiteSpace(historicalFreshness.Mode)
+                    ? "Not run yet"
+                    : historicalFreshness.Mode;
+            }
+
+            if (HistoricalFreshnessVisiblePilotsText != null)
+            {
+                HistoricalFreshnessVisiblePilotsText.Text = historicalFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessCandidatesConsideredText != null)
+            {
+                HistoricalFreshnessCandidatesConsideredText.Text = historicalFreshness.CandidatePilotsConsidered.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessCandidatesSkippedCooldownText != null)
+            {
+                HistoricalFreshnessCandidatesSkippedCooldownText.Text = historicalFreshness.CandidatePilotsSkippedCooldown.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessPilotsCheckedText != null)
+            {
+                HistoricalFreshnessPilotsCheckedText.Text = historicalFreshness.PilotsChecked.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessDaysCheckedText != null)
+            {
+                HistoricalFreshnessDaysCheckedText.Text = historicalFreshness.HistoricalDaysChecked.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessEntitiesQueriedText != null)
+            {
+                HistoricalFreshnessEntitiesQueriedText.Text = historicalFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessResultsFoundText != null)
+            {
+                HistoricalFreshnessResultsFoundText.Text = historicalFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessKnownSkippedText != null)
+            {
+                HistoricalFreshnessKnownSkippedText.Text = historicalFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessImportedText != null)
+            {
+                HistoricalFreshnessImportedText.Text = historicalFreshness.MissingImportedCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessFailedText != null)
+            {
+                HistoricalFreshnessFailedText.Text = historicalFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessLastRunText != null)
+            {
+                HistoricalFreshnessLastRunText.Text = FormatIntelTimestamp(
+                    historicalFreshness.LastRunAtUtc,
+                    "No Historical Freshness run recorded yet.");
+            }
+
+            if (HistoricalFreshnessDetailText != null)
+            {
+                HistoricalFreshnessDetailText.Text = string.IsNullOrWhiteSpace(historicalFreshness.DetailText)
+                    ? "Historical Freshness is idle."
+                    : historicalFreshness.DetailText;
+            }
+
+            if (HistoricalFreshnessLastErrorText != null)
+            {
+                HistoricalFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(historicalFreshness.LastError)
+                    ? "No Historical Freshness errors recorded."
+                    : historicalFreshness.LastError;
+            }
+
+            if (RunHistoricalFreshnessButton != null)
+            {
+                var isRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
+                RunHistoricalFreshnessButton.IsEnabled = !isRunning && !_isShuttingDown;
+                RunHistoricalFreshnessButton.Content = isRunning
+                    ? "Historical Freshness Running..."
+                    : "Repair Recent Historical Intel";
+            }
         }
 
         private static string BuildIntelCurrentUpdateStatusText(IntelUpdateStatusSnapshot snapshot)
@@ -2757,6 +2940,116 @@ namespace PitmastersGrill
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+        }
+
+        private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
+        {
+            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
+            if (visibleCharacterIds.Count == 0)
+            {
+                MessageBox.Show(
+                    "Today's Freshness needs at least one visible Grill pilot with a resolved character ID.",
+                    "PMG Today's Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
+                var result = await _backgroundIntelUpdateService.RunTodaysFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
+
+                if (!_isShuttingDown && result.NewKillmailsImported > 0)
+                {
+                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Today's Freshness");
+                }
+            }
+            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
+            {
+                AppLogger.UiInfo("Today's Freshness cancelled during shutdown.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Today's Freshness failed from the Intel UI.", ex);
+
+                MessageBox.Show(
+                    $"Today's Freshness failed.\n\n{ex.Message}",
+                    "PMG Today's Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void RunHistoricalFreshnessButton_Click(object sender, RoutedEventArgs e)
+        {
+            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
+            if (visibleCharacterIds.Count == 0)
+            {
+                MessageBox.Show(
+                    "Historical Freshness needs at least one visible Grill pilot with a resolved character ID.",
+                    "PMG Historical Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
+                var result = await _backgroundIntelUpdateService.RunHistoricalFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
+
+                if (!_isShuttingDown && result.MissingImportedCount > 0)
+                {
+                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Historical Freshness");
+                }
+            }
+            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
+            {
+                AppLogger.UiInfo("Historical Freshness cancelled during shutdown.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Historical Freshness failed from the Intel UI.", ex);
+
+                MessageBox.Show(
+                    $"Historical Freshness failed.\n\n{ex.Message}",
+                    "PMG Historical Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        public List<long> GetVisibleCharacterIdsForBackgroundHistoricalRepair()
+        {
+            return GetVisibleCharacterIdsForTodaysFreshness();
+        }
+
+        private List<long> GetVisibleCharacterIdsForTodaysFreshness()
+        {
+            return _currentRows
+                .Select(row => row.CharacterId)
+                .Where(characterId => long.TryParse(characterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                .Select(characterId => long.Parse(characterId!, CultureInfo.InvariantCulture))
+                .Distinct()
+                .ToList();
+        }
+
+        private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
+        {
+            if (_currentRows.Count == 0)
+            {
+                return;
+            }
+
+            AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentRows.Count}");
+            CancelBoardPopulationRetry();
+
+            var generation = ++_processingGeneration;
+            UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral);
+            await ProcessRowBatchAsync(_currentRows.ToList(), generation);
+            FinalizeBoardPopulationPass(generation);
+            UpdateLastRefreshed();
         }
 
         private void OpenZkillForRow(PilotBoardRow selectedRow)

@@ -76,6 +76,12 @@ namespace PitmastersGrill.Services
             settings.MaxKillmailAgeDays =
                 KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(settings.MaxKillmailAgeDays);
 
+            settings.BackgroundHistoricalRepairDelaySeconds = Clamp(settings.BackgroundHistoricalRepairDelaySeconds, 0, 600, 30);
+            settings.BackgroundHistoricalRepairCooldownHours = Clamp(settings.BackgroundHistoricalRepairCooldownHours, 0, 168, 12);
+            settings.BackgroundHistoricalRepairLookbackDays = Clamp(settings.BackgroundHistoricalRepairLookbackDays, 1, 7, 3);
+            settings.BackgroundHistoricalRepairMaxPilotsPerRun = Clamp(settings.BackgroundHistoricalRepairMaxPilotsPerRun, 1, 250, 50);
+            settings.BackgroundHistoricalRepairRecentPilotWindowDays = Clamp(settings.BackgroundHistoricalRepairRecentPilotWindowDays, 1, 90, 14);
+
             if (!Enum.IsDefined(typeof(AppLogLevel), settings.LogLevel))
             {
                 settings.LogLevel = AppLogLevel.Normal;
@@ -101,6 +107,26 @@ namespace PitmastersGrill.Services
             settings.BoardColumnLayout ??= new List<BoardColumnLayoutSetting>();
 
             return settings;
+        }
+
+        private static int Clamp(int value, int min, int max, int fallback)
+        {
+            if (value <= 0)
+            {
+                return fallback;
+            }
+
+            if (value < min)
+            {
+                return min;
+            }
+
+            if (value > max)
+            {
+                return max;
+            }
+
+            return value;
         }
     }
 }

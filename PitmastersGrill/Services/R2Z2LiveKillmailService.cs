@@ -31,7 +31,7 @@ namespace PitmastersGrill.Services
         private readonly string _databasePath;
         private readonly AppSettingsService _appSettingsService;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
-        private readonly KillmailDerivedObservationParser _parser = new();
+        private readonly KillmailIncrementalImportService _incrementalImportService;
         private readonly CynoShipCatalog _cynoShipCatalog = new();
         private readonly HttpClient _httpClient;
 
@@ -40,9 +40,12 @@ namespace PitmastersGrill.Services
         private R2Z2LiveFeedSnapshot _snapshot = new();
         private string _nextRetryAtUtc = "";
 
-        public R2Z2LiveKillmailService(AppSettingsService appSettingsService)
+        public R2Z2LiveKillmailService(
+            AppSettingsService appSettingsService,
+            KillmailIncrementalImportService incrementalImportService)
         {
             _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
+            _incrementalImportService = incrementalImportService ?? throw new ArgumentNullException(nameof(incrementalImportService));
             _databasePath = KillmailPaths.GetKillmailDatabasePath();
             _metadataRepository = new KillmailDatasetMetadataRepository(_databasePath);
             _httpClient = new HttpClient
@@ -341,16 +344,6 @@ namespace PitmastersGrill.Services
                 };
             }
 
-            var parsed = _parser.ParseKillmailEntry(envelope.KillmailJson);
-            if (parsed == null)
-            {
-                return new LiveProcessResult
-                {
-                    Success = false,
-                    Error = "Unable to parse embedded killmail JSON."
-                };
-            }
-
             if (!long.TryParse(envelope.KillmailId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var killmailId))
             {
                 return new LiveProcessResult
@@ -360,135 +353,47 @@ namespace PitmastersGrill.Services
                 };
             }
 
-            var nowUtc = DateTime.UtcNow.ToString("o");
-            using var connection = new SqliteConnection($"Data Source={_databasePath}");
-            connection.Open();
-
-            using var transaction = connection.BeginTransaction();
-
-            AppLogger.KillmailImportDebug(
-                $"R2Z2 derived observations. sequence={requestedSequenceId} killmailId={envelope.KillmailId} registry={parsed.RegistryPilots.Count} fleet={parsed.FleetPilots.Count} ship={parsed.ShipPilots.Count} cyno={parsed.CynoModuleObservations.Count} bait={parsed.BaitObservations.Count} tackle={parsed.CynoTackleObservations.Count}");
-
-            if (TryGetSeenRecord(connection, transaction, killmailId, out _))
+            var importResult = _incrementalImportService.ImportKillmailJson(new IncrementalKillmailImportRequest
             {
-                UpsertSeenRecord(
-                    connection,
-                    transaction,
-                    killmailId,
-                    envelope.KillmailHash,
-                    envelope.SequenceId,
-                    parsed.KillmailTimeUtc,
-                    parsed.DayUtc,
-                    envelope.UploadedAtUtc,
-                    nowUtc,
-                    "duplicate",
-                    "");
+                KillmailId = killmailId,
+                KillmailHash = envelope.KillmailHash,
+                KillmailJson = envelope.KillmailJson,
+                Source = "r2z2",
+                SequenceId = envelope.SequenceId,
+                UploadedAtUtc = envelope.UploadedAtUtc
+            });
 
-                UpdateFeedStateInTransaction(
-                    connection,
-                    transaction,
-                    state =>
-                    {
-                        state.Enabled = 1;
-                        state.NextSequenceId = envelope.SequenceId + 1;
-                        state.LastProcessedSequenceId = envelope.SequenceId;
-                        state.LastSuccessAtUtc = nowUtc;
-                        state.LastError = "";
-                        state.Status = "Catching up";
-                        state.UpdatedAtUtc = nowUtc;
-                    });
-
-                transaction.Commit();
-
-                UpdateSnapshot(ReadSnapshotFromDatabase());
-                AppLogger.KillmailImportDebug($"R2Z2 checkpoint updated. sequence={envelope.SequenceId} duplicate=true");
-
+            if (!importResult.Success)
+            {
                 return new LiveProcessResult
                 {
-                    Success = true,
-                    WasDuplicate = true,
-                    KillmailId = envelope.KillmailId,
-                    DayUtc = parsed.DayUtc
+                    Success = false,
+                    Error = importResult.Error
                 };
             }
 
-            foreach (var registryPilot in parsed.RegistryPilots)
+            var nowUtc = DateTime.UtcNow.ToString("o");
+            UpdateFeedState(state =>
             {
-                UpsertRegistryRecord(connection, transaction, parsed.DayUtc, registryPilot, nowUtc);
-            }
+                state.Enabled = 1;
+                state.NextSequenceId = envelope.SequenceId + 1;
+                state.LastProcessedSequenceId = envelope.SequenceId;
+                state.LastSuccessAtUtc = nowUtc;
+                state.LastError = "";
+                state.Status = "Catching up";
+                state.UpdatedAtUtc = nowUtc;
+            });
 
-            foreach (var fleetPilot in parsed.FleetPilots)
-            {
-                UpsertFleetRecord(connection, transaction, parsed.DayUtc, fleetPilot, nowUtc);
-            }
-
-            foreach (var shipPilot in parsed.ShipPilots)
-            {
-                var shipUpsertAction = UpsertShipRecord(connection, transaction, parsed.DayUtc, shipPilot, nowUtc);
-                AppLogger.KillmailImportDebug(
-                    $"R2Z2 ship observation upsert. sequence={requestedSequenceId} killmailId={envelope.KillmailId} characterId={shipPilot.CharacterId} shipTypeId={(shipPilot.LastSeenShipTypeId.HasValue ? shipPilot.LastSeenShipTypeId.Value.ToString(CultureInfo.InvariantCulture) : "<null>")} killmailTimeUtc={shipPilot.LastSeenShipTimeUtc} day={parsed.DayUtc} action={shipUpsertAction}");
-            }
-
-            foreach (var observation in parsed.CynoModuleObservations)
-            {
-                observation.DayUtc = parsed.DayUtc;
-                observation.UpdatedAtUtc = nowUtc;
-                UpsertCynoModuleRecord(connection, transaction, observation);
-            }
-
-            foreach (var observation in parsed.BaitObservations)
-            {
-                observation.DayUtc = parsed.DayUtc;
-                observation.UpdatedAtUtc = nowUtc;
-                UpsertBaitRecord(connection, transaction, observation);
-            }
-
-            foreach (var observation in parsed.CynoTackleObservations)
-            {
-                observation.DayUtc = parsed.DayUtc;
-                observation.UpdatedAtUtc = nowUtc;
-                UpsertCynoTackleRecord(connection, transaction, observation);
-            }
-
-            UpsertSeenRecord(
-                connection,
-                transaction,
-                killmailId,
-                envelope.KillmailHash,
-                envelope.SequenceId,
-                parsed.KillmailTimeUtc,
-                parsed.DayUtc,
-                envelope.UploadedAtUtc,
-                nowUtc,
-                "processed",
-                "");
-
-            UpdateFeedStateInTransaction(
-                connection,
-                transaction,
-                state =>
-                {
-                    state.Enabled = 1;
-                    state.NextSequenceId = envelope.SequenceId + 1;
-                    state.LastProcessedSequenceId = envelope.SequenceId;
-                    state.LastSuccessAtUtc = nowUtc;
-                    state.LastError = "";
-                    state.Status = "Catching up";
-                    state.UpdatedAtUtc = nowUtc;
-                });
-
-            transaction.Commit();
-            _metadataRepository.SetUtcNow("last_successful_update_at_utc");
-
-            UpdateSnapshot(ReadSnapshotFromDatabase());
-            AppLogger.KillmailImportDebug($"R2Z2 checkpoint updated. sequence={envelope.SequenceId} duplicate=false");
+            AppLogger.KillmailImportDebug(
+                $"R2Z2 derived observations. sequence={requestedSequenceId} killmailId={envelope.KillmailId} registry={importResult.RegistryObservationCount} fleet={importResult.FleetObservationCount} ship={importResult.ShipObservationCount} cyno={importResult.CynoObservationCount} bait={importResult.BaitObservationCount} tackle={importResult.TackleObservationCount}");
+            AppLogger.KillmailImportDebug($"R2Z2 checkpoint updated. sequence={envelope.SequenceId} duplicate={importResult.WasDuplicate.ToString().ToLowerInvariant()}");
 
             return new LiveProcessResult
             {
                 Success = true,
-                WasDuplicate = false,
+                WasDuplicate = importResult.WasDuplicate,
                 KillmailId = envelope.KillmailId,
-                DayUtc = parsed.DayUtc
+                DayUtc = importResult.DayUtc
             };
         }
 

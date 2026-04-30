@@ -1,6 +1,8 @@
-﻿using Microsoft.Data.Sqlite;
+using Microsoft.Data.Sqlite;
 using PitmastersGrill.Models;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace PitmastersGrill.Persistence
 {
@@ -148,6 +150,49 @@ namespace PitmastersGrill.Persistence
                 };
 
                 results[aggregate.CharacterId] = aggregate;
+            }
+
+            return results;
+        }
+
+        public List<long> GetRecentlySeenCharacterIds(DateTime sinceUtc, int maxCount)
+        {
+            var results = new List<long>();
+            var limit = maxCount <= 0 ? 50 : maxCount;
+            var sinceText = sinceUtc.ToString("o", CultureInfo.InvariantCulture);
+
+            var connectionString = $"Data Source={_databasePath}";
+            using var connection = new SqliteConnection(connectionString);
+            connection.Open();
+
+            using var command = connection.CreateCommand();
+            command.CommandText =
+            @"
+            SELECT
+                character_id,
+                MAX(last_seen_killmail_time_utc) AS last_seen_killmail_time_utc
+            FROM pilot_registry_day
+            WHERE last_seen_killmail_time_utc >= $sinceUtc
+            GROUP BY character_id
+            ORDER BY last_seen_killmail_time_utc DESC
+            LIMIT $limit;
+            ";
+            command.Parameters.AddWithValue("$sinceUtc", sinceText);
+            command.Parameters.AddWithValue("$limit", limit);
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0))
+                {
+                    continue;
+                }
+
+                var text = reader.GetString(0);
+                if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
+                {
+                    results.Add(parsed);
+                }
             }
 
             return results;

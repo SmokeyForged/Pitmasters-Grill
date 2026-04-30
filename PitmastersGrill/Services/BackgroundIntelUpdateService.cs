@@ -2,6 +2,7 @@
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,6 +18,9 @@ namespace PitmastersGrill.Services
         private readonly KillmailDayImportService _killmailDayImportService;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly R2Z2LiveKillmailService _r2z2LiveKillmailService;
+        private readonly TodaysFreshnessService _todaysFreshnessService;
+        private readonly HistoricalFreshnessService _historicalFreshnessService;
+        private Task? _backgroundHistoricalRepairTask;
 
         private Task? _backgroundTask;
         private readonly CancellationTokenSource _shutdownCts = new();
@@ -34,13 +38,19 @@ namespace PitmastersGrill.Services
         public BackgroundIntelUpdateService(
             KillmailDatasetFreshnessService freshnessService,
             KillmailDayImportService killmailDayImportService,
-            R2Z2LiveKillmailService r2z2LiveKillmailService)
+            R2Z2LiveKillmailService r2z2LiveKillmailService,
+            TodaysFreshnessService todaysFreshnessService,
+            HistoricalFreshnessService historicalFreshnessService)
         {
             _freshnessService = freshnessService;
             _killmailDayImportService = killmailDayImportService;
             _metadataRepository = new KillmailDatasetMetadataRepository(KillmailPaths.GetKillmailDatabasePath());
             _r2z2LiveKillmailService = r2z2LiveKillmailService;
+            _todaysFreshnessService = todaysFreshnessService;
+            _historicalFreshnessService = historicalFreshnessService;
             _r2z2LiveKillmailService.StatusChanged += OnLiveFeedStatusChanged;
+            _todaysFreshnessService.StatusChanged += OnTodaysFreshnessStatusChanged;
+            _historicalFreshnessService.StatusChanged += OnHistoricalFreshnessStatusChanged;
         }
 
         public IntelUpdateStatusSnapshot GetSnapshot()
@@ -86,6 +96,112 @@ namespace PitmastersGrill.Services
         public Task SetLiveFeedEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
         {
             return _r2z2LiveKillmailService.SetEnabledAsync(enabled, cancellationToken);
+        }
+
+        public Task<TodaysFreshnessRunResult> RunTodaysFreshnessAsync(IReadOnlyCollection<long> characterIds, CancellationToken cancellationToken = default)
+        {
+            return _todaysFreshnessService.RunAsync(characterIds, cancellationToken);
+        }
+
+        public Task<HistoricalFreshnessRunResult> RunHistoricalFreshnessAsync(IReadOnlyCollection<long> characterIds, CancellationToken cancellationToken = default)
+        {
+            return _historicalFreshnessService.RunAsync(characterIds, cancellationToken);
+        }
+
+        public void ScheduleBackgroundHistoricalRepairAfterUiShown(Func<IReadOnlyCollection<long>> visibleCharacterIdsProvider)
+        {
+            if (visibleCharacterIdsProvider == null)
+            {
+                throw new ArgumentNullException(nameof(visibleCharacterIdsProvider));
+            }
+
+            lock (_sync)
+            {
+                if (_backgroundHistoricalRepairTask != null && !_backgroundHistoricalRepairTask.IsCompleted)
+                {
+                    AppLogger.KillmailImportInfo("Background historical repair startup scheduling skipped because a schedule is already active.");
+                    return;
+                }
+
+                var configuration = _historicalFreshnessService.GetBackgroundStartupConfiguration();
+                AppLogger.KillmailImportInfo(
+                    $"Background historical repair startup configuration evaluated. enabled={configuration.Enabled} delaySeconds={configuration.DelaySeconds} cooldownHours={configuration.CooldownHours} lookbackDays={configuration.LookbackDays} maxPilots={configuration.MaxPilotsPerRun} recentPilotWindowDays={configuration.RecentPilotWindowDays}");
+
+                if (!configuration.Enabled)
+                {
+                    AppLogger.KillmailImportInfo("Background historical repair startup skipped because AppSettings disabled it.");
+                    return;
+                }
+
+                AppLogger.KillmailImportInfo(
+                    $"Background historical repair scheduled after UI shown. delaySeconds={configuration.DelaySeconds}");
+
+                _backgroundHistoricalRepairTask = Task.Run(async () =>
+                {
+                    try
+                    {
+                        if (configuration.DelaySeconds > 0)
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(configuration.DelaySeconds), _shutdownCts.Token);
+                        }
+
+                        if (_shutdownCts.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
+                        await WaitForForegroundPriorityToClearAsync(_shutdownCts.Token);
+
+                        IReadOnlyCollection<long> visibleCharacterIds;
+                        try
+                        {
+                            visibleCharacterIds = visibleCharacterIdsProvider() ?? Array.Empty<long>();
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.KillmailImportWarn($"Background historical repair could not read visible pilot IDs. message={ex.Message}");
+                            AppLogger.ErrorOnly("Background historical repair visible pilot provider failed.", ex);
+                            visibleCharacterIds = Array.Empty<long>();
+                        }
+
+                        AppLogger.KillmailImportInfo(
+                            $"Background historical repair starting after UI shown. visiblePilotCount={visibleCharacterIds.Count}");
+
+                        var result = await _historicalFreshnessService.RunBackgroundStartupRepairAsync(
+                            visibleCharacterIds,
+                            _shutdownCts.Token);
+
+                        if (result.CandidatePilotsConsidered == 0)
+                        {
+                            AppLogger.KillmailImportInfo("Background historical repair skipped because no candidates were available.");
+                        }
+                        else if (result.PilotsChecked == 0 && result.CandidatePilotsSkippedCooldown > 0)
+                        {
+                            AppLogger.KillmailImportInfo(
+                                $"Background historical repair skipped because all candidates were in cooldown. considered={result.CandidatePilotsConsidered} cooldownSkipped={result.CandidatePilotsSkippedCooldown}");
+                        }
+                        else if (!result.Success &&
+                                 result.FailedCount > 0 &&
+                                 string.Equals(result.DetailText, $"Background historical repair stopped after zKill rate limiting while checking pilot {result.PilotsChecked} of {result.CandidatePilotsConsidered}.", StringComparison.Ordinal))
+                        {
+                            AppLogger.KillmailImportInfo(
+                                $"Background historical repair rate-limited and exited. pilotsChecked={result.PilotsChecked} failed={result.FailedCount} detail='{result.DetailText}'");
+                        }
+
+                        AppLogger.KillmailImportInfo(
+                            $"Background historical repair completed. candidatePilots={result.CandidatePilotsConsidered} skippedCooldown={result.CandidatePilotsSkippedCooldown} pilotsChecked={result.PilotsChecked} imported={result.MissingImportedCount} failed={result.FailedCount} detail='{result.DetailText}'");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        AppLogger.KillmailImportInfo("Background historical repair cancelled.");
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.KillmailImportWarn($"Background historical repair failed. message={ex.Message}");
+                        AppLogger.ErrorOnly("Background historical repair exception.", ex);
+                    }
+                }, _shutdownCts.Token);
+            }
         }
 
         public async Task EnableKillmailDbPullAsync(int lookbackDays, CancellationToken cancellationToken = default)
@@ -382,6 +498,8 @@ namespace PitmastersGrill.Services
         {
             var freshness = _freshnessService.GetFreshnessStatus();
             var liveFeedSnapshot = _r2z2LiveKillmailService.GetSnapshot();
+            var todaysFreshnessSnapshot = _todaysFreshnessService.GetSnapshot();
+            var historicalFreshnessSnapshot = _historicalFreshnessService.GetSnapshot();
             var foregroundActive = Volatile.Read(ref _foregroundPriorityRequests) > 0;
             var coverageDetail = BuildCoverageDetail(freshness);
             var lastSuccessfulUpdateAtUtc = _metadataRepository.GetValue("last_successful_update_at_utc") ?? "";
@@ -431,7 +549,9 @@ namespace PitmastersGrill.Services
                     CurrentDayProgressIsIndeterminate = true,
                     CurrentDayProgressPercent = 0,
                     CurrentDayProgressText = currentDayProgressText,
-                    LiveFeed = liveFeedSnapshot
+                    LiveFeed = liveFeedSnapshot,
+                    TodaysFreshness = todaysFreshnessSnapshot,
+                    HistoricalFreshness = historicalFreshnessSnapshot
                 };
             }
 
@@ -469,7 +589,9 @@ namespace PitmastersGrill.Services
                     CurrentDayProgressIsIndeterminate = false,
                     CurrentDayProgressPercent = 0,
                     CurrentDayProgressText = "No update currently running.",
-                    LiveFeed = liveFeedSnapshot
+                    LiveFeed = liveFeedSnapshot,
+                    TodaysFreshness = todaysFreshnessSnapshot,
+                    HistoricalFreshness = historicalFreshnessSnapshot
                 };
             }
 
@@ -510,7 +632,9 @@ namespace PitmastersGrill.Services
                     CurrentDayProgressIsIndeterminate = true,
                     CurrentDayProgressPercent = 0,
                     CurrentDayProgressText = currentDayProgressText,
-                    LiveFeed = liveFeedSnapshot
+                    LiveFeed = liveFeedSnapshot,
+                    TodaysFreshness = todaysFreshnessSnapshot,
+                    HistoricalFreshness = historicalFreshnessSnapshot
                 };
             }
 
@@ -545,7 +669,9 @@ namespace PitmastersGrill.Services
                     CurrentDayProgressIsIndeterminate = false,
                     CurrentDayProgressPercent = 0,
                     CurrentDayProgressText = currentDayProgressText,
-                    LiveFeed = liveFeedSnapshot
+                    LiveFeed = liveFeedSnapshot,
+                    TodaysFreshness = todaysFreshnessSnapshot,
+                    HistoricalFreshness = historicalFreshnessSnapshot
                 };
             }
 
@@ -580,11 +706,23 @@ namespace PitmastersGrill.Services
                 CurrentDayProgressIsIndeterminate = false,
                 CurrentDayProgressPercent = 0,
                 CurrentDayProgressText = currentDayProgressText,
-                LiveFeed = liveFeedSnapshot
+                LiveFeed = liveFeedSnapshot,
+                TodaysFreshness = todaysFreshnessSnapshot,
+                HistoricalFreshness = historicalFreshnessSnapshot
             };
         }
 
         private void OnLiveFeedStatusChanged()
+        {
+            Publish();
+        }
+
+        private void OnTodaysFreshnessStatusChanged()
+        {
+            Publish();
+        }
+
+        private void OnHistoricalFreshnessStatusChanged()
         {
             Publish();
         }

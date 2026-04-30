@@ -1297,6 +1297,316 @@
                                                        Text="No live-feed errors recorded."/>
                                         </StackPanel>
                                     </Border>
+
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16"
+                                            Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <TextBlock Text="Today's Freshness"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource HeaderTextBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button x:Name="RunTodaysFreshnessButton"
+                                                        DockPanel.Dock="Right"
+                                                        Width="200"
+                                                        Padding="14,6"
+                                                        Content="Refresh Today's zKill Intel"
+                                                        Click="RunTodaysFreshnessButton_Click"/>
+                                            </DockPanel>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,12"
+                                                       TextWrapping="Wrap"
+                                                       Text="Checks recent zKill activity for currently visible Grill pilots and imports any missing same-day local intel without touching archive completeness."/>
+
+                                            <UniformGrid Columns="2"
+                                                         Margin="0,0,0,0">
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Status"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessStatusText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Idle"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Visible Pilots Targeted"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessVisiblePilotsText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Entities Queried"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessEntitiesQueriedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="zKill Results Found"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessResultsFoundText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Already Known / Skipped"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessKnownSkippedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="New Killmails Imported"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessImportedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Failed"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessFailedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Last Run"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessLastRunText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No Today's Freshness run recorded yet."/>
+                                                </StackPanel>
+                                            </UniformGrid>
+
+                                            <TextBlock Text="Details"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="TodaysFreshnessDetailText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="Today's Freshness is idle."/>
+
+                                            <TextBlock Text="Last Error"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,10,0,0"/>
+                                            <TextBlock x:Name="TodaysFreshnessLastErrorText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="No Today's Freshness errors recorded."/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16"
+                                            Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <TextBlock Text="Historical Freshness"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource HeaderTextBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button x:Name="RunHistoricalFreshnessButton"
+                                                        DockPanel.Dock="Right"
+                                                        Width="210"
+                                                        Padding="14,6"
+                                                        Content="Repair Recent Historical Intel"
+                                                        Click="RunHistoricalFreshnessButton_Click"/>
+                                            </DockPanel>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,12"
+                                                       TextWrapping="Wrap"
+                                                       Text="Manual Historical Freshness checks the last 3 completed UTC days for currently visible Grill pilots. Background startup repair uses a bounded local candidate pool, compares zKill-known killmail IDs against PMG's freshness-seen IDs, and imports missing historical deltas without changing archive completeness."/>
+
+                                            <UniformGrid Columns="2"
+                                                         Margin="0,0,0,0">
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Status"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessStatusText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Idle"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Mode"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessModeText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Not run yet"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Visible Pilots Targeted"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessVisiblePilotsText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Candidate Pilots Considered"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessCandidatesConsideredText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Skipped By Cooldown"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessCandidatesSkippedCooldownText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Pilots Checked"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessPilotsCheckedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Historical Days Checked"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessDaysCheckedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Entities Queried"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessEntitiesQueriedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="zKill Results Found"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessResultsFoundText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Already Known / Skipped"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessKnownSkippedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Missing Imported"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessImportedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Failed"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessFailedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Last Run"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessLastRunText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No Historical Freshness run recorded yet."/>
+                                                </StackPanel>
+                                            </UniformGrid>
+
+                                            <TextBlock Text="Details"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="HistoricalFreshnessDetailText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="Historical Freshness is idle."/>
+
+                                            <TextBlock Text="Last Error"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,10,0,0"/>
+                                            <TextBlock x:Name="HistoricalFreshnessLastErrorText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="No Historical Freshness errors recorded."/>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </ScrollViewer>
                         </TabItem>

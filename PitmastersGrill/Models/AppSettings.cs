@@ -54,6 +54,18 @@ namespace PitmastersGrill.Models
 
         public bool LiveZkillFeedEnabled { get; set; } = false;
 
+        public bool BackgroundHistoricalRepairEnabled { get; set; } = true;
+
+        public int BackgroundHistoricalRepairDelaySeconds { get; set; } = 30;
+
+        public int BackgroundHistoricalRepairCooldownHours { get; set; } = 12;
+
+        public int BackgroundHistoricalRepairLookbackDays { get; set; } = 3;
+
+        public int BackgroundHistoricalRepairMaxPilotsPerRun { get; set; } = 50;
+
+        public int BackgroundHistoricalRepairRecentPilotWindowDays { get; set; } = 14;
+
         public string KillmailDataRootPath { get; set; } = string.Empty;
 
         public List<BoardColumnLayoutSetting> BoardColumnLayout { get; set; } = new();

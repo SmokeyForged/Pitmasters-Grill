@@ -32,5 +32,7 @@
         public double CurrentDayProgressPercent { get; set; }
         public string CurrentDayProgressText { get; set; } = "";
         public R2Z2LiveFeedSnapshot LiveFeed { get; set; } = new();
+        public TodaysFreshnessSnapshot TodaysFreshness { get; set; } = new();
+        public HistoricalFreshnessSnapshot HistoricalFreshness { get; set; } = new();
     }
 }

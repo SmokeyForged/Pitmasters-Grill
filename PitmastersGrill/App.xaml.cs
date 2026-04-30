@@ -273,16 +273,21 @@ namespace PitmastersGrill
                 var archiveProvider = new KillmailDayArchiveProvider();
                 var freshnessService = new KillmailDatasetFreshnessService(metadataRepository);
                 var appSettingsService = new AppSettingsService();
+                var incrementalImportService = new KillmailIncrementalImportService(killmailDbPath);
                 var dayImportService = new KillmailDayImportService(
                     dayImportStateRepository,
                     metadataRepository,
                     archiveProvider);
-                var r2z2LiveKillmailService = new R2Z2LiveKillmailService(appSettingsService);
+                var r2z2LiveKillmailService = new R2Z2LiveKillmailService(appSettingsService, incrementalImportService);
+                var todaysFreshnessService = new TodaysFreshnessService(incrementalImportService);
+                var historicalFreshnessService = new HistoricalFreshnessService(incrementalImportService, appSettingsService);
 
                 var backgroundIntelUpdateService = new BackgroundIntelUpdateService(
                     freshnessService,
                     dayImportService,
-                    r2z2LiveKillmailService);
+                    r2z2LiveKillmailService,
+                    todaysFreshnessService,
+                    historicalFreshnessService);
 
                 metadataRepository.SetUtcNow("last_startup_check_at_utc");
 
@@ -309,6 +314,8 @@ namespace PitmastersGrill
                         AppLogger.AppInfo("Starting background services after UI shown.");
                         backgroundIntelUpdateService.StartIfNeeded();
                         backgroundIntelUpdateService.StartLiveFeedIfConfiguredAfterUiShown();
+                        backgroundIntelUpdateService.ScheduleBackgroundHistoricalRepairAfterUiShown(
+                            () => mainWindow.GetVisibleCharacterIdsForBackgroundHistoricalRepair());
                         AppLogger.AppInfo("Background services started after UI shown.");
                     }), DispatcherPriority.Background);
                 };
