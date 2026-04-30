@@ -1,6 +1,7 @@
 ﻿using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
@@ -97,6 +98,7 @@ namespace PitmastersGrill.Services
             settings.ShowLastShipSeenColumn ??= true;
             settings.ShowLastSeenColumn ??= true;
             settings.ShowCynoHullSeenColumn ??= true;
+            settings.BoardColumnLayout ??= new List<BoardColumnLayoutSetting>();
 
             return settings;
         }

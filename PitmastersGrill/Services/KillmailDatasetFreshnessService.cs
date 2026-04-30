@@ -1,6 +1,7 @@
 ﻿using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace PitmastersGrill.Services
@@ -56,6 +57,7 @@ namespace PitmastersGrill.Services
 
             var bootstrapStartDayUtc = _metadataRepository.GetValue("bootstrap_start_day_utc") ?? "";
             var requiredThroughDayUtc = DateTime.UtcNow.Date.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var requestedHistoryDays = 0;
 
             if (!TryParseDay(requiredThroughDayUtc, out var requiredThroughDay))
             {
@@ -64,49 +66,83 @@ namespace PitmastersGrill.Services
                     EarliestCompleteDayUtc = earliestCompleteDayUtc,
                     LatestCompleteDayUtc = latestCompleteDayUtc,
                     RequiredThroughDayUtc = requiredThroughDayUtc,
+                    RequestedStartDayUtc = bootstrapStartDayUtc,
                     IsCurrentThroughRequiredDay = true,
+                    IsRequestedCoverageComplete = true,
+                    HasRequestedCoverageWindow = false,
+                    RequestedHistoryDays = 0,
+                    RequestedCoverageDays = 0,
+                    LocalCoverageDays = 0,
                     MissingDayCount = 0
                 };
             }
 
-            if (!TryParseDay(latestCompleteDayUtc, out var latestCompleteDay))
+            if (TryParseDay(bootstrapStartDayUtc, out var bootstrapStartDay))
             {
-                if (TryParseDay(bootstrapStartDayUtc, out var bootstrapStartDay))
+                requestedHistoryDays = bootstrapStartDay > requiredThroughDay
+                    ? 0
+                    : (requiredThroughDay - bootstrapStartDay).Days + 1;
+
+                if (requestedHistoryDays > 0)
                 {
-                    if (bootstrapStartDay > requiredThroughDay)
+                    var completeDays = _dayImportStateRepository.GetCompleteDaysInRange(bootstrapStartDayUtc, requiredThroughDayUtc);
+                    var completeDaySet = new HashSet<string>(completeDays, StringComparer.Ordinal);
+                    var missingDayCount = 0;
+                    string firstMissingDayUtc = string.Empty;
+                    string lastMissingDayUtc = string.Empty;
+
+                    for (var day = bootstrapStartDay; day <= requiredThroughDay; day = day.AddDays(1))
                     {
-                        return new KillmailDatasetFreshnessStatus
+                        var dayText = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        if (completeDaySet.Contains(dayText))
                         {
-                            EarliestCompleteDayUtc = earliestCompleteDayUtc,
-                            LatestCompleteDayUtc = latestCompleteDayUtc,
-                            RequiredThroughDayUtc = requiredThroughDayUtc,
-                            IsCurrentThroughRequiredDay = true,
-                            MissingDayCount = 0,
-                            FirstMissingDayUtc = "",
-                            LastMissingDayUtc = ""
-                        };
+                            continue;
+                        }
+
+                        missingDayCount++;
+                        if (string.IsNullOrWhiteSpace(firstMissingDayUtc))
+                        {
+                            firstMissingDayUtc = dayText;
+                        }
+
+                        lastMissingDayUtc = dayText;
                     }
 
-                    var bootstrapMissingDayCount = (requiredThroughDay - bootstrapStartDay).Days + 1;
+                    var latestExpectedDayPresent = completeDaySet.Contains(requiredThroughDayUtc);
 
                     return new KillmailDatasetFreshnessStatus
                     {
                         EarliestCompleteDayUtc = earliestCompleteDayUtc,
                         LatestCompleteDayUtc = latestCompleteDayUtc,
                         RequiredThroughDayUtc = requiredThroughDayUtc,
-                        IsCurrentThroughRequiredDay = false,
-                        MissingDayCount = bootstrapMissingDayCount,
-                        FirstMissingDayUtc = bootstrapStartDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                        LastMissingDayUtc = requiredThroughDayUtc
+                        RequestedStartDayUtc = bootstrapStartDayUtc,
+                        IsCurrentThroughRequiredDay = latestExpectedDayPresent,
+                        IsRequestedCoverageComplete = missingDayCount == 0,
+                        HasRequestedCoverageWindow = true,
+                        RequestedHistoryDays = requestedHistoryDays,
+                        RequestedCoverageDays = requestedHistoryDays,
+                        LocalCoverageDays = completeDaySet.Count,
+                        MissingDayCount = missingDayCount,
+                        FirstMissingDayUtc = firstMissingDayUtc,
+                        LastMissingDayUtc = lastMissingDayUtc
                     };
                 }
+            }
 
+            if (!TryParseDay(latestCompleteDayUtc, out var latestCompleteDay))
+            {
                 return new KillmailDatasetFreshnessStatus
                 {
                     EarliestCompleteDayUtc = earliestCompleteDayUtc,
                     LatestCompleteDayUtc = latestCompleteDayUtc,
                     RequiredThroughDayUtc = requiredThroughDayUtc,
+                    RequestedStartDayUtc = bootstrapStartDayUtc,
                     IsCurrentThroughRequiredDay = false,
+                    IsRequestedCoverageComplete = false,
+                    HasRequestedCoverageWindow = false,
+                    RequestedHistoryDays = requestedHistoryDays,
+                    RequestedCoverageDays = 0,
+                    LocalCoverageDays = 0,
                     MissingDayCount = 1,
                     FirstMissingDayUtc = requiredThroughDayUtc,
                     LastMissingDayUtc = requiredThroughDayUtc
@@ -120,21 +156,33 @@ namespace PitmastersGrill.Services
                     EarliestCompleteDayUtc = earliestCompleteDayUtc,
                     LatestCompleteDayUtc = latestCompleteDayUtc,
                     RequiredThroughDayUtc = requiredThroughDayUtc,
+                    RequestedStartDayUtc = bootstrapStartDayUtc,
                     IsCurrentThroughRequiredDay = true,
+                    IsRequestedCoverageComplete = true,
+                    HasRequestedCoverageWindow = false,
+                    RequestedHistoryDays = requestedHistoryDays,
+                    RequestedCoverageDays = 0,
+                    LocalCoverageDays = 0,
                     MissingDayCount = 0
                 };
             }
 
             var firstMissingDay = latestCompleteDay.AddDays(1);
-            var missingDayCount = (requiredThroughDay - firstMissingDay).Days + 1;
+            var trailingMissingDayCount = (requiredThroughDay - firstMissingDay).Days + 1;
 
             return new KillmailDatasetFreshnessStatus
             {
                 EarliestCompleteDayUtc = earliestCompleteDayUtc,
                 LatestCompleteDayUtc = latestCompleteDayUtc,
                 RequiredThroughDayUtc = requiredThroughDayUtc,
+                RequestedStartDayUtc = bootstrapStartDayUtc,
                 IsCurrentThroughRequiredDay = false,
-                MissingDayCount = missingDayCount,
+                IsRequestedCoverageComplete = false,
+                HasRequestedCoverageWindow = false,
+                RequestedHistoryDays = requestedHistoryDays,
+                RequestedCoverageDays = 0,
+                LocalCoverageDays = 0,
+                MissingDayCount = trailingMissingDayCount,
                 FirstMissingDayUtc = firstMissingDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 LastMissingDayUtc = requiredThroughDayUtc
             };
@@ -142,7 +190,8 @@ namespace PitmastersGrill.Services
 
         public KillmailDatasetUpdatePlan BuildUpdatePlan(KillmailDatasetFreshnessStatus freshnessStatus)
         {
-            if (freshnessStatus == null || freshnessStatus.IsCurrentThroughRequiredDay || freshnessStatus.MissingDayCount <= 0)
+            if (freshnessStatus == null ||
+                ((freshnessStatus.IsCurrentThroughRequiredDay && freshnessStatus.IsRequestedCoverageComplete) || freshnessStatus.MissingDayCount <= 0))
             {
                 return new KillmailDatasetUpdatePlan
                 {

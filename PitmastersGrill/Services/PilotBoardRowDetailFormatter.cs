@@ -668,6 +668,7 @@ namespace PitmastersGrill.Services
             }
 
             SetBoardSignal(row, "None", "", "No board signal");
+            row.BoardHoverToolTip = BuildBoardHoverToolTip(row, signal, hasDerivedBaitEvidence);
         }
 
         private static bool IsNormalOrCovertSignal(CynoSignalType signalType)
@@ -682,6 +683,63 @@ namespace PitmastersGrill.Services
             row.BoardSignalKind = kind;
             row.BoardSignalIcon = icon;
             row.BoardSignalToolTip = toolTip;
+            row.BoardHoverToolTip = toolTip;
+        }
+
+        private static string BuildBoardHoverToolTip(
+            PilotBoardRow row,
+            CynoSignalResult signal,
+            bool hasDerivedBaitEvidence)
+        {
+            if (row == null)
+            {
+                return string.Empty;
+            }
+
+            var lines = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(row.BoardSignalToolTip) &&
+                !string.Equals(row.BoardSignalToolTip, "No board signal", StringComparison.OrdinalIgnoreCase))
+            {
+                lines.Add(row.BoardSignalToolTip);
+            }
+
+            if (hasDerivedBaitEvidence)
+            {
+                lines.Add($"Bait evidence: {row.DerivedBaitEvidenceCount}");
+            }
+            else if (row.HasConfirmedCynoModuleEvidence && !string.IsNullOrWhiteSpace(row.ConfirmedCynoSignalTypesDisplay))
+            {
+                lines.Add($"Confirmed: {row.ConfirmedCynoSignalTypesDisplay}");
+            }
+            else if (signal != null && signal.Status != CynoSignalStatus.Unknown)
+            {
+                lines.Add($"Signal: {signal.Status} ({GetCompactSignalTypeForHover(signal)})");
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.LastPublicCynoCapableHull))
+            {
+                lines.Add($"Cyno hull: {row.LastPublicCynoCapableHull}");
+            }
+
+            if (lines.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            return string.Join(Environment.NewLine, lines.Take(3));
+        }
+
+        private static string GetCompactSignalTypeForHover(CynoSignalResult signal)
+        {
+            return signal.SignalType switch
+            {
+                CynoSignalType.Normal => "hard",
+                CynoSignalType.Covert => "covert",
+                CynoSignalType.Industrial => "industrial",
+                CynoSignalType.Mixed => "mixed",
+                _ => "unknown"
+            };
         }
 
         private static IEnumerable<string> BuildBaitEvidenceLines(IReadOnlyCollection<IndustrialCynoBaitEvidence> evidence)

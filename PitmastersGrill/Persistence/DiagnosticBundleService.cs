@@ -10,7 +10,7 @@ namespace PitmastersGrill.Persistence
 {
     public static class DiagnosticBundleService
     {
-        private const string VersionLabel = "Technical Preview-v0.9.5.1";
+        private const string VersionLabel = "Technical Preview-v0.9.6";
         private const int MaximumBundlesToRetain = 20;
 
         public static string GetDiagnosticsDirectory()
@@ -33,6 +33,7 @@ namespace PitmastersGrill.Persistence
                 AddManifest(archive, reason, exception);
                 AddBundleNotes(archive);
                 AddSettingsSummary(archive);
+                AddLiveFeedSummary(archive);
                 AddProviderHealthSummary(archive);
                 AddPerformanceSummary(archive);
                 AddCacheSummary(archive);
@@ -113,9 +114,70 @@ namespace PitmastersGrill.Persistence
                 writer.WriteLine($"colorBlindMode={settings.ColorBlindMode}");
                 writer.WriteLine($"darkMode={settings.DarkModeEnabled}");
                 writer.WriteLine($"logLevel={AppLogger.CurrentLogLevel}");
+                writer.WriteLine($"liveZkillFeedEnabled={settings.LiveZkillFeedEnabled}");
                 writer.WriteLine($"killmailDataPath={RedactSensitiveDiagnosticsText(KillmailPaths.GetKillmailDataDirectoryDisplayPath())}");
                 writer.WriteLine($"killmailDataPathSource={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
                 writer.WriteLine("Secrets/tokens/credentials are not collected.");
+            });
+        }
+
+        private static void AddLiveFeedSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "live-feed-status.txt", writer =>
+            {
+                try
+                {
+                    using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={KillmailPaths.GetKillmailDatabasePath()}");
+                    connection.Open();
+
+                    using (var stateCommand = connection.CreateCommand())
+                    {
+                        stateCommand.CommandText =
+                        @"
+                        SELECT
+                            feed_name,
+                            enabled,
+                            next_sequence_id,
+                            last_processed_sequence_id,
+                            last_success_at_utc,
+                            last_404_at_utc,
+                            last_error_at_utc,
+                            last_error,
+                            status,
+                            updated_at_utc
+                        FROM live_killmail_feed_state
+                        WHERE feed_name = 'r2z2'
+                        LIMIT 1;
+                        ";
+
+                        using var reader = stateCommand.ExecuteReader();
+                        if (reader.Read())
+                        {
+                            writer.WriteLine("R2Z2 live feed state");
+                            writer.WriteLine($"enabled={(reader.IsDBNull(1) ? 0 : reader.GetInt32(1))}");
+                            writer.WriteLine($"nextSequence={SafeValue(reader, 2)}");
+                            writer.WriteLine($"lastProcessedSequence={SafeValue(reader, 3)}");
+                            writer.WriteLine($"lastSuccessAtUtc={SafeValue(reader, 4)}");
+                            writer.WriteLine($"last404AtUtc={SafeValue(reader, 5)}");
+                            writer.WriteLine($"lastErrorAtUtc={SafeValue(reader, 6)}");
+                            writer.WriteLine($"lastError={Sanitize(SafeValue(reader, 7))}");
+                            writer.WriteLine($"status={Sanitize(SafeValue(reader, 8))}");
+                            writer.WriteLine($"updatedAtUtc={SafeValue(reader, 9)}");
+                        }
+                        else
+                        {
+                            writer.WriteLine("R2Z2 live feed state not initialized.");
+                        }
+                    }
+
+                    using var countCommand = connection.CreateCommand();
+                    countCommand.CommandText = "SELECT COUNT(*) FROM live_killmail_seen;";
+                    writer.WriteLine($"liveSeenCount={countCommand.ExecuteScalar() ?? 0}");
+                }
+                catch (Exception ex)
+                {
+                    writer.WriteLine($"liveFeedSummaryError={Sanitize(ex.Message)}");
+                }
             });
         }
 
@@ -256,6 +318,11 @@ namespace PitmastersGrill.Persistence
             using var stream = entry.Open();
             using var writer = new StreamWriter(stream, Encoding.UTF8);
             write(writer);
+        }
+
+        private static string SafeValue(Microsoft.Data.Sqlite.SqliteDataReader reader, int ordinal)
+        {
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetValue(ordinal)?.ToString() ?? string.Empty;
         }
 
         private static void AddBundleNotes(ZipArchive archive)
