@@ -14,6 +14,8 @@
         Icon="Assets/PMGIcon.ico"
         Background="{DynamicResource WindowBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
+        LocationChanged="Window_LocationChanged"
+        SizeChanged="Window_SizeChanged"
         StateChanged="Window_StateChanged">
 
     <Window.Resources>
@@ -119,10 +121,14 @@
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="{DynamicResource GridBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
+            <Setter Property="ToolTip" Value="{Binding BoardHoverToolTip}"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
                     <Setter Property="FontWeight" Value="SemiBold"/>
                 </Trigger>
+                <DataTrigger Binding="{Binding BoardHoverToolTip}" Value="">
+                    <Setter Property="ToolTip" Value="{x:Null}"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -135,20 +141,22 @@
 
         <Style x:Key="CompactModeToggleStyle" TargetType="ToggleButton">
             <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
-            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}"/>
+            <Setter Property="Background" Value="#0891B2"/>
+            <Setter Property="BorderBrush" Value="#22D3EE"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="MinWidth" Value="78"/>
+            <Setter Property="MinWidth" Value="112"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="RootBorder"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"
@@ -162,8 +170,8 @@
                                 <Setter TargetName="RootBorder" Property="Background" Value="#2A2A2A"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="RootBorder" Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
-                                <Setter TargetName="RootBorder" Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}"/>
+                                <Setter TargetName="RootBorder" Property="Background" Value="#0F766E"/>
+                                <Setter TargetName="RootBorder" Property="BorderBrush" Value="#5EEAD4"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="RootBorder" Property="Opacity" Value="0.6"/>
@@ -172,10 +180,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-            <Setter Property="Content" Value="Compact"/>
+            <Setter Property="Content" Value="Board Mode"/>
+            <Setter Property="ToolTip" Value="Switch to the dense Board Mode layout."/>
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Content" Value="Normal"/>
+                    <Setter Property="Content" Value="Analysis Mode"/>
+                    <Setter Property="ToolTip" Value="Switch to the expanded Analysis Mode layout."/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -265,6 +275,10 @@
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="#22D3EE"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="CommandStripButtonStyle" TargetType="Button" BasedOn="{StaticResource OpenDetailsActionButtonStyle}">
+            <Setter Property="MinWidth" Value="112"/>
         </Style>
 
 
@@ -520,7 +534,6 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <Border Grid.Column="0"
@@ -532,7 +545,7 @@
                         BorderBrush="{DynamicResource PanelBorderBrush}"
                         BorderThickness="1"
                         Cursor="SizeAll"
-                        ToolTip="Drag to move PMG while Compact Mode is enabled."
+                        ToolTip="Drag to move PMG while Board Mode is enabled."
                         MouseLeftButtonDown="CompactWindowDragHandle_MouseLeftButtonDown">
                     <Border.Style>
                         <Style TargetType="Border">
@@ -554,29 +567,29 @@
 
                 <Button Grid.Column="2"
                         x:Name="ClearBoardButton"
-                        Style="{StaticResource CompactActionButtonStyle}"
+                        Style="{StaticResource CommandStripButtonStyle}"
                         Margin="0,0,8,0"
                         Content="Clear"
                         Click="ClearBoardButton_Click"/>
 
-                <Button Grid.Column="3"
-                        x:Name="OpenDetailsButton"
-                        Style="{StaticResource OpenDetailsActionButtonStyle}"
-                        Margin="0,0,8,0"
-                        Content="Open Details"
-                        IsEnabled="False"
-                        Click="OpenDetailsButton_Click"/>
+                <TextBlock Grid.Column="1"
+                           Margin="0,0,16,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Text="Right-click a row for pilot details."
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"/>
 
-                <ToggleButton Grid.Column="4"
+                <ToggleButton Grid.Column="3"
                               x:Name="CompactModeToggleButton"
                               Style="{StaticResource CompactModeToggleStyle}"
                               Margin="0,0,8,0"
                               Checked="CompactModeToggleButton_Changed"
                               Unchecked="CompactModeToggleButton_Changed"/>
 
-                <Button Grid.Column="5"
+                <Button Grid.Column="4"
                         x:Name="ExitApplicationButton"
-                        Style="{StaticResource CompactActionButtonStyle}"
+                        Style="{StaticResource CommandStripButtonStyle}"
                         Content="Exit"
                         ToolTip="Exit PMG and stop PMG-owned background work."
                         Click="ExitApplicationButton_Click"/>
@@ -586,8 +599,198 @@
                         Grid.Row="1"
                         Background="{DynamicResource WindowBackgroundBrush}"
                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                        SelectionChanged="MainTabControl_SelectionChanged"
                         ItemContainerStyle="{StaticResource CompactAwareTabItemStyle}">
-                <TabItem Header="Board">
+                <TabItem Header="Analysis">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Padding="12"
+                                  Background="{DynamicResource WindowBackgroundBrush}">
+                        <StackPanel>
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="16"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="EVE Session Context"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Current character"/>
+                                        <TextBlock x:Name="AnalysisCurrentCharacterText"
+                                                   Grid.Row="0"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not detected"/>
+
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Current system"/>
+                                        <TextBlock x:Name="AnalysisCurrentSystemText"
+                                                   Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not detected"/>
+
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Evidence source"/>
+                                        <TextBlock x:Name="AnalysisEvidenceSourceText"
+                                                   Grid.Row="2"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not configured"/>
+
+                                        <TextBlock Grid.Row="3"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Last observed"/>
+                                        <TextBlock x:Name="AnalysisObservedAtText"
+                                                   Grid.Row="3"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not detected"/>
+
+                                        <TextBlock Grid.Row="4"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Confidence / status"/>
+                                        <TextBlock x:Name="AnalysisContextStatusText"
+                                                   Grid.Row="4"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Unable to infer EVE context"/>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,8,0,0"
+                                               Text="Right-click a Grill row to open pilot details. Board Mode keeps the Grill dense for live use; Analysis collects the aggregate readout here."/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Visible Board Analysis"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <TextBlock x:Name="AnalysisEmptyStateText"
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               Text="No visible pilots yet. Load or refresh the Grill to see aggregate analysis."/>
+                                    <StackPanel x:Name="AnalysisDetailsPanel"
+                                                Visibility="Collapsed">
+                                        <TextBlock x:Name="AnalysisVisibleCountsText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Text="Visible pilots: 0 | Watched pilots: 0"/>
+                                        <TextBlock x:Name="AnalysisSignalsText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,2,0,0"
+                                                   Text="Confirmed cynos: Hard 0 | Covert 0 | Bait 0"/>
+                                        <TextBlock x:Name="AnalysisUniqueCountsText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,8,0,0"
+                                                   Text="Unique corps: 0 | Unique alliances: 0"/>
+                                        <TextBlock x:Name="AnalysisAllianceTopText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,8,0,0"/>
+                                        <TextBlock x:Name="AnalysisCorpTopText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,2,0,0"/>
+                                        <TextBlock x:Name="AnalysisHighlightsText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,8,0,0"/>
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="All alliances"
+                                                           Foreground="{DynamicResource MutedTextBrush}"
+                                                           Margin="0,0,0,4"/>
+                                                <ListBox x:Name="AnalysisAllianceListBox"
+                                                         Height="192"
+                                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                         Background="{DynamicResource SurfaceBrush}"
+                                                         Foreground="{DynamicResource BodyTextBrush}"
+                                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                         MouseDoubleClick="AnalysisAllianceListBox_MouseDoubleClick">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding DisplayText}"
+                                                                       TextWrapping="NoWrap"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Padding="2"/>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="All corps"
+                                                           Foreground="{DynamicResource MutedTextBrush}"
+                                                           Margin="0,0,0,4"/>
+                                                <ListBox x:Name="AnalysisCorpListBox"
+                                                         Height="192"
+                                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                         Background="{DynamicResource SurfaceBrush}"
+                                                         Foreground="{DynamicResource BodyTextBrush}"
+                                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                         MouseDoubleClick="AnalysisCorpListBox_MouseDoubleClick">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding DisplayText}"
+                                                                       TextWrapping="NoWrap"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Padding="2"/>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="Grill">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
                         <Grid x:Name="BoardOverlayHost">
                             <Grid.ColumnDefinitions>
@@ -609,6 +812,7 @@
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto"
                                       Sorting="PilotBoard_Sorting"
+                                      ColumnReordered="PilotBoard_ColumnReordered"
                                       SelectionChanged="PilotBoard_SelectionChanged"
                                       MouseDoubleClick="PilotBoard_MouseDoubleClick"
                                       PreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
@@ -620,20 +824,20 @@
                                     <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
                                 </DataGrid.Resources>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42">
+                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42" MinWidth="42">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"
                                                            FontWeight="Bold"
                                                            Text="{Binding BoardSignalIcon}"
-                                                           ToolTip="{Binding BoardSignalToolTip}"
+                                                           ToolTip="{Binding BoardHoverToolTip}"
                                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}"/>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
 
-                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="2*">
+                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="2*" MinWidth="120">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <DockPanel LastChildFill="True">
@@ -652,6 +856,7 @@
                                                             Click="PilotNoteButton_Click"/>
                                                     <TextBlock Text="{Binding CharacterName}"
                                                                VerticalAlignment="Center"
+                                                               ToolTip="{Binding BoardHoverToolTip}"
                                                                TextTrimming="CharacterEllipsis"/>
                                                 </DockPanel>
                                                 <DataTemplate.Triggers>
@@ -667,17 +872,17 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="1.8*"/>
-                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="1.8*"/>
-                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="0.9*"/>
-                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="0.9*"/>
+                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="1.8*" MinWidth="120"/>
+                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="1.8*" MinWidth="140"/>
+                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="0.9*" MinWidth="55"/>
+                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="0.9*" MinWidth="55"/>
                                     <DataGridTextColumn x:Name="AvgFleetSizeColumn"
                                                         Header="Avg Fleet Size"
                                                         Binding="{Binding AvgAttackersWhenAttacking, StringFormat={}{0:0}}"
-                                                        Width="1.2*"/>
-                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="1.8*"/>
-                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" Width="1.2*"/>
-                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="1.8*"/>
+                                                        Width="1.2*" MinWidth="70"/>
+                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="1.8*" MinWidth="100"/>
+                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" Width="1.2*" MinWidth="90"/>
+                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="1.8*" MinWidth="110"/>
                                 </DataGrid.Columns>
                             </DataGrid>
 
@@ -881,6 +1086,683 @@
                     </Grid>
                 </TabItem>
 
+                <TabItem Header="Intel">
+                    <TabControl Background="{DynamicResource WindowBackgroundBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}">
+                        <TabItem Header="Status">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          Padding="12"
+                                          Background="{DynamicResource WindowBackgroundBrush}">
+                                <StackPanel>
+                                    <Border x:Name="IntelUpdateBanner"
+                                            Background="#155724"
+                                            Padding="12,8"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Margin="0,0,0,12">
+                                        <StackPanel>
+                                            <TextBlock x:Name="IntelUpdateStatusText"
+                                                       Foreground="White"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="16"
+                                                       Text="Intel current"/>
+                                            <TextBlock x:Name="IntelUpdateDetailText"
+                                                       Foreground="#F3F3F3"
+                                                       FontSize="12"
+                                                       Text="Through latest archive"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16">
+                                        <StackPanel>
+                                            <UniformGrid Columns="2"
+                                                         Margin="0,0,0,14">
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Last Updated"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLastUpdatedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No successful local intel update recorded yet."/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Current Update Status"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelCurrentUpdateStatusText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No update currently running."/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Oldest Killmail Day"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelOldestKillmailDayText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No local killmail days recorded yet."/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Newest Killmail Day"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelNewestKillmailDayText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No local killmail days recorded yet."/>
+                                                </StackPanel>
+                                            </UniformGrid>
+
+                                            <TextBlock Text="Total Update Progress"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"/>
+                                            <ProgressBar x:Name="IntelTotalProgressBar"
+                                                         Height="16"
+                                                         Margin="0,6,0,4"
+                                                         Minimum="0"
+                                                         Maximum="100"
+                                                         Value="0"/>
+                                            <TextBlock x:Name="IntelTotalProgressText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,12"
+                                                       Text="No catch-up update is currently required."/>
+
+                                            <TextBlock Text="Current-Day Progress"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"/>
+                                            <ProgressBar x:Name="IntelCurrentDayProgressBar"
+                                                         Height="16"
+                                                         Margin="0,6,0,4"
+                                                         Minimum="0"
+                                                         Maximum="100"
+                                                         Value="0"/>
+                                            <TextBlock x:Name="IntelCurrentDayProgressText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,0"
+                                                       Text="No update currently running."/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16"
+                                            Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Live zKill Feed"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
+
+                                            <UniformGrid Columns="2"
+                                                         Margin="0,0,0,0">
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Source"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedSourceText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="R2Z2"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Status"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedStatusText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Disabled"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Enabled"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedEnabledText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Recent Live Imports"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedRecentImportsText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Next Sequence"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedNextSequenceText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Not initialized"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Last Processed Sequence"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedLastProcessedSequenceText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="None"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Last Successful Live Import"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedLastSuccessText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No live imports recorded yet."/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Last Caught Up / Waiting"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="IntelLiveFeedLastCaughtUpText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No caught-up wait recorded yet."/>
+                                                </StackPanel>
+                                            </UniformGrid>
+
+                                            <TextBlock Text="Last Error"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="IntelLiveFeedLastErrorText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="No live-feed errors recorded."/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16"
+                                            Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <TextBlock Text="Today's Freshness"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource HeaderTextBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button x:Name="RunTodaysFreshnessButton"
+                                                        DockPanel.Dock="Right"
+                                                        Width="200"
+                                                        Padding="14,6"
+                                                        Content="Refresh Today's zKill Intel"
+                                                        Click="RunTodaysFreshnessButton_Click"/>
+                                            </DockPanel>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,12"
+                                                       TextWrapping="Wrap"
+                                                       Text="Checks recent zKill activity for currently visible Grill pilots and imports any missing same-day local intel without touching archive completeness."/>
+
+                                            <UniformGrid Columns="2"
+                                                         Margin="0,0,0,0">
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Status"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessStatusText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Idle"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Visible Pilots Targeted"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessVisiblePilotsText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Entities Queried"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessEntitiesQueriedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="zKill Results Found"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessResultsFoundText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Already Known / Skipped"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessKnownSkippedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="New Killmails Imported"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessImportedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Failed"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessFailedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Last Run"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="TodaysFreshnessLastRunText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No Today's Freshness run recorded yet."/>
+                                                </StackPanel>
+                                            </UniformGrid>
+
+                                            <TextBlock Text="Details"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="TodaysFreshnessDetailText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="Today's Freshness is idle."/>
+
+                                            <TextBlock Text="Last Error"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,10,0,0"/>
+                                            <TextBlock x:Name="TodaysFreshnessLastErrorText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="No Today's Freshness errors recorded."/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="16"
+                                            Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,12">
+                                                <TextBlock Text="Historical Freshness"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource HeaderTextBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button x:Name="RunHistoricalFreshnessButton"
+                                                        DockPanel.Dock="Right"
+                                                        Width="210"
+                                                        Padding="14,6"
+                                                        Content="Repair Recent Historical Intel"
+                                                        Click="RunHistoricalFreshnessButton_Click"/>
+                                            </DockPanel>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,12"
+                                                       TextWrapping="Wrap"
+                                                       Text="Manual Historical Freshness checks the last 3 completed UTC days for currently visible Grill pilots. Background startup repair uses a bounded local candidate pool, compares zKill-known killmail IDs against PMG's freshness-seen IDs, and imports missing historical deltas without changing archive completeness."/>
+
+                                            <UniformGrid Columns="2"
+                                                         Margin="0,0,0,0">
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Status"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessStatusText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Idle"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Mode"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessModeText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="Not run yet"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Visible Pilots Targeted"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessVisiblePilotsText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Candidate Pilots Considered"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessCandidatesConsideredText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Skipped By Cooldown"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessCandidatesSkippedCooldownText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Pilots Checked"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessPilotsCheckedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Historical Days Checked"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessDaysCheckedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Entities Queried"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessEntitiesQueriedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="zKill Results Found"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessResultsFoundText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Already Known / Skipped"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessKnownSkippedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Missing Imported"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessImportedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <TextBlock Text="Failed"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessFailedText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="0,0,12,8">
+                                                    <TextBlock Text="Last Run"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource HeaderTextBrush}"/>
+                                                    <TextBlock x:Name="HistoricalFreshnessLastRunText"
+                                                               Style="{StaticResource SettingsLabelStyle}"
+                                                               Margin="0,4,0,0"
+                                                               Text="No Historical Freshness run recorded yet."/>
+                                                </StackPanel>
+                                            </UniformGrid>
+
+                                            <TextBlock Text="Details"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="HistoricalFreshnessDetailText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="Historical Freshness is idle."/>
+
+                                            <TextBlock Text="Last Error"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,10,0,0"/>
+                                            <TextBlock x:Name="HistoricalFreshnessLastErrorText"
+                                                       Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,4,0,0"
+                                                       TextWrapping="Wrap"
+                                                       Text="No Historical Freshness errors recorded."/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="Config">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          Padding="12">
+                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="Killmail Intel Configuration"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,0,0,12"/>
+
+                                        <TextBlock Text="Max Killmail Age (days)"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <TextBlock x:Name="EffectiveMaxKillmailAgeText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Text="Effective max killmail age: 30 days"/>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,6,0,4"
+                                                   Text="Controls the seed window used when you run Enable KillMail DB Pull. Changes apply the next time you trigger a fresh bootstrap."/>
+
+                                        <TextBox x:Name="MaxKillmailAgeDaysTextBox"
+                                                 Margin="0,0,0,10"
+                                                 Width="140"
+                                                 HorizontalAlignment="Left"/>
+
+                                        <WrapPanel Margin="0,0,0,12">
+                                            <Button x:Name="SaveMaxKillmailAgeButton"
+                                                    Width="120"
+                                                    Padding="14,6"
+                                                    Margin="0,0,10,0"
+                                                    Content="Save Age"
+                                                    Click="SaveMaxKillmailAgeButton_Click"/>
+
+                                            <Button x:Name="UseDefaultMaxKillmailAgeButton"
+                                                    Width="120"
+                                                    Padding="14,6"
+                                                    Margin="0,0,10,0"
+                                                    Content="Use Default"
+                                                    Click="UseDefaultMaxKillmailAgeButton_Click"/>
+                                        </WrapPanel>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Text="Enable local killmail DB pull from the configured max-age seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
+
+                                        <WrapPanel Margin="0,4,0,14">
+                                            <Button x:Name="EnableKillmailDbPullButton"
+                                                    Width="180"
+                                                    Padding="14,6"
+                                                    Margin="0,0,10,0"
+                                                    HorizontalAlignment="Left"
+                                                    Content="Enable KillMail DB Pull"
+                                                    Click="EnableKillmailDbPullButton_Click"/>
+                                        </WrapPanel>
+
+                                        <TextBlock Text="Live zKill Feed"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <CheckBox x:Name="EnableLiveZkillFeedCheckBox"
+                                                  Content="Enable R2Z2 live zKill feed"
+                                                  Margin="0,0,0,8"
+                                                  Checked="EnableLiveZkillFeedCheckBox_Checked"
+                                                  Unchecked="EnableLiveZkillFeedCheckBox_Checked"/>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,12"
+                                                   TextWrapping="Wrap"
+                                                   Text="Optional live delta feed for recent zKill-known killmails after the latest completed daily archive. Disabling stops live polling but keeps any already imported live records."/>
+
+                                        <TextBlock Text="Pilot Detail Placement"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,8,0,8"/>
+
+                                        <ComboBox x:Name="PilotDetailPlacementComboBox"
+                                                  Width="220"
+                                                  HorizontalAlignment="Left"
+                                                  Margin="0,0,0,8"
+                                                  SelectionChanged="PilotDetailPlacementComboBox_SelectionChanged">
+                                            <ComboBoxItem Content="Auto, prefer right"/>
+                                            <ComboBoxItem Content="Auto, prefer left"/>
+                                        </ComboBox>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Text="Board Mode details open beside the board. PMG uses this preferred side when there is room and flips sides near screen edges."/>
+
+                                        <TextBlock Text="Killmail Data Location"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <TextBlock x:Name="KillmailDataPathModeText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Text="Using default LocalAppData path."/>
+
+                                        <TextBlock x:Name="EffectiveKillmailDataPathText"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   TextWrapping="Wrap"
+                                                   Text="Effective path: --"/>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,6,0,4"
+                                                   Text="Set a custom killmail data root for Proton or non-standard storage layouts. Leave blank or click Use Default to return to PMG's default LocalAppData location."/>
+
+                                        <TextBox x:Name="KillmailDataRootPathTextBox"
+                                                 Margin="0,0,0,10"
+                                                 Width="420"
+                                                 MaxWidth="620"
+                                                 HorizontalAlignment="Left"/>
+
+                                        <WrapPanel>
+                                            <Button x:Name="SaveKillmailPathButton"
+                                                    Width="120"
+                                                    Padding="14,6"
+                                                    Margin="0,0,10,0"
+                                                    Content="Save Path"
+                                                    Click="SaveKillmailPathButton_Click"/>
+
+                                            <Button x:Name="UseDefaultKillmailPathButton"
+                                                    Width="120"
+                                                    Padding="14,6"
+                                                    Margin="0,0,10,0"
+                                                    Content="Use Default"
+                                                    Click="UseDefaultKillmailPathButton_Click"/>
+                                        </WrapPanel>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,10,0,0"
+                                                   Text="Restart PMG after changing the killmail data path. Path changes do not migrate existing killmail data automatically."/>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+                </TabItem>
+
+                <TabItem Header="Ignore List">
+                    <views:IgnoreAllianceListView x:Name="IgnoreAllianceListViewControl"/>
+                </TabItem>
+
                 <TabItem Header="Settings">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
                         <TabControl Margin="0,0,0,0"
@@ -971,6 +1853,19 @@
                                                            Foreground="{DynamicResource BodyTextBrush}"
                                                            Text="100%"/>
                                             </Grid>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,12,0,6"
+                                                       Text="Reset saved window position and size if PMG ever comes back off-screen or with a bad layout."/>
+
+                                            <WrapPanel>
+                                                <Button x:Name="ResetWindowLayoutButton"
+                                                        Width="170"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Reset Window Layout"
+                                                        Click="ResetWindowLayoutButton_Click"/>
+                                            </WrapPanel>
                                         </StackPanel>
                                     </Border>
                                 </ScrollViewer>
@@ -1118,13 +2013,20 @@
                                                         Width="140"
                                                         Padding="14,6"
                                                         Margin="0,0,10,0"
-                                                        Content="Reset Defaults"
+                                                        Content="Reset Visibility Defaults"
                                                         Click="ResetBoardColumnsButton_Click"/>
+
+                                                <Button x:Name="ResetBoardLayoutButton"
+                                                        Width="140"
+                                                        Padding="14,6"
+                                                        Margin="0,0,10,0"
+                                                        Content="Reset Layout"
+                                                        Click="ResetBoardLayoutButton_Click"/>
                                             </WrapPanel>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,10,0,0"
-                                                       Text="Column choices are saved immediately and reused on the next PMG launch."/>
+                                                       Text="Column visibility saves immediately. Column order and width are saved separately and reused on the next PMG launch."/>
                                         </StackPanel>
                                     </Border>
                                 </ScrollViewer>
@@ -1145,7 +2047,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="Technical Preview-v0.9.5.1"/>
+                                                       Text="Technical Preview-v0.9.6"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"
@@ -1319,168 +2221,6 @@
                         </TabControl>
                     </Grid>
                 </TabItem>
-                <TabItem Header="Ignore List">
-                    <views:IgnoreAllianceListView x:Name="IgnoreAllianceListViewControl"/>
-                </TabItem>
-                <TabItem Header="Intel">
-                    <TabControl Background="{DynamicResource WindowBackgroundBrush}"
-                                BorderBrush="{DynamicResource PanelBorderBrush}">
-                        <TabItem Header="Status">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          Padding="12"
-                                          Background="{DynamicResource WindowBackgroundBrush}">
-                                <Border x:Name="IntelUpdateBanner"
-                                        Background="#155724"
-                                        Padding="12,8"
-                                        BorderBrush="{DynamicResource PanelBorderBrush}"
-                                        BorderThickness="1"
-                                        Margin="0,0,0,12">
-                                    <StackPanel>
-                                        <TextBlock x:Name="IntelUpdateStatusText"
-                                                   Foreground="White"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="16"
-                                                   Text="Intel current"/>
-                                        <TextBlock x:Name="IntelUpdateDetailText"
-                                                   Foreground="#F3F3F3"
-                                                   FontSize="12"
-                                                   Text="Through latest archive"/>
-                                    </StackPanel>
-                                </Border>
-                            </ScrollViewer>
-                        </TabItem>
-
-                        <TabItem Header="Config">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          Padding="12">
-                                <Border Background="{DynamicResource SurfaceAltBrush}"
-                                        BorderBrush="{DynamicResource PanelBorderBrush}"
-                                        BorderThickness="1"
-                                        Padding="16">
-                                    <StackPanel>
-                                        <TextBlock Text="Killmail Intel Configuration"
-                                                   FontSize="18"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource HeaderTextBrush}"
-                                                   Margin="0,0,0,12"/>
-
-                                        <TextBlock Text="Max Killmail Age (days)"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource HeaderTextBrush}"
-                                                   Margin="0,0,0,8"/>
-
-                                        <TextBlock x:Name="EffectiveMaxKillmailAgeText"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Text="Effective max killmail age: 30 days"/>
-
-                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,6,0,4"
-                                                   Text="Controls the seed window used when you run Enable KillMail DB Pull. Changes apply the next time you trigger a fresh bootstrap."/>
-
-                                        <TextBox x:Name="MaxKillmailAgeDaysTextBox"
-                                                 Margin="0,0,0,10"
-                                                 Width="140"
-                                                 HorizontalAlignment="Left"/>
-
-                                        <WrapPanel Margin="0,0,0,12">
-                                            <Button x:Name="SaveMaxKillmailAgeButton"
-                                                    Width="120"
-                                                    Padding="14,6"
-                                                    Margin="0,0,10,0"
-                                                    Content="Save Age"
-                                                    Click="SaveMaxKillmailAgeButton_Click"/>
-
-                                            <Button x:Name="UseDefaultMaxKillmailAgeButton"
-                                                    Width="120"
-                                                    Padding="14,6"
-                                                    Margin="0,0,10,0"
-                                                    Content="Use Default"
-                                                    Click="UseDefaultMaxKillmailAgeButton_Click"/>
-                                        </WrapPanel>
-
-                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                   Text="Enable local killmail DB pull from the configured max-age seed window. The background updater will continue forward and keep the DB current while PMG remains usable."/>
-
-                                        <WrapPanel Margin="0,4,0,14">
-                                            <Button x:Name="EnableKillmailDbPullButton"
-                                                    Width="180"
-                                                    Padding="14,6"
-                                                    Margin="0,0,10,0"
-                                                    HorizontalAlignment="Left"
-                                                    Content="Enable KillMail DB Pull"
-                                                    Click="EnableKillmailDbPullButton_Click"/>
-                                        </WrapPanel>
-
-                                        <TextBlock Text="Pilot Detail Placement"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource HeaderTextBrush}"
-                                                   Margin="0,8,0,8"/>
-
-                                        <ComboBox x:Name="PilotDetailPlacementComboBox"
-                                                  Width="220"
-                                                  HorizontalAlignment="Left"
-                                                  Margin="0,0,0,8"
-                                                  SelectionChanged="PilotDetailPlacementComboBox_SelectionChanged">
-                                            <ComboBoxItem Content="Auto, prefer right"/>
-                                            <ComboBoxItem Content="Auto, prefer left"/>
-                                        </ComboBox>
-
-                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                   Text="Compact details open beside the board. PMG uses this preferred side when there is room and flips sides near screen edges."/>
-
-                                        <TextBlock Text="Killmail Data Location"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource HeaderTextBrush}"
-                                                   Margin="0,0,0,8"/>
-
-                                        <TextBlock x:Name="KillmailDataPathModeText"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Text="Using default LocalAppData path."/>
-
-                                        <TextBlock x:Name="EffectiveKillmailDataPathText"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   TextWrapping="Wrap"
-                                                   Text="Effective path: --"/>
-
-                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,6,0,4"
-                                                   Text="Set a custom killmail data root for Proton or non-standard storage layouts. Leave blank or click Use Default to return to PMG's default LocalAppData location."/>
-
-                                        <TextBox x:Name="KillmailDataRootPathTextBox"
-                                                 Margin="0,0,0,10"
-                                                 MinWidth="220"
-                                                 HorizontalAlignment="Stretch"
-                                                 TextWrapping="Wrap"
-                                                 VerticalScrollBarVisibility="Auto"/>
-
-                                        <WrapPanel>
-                                            <Button x:Name="SaveKillmailPathButton"
-                                                    Width="120"
-                                                    Padding="14,6"
-                                                    Margin="0,0,10,0"
-                                                    Content="Save Path"
-                                                    Click="SaveKillmailPathButton_Click"/>
-
-                                            <Button x:Name="UseDefaultKillmailPathButton"
-                                                    Width="120"
-                                                    Padding="14,6"
-                                                    Margin="0,0,10,0"
-                                                    Content="Use Default"
-                                                    Click="UseDefaultKillmailPathButton_Click"/>
-                                        </WrapPanel>
-
-                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,10,0,0"
-                                                   Text="Restart PMG after changing the killmail data path. Path changes do not migrate existing killmail data automatically."/>
-                                    </StackPanel>
-                                </Border>
-                            </ScrollViewer>
-                        </TabItem>
-                    </TabControl>
-                </TabItem>
             </TabControl>
 
             <Border x:Name="BoardStatusFooter"
@@ -1491,12 +2231,17 @@
                     BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="1">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="BoardPopulationStatusText"
+                               Grid.Row="0"
                                Grid.Column="0"
                                Foreground="{DynamicResource MutedTextBrush}"
                                Text="Board population idle"
@@ -1506,10 +2251,22 @@
                                Margin="0,0,12,0"/>
 
                     <TextBlock x:Name="LastRefreshedText"
+                               Grid.Row="0"
                                Grid.Column="1"
                                Foreground="{DynamicResource MutedTextBrush}"
                                Text="Last Refreshed: --"
                                TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+
+                    <TextBlock x:Name="BoardSummaryText"
+                               Grid.Row="1"
+                               Grid.Column="0"
+                               Grid.ColumnSpan="2"
+                               Foreground="{DynamicResource BodyTextBrush}"
+                               Text="Visible 0 | Watched 0"
+                               Margin="0,5,0,0"
+                               TextWrapping="Wrap"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"/>
                 </Grid>

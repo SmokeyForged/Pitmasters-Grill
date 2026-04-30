@@ -27,7 +27,7 @@ namespace PitmastersGrill.Persistence
 
             CreateIndexes(connection);
 
-            SetMetadataValue(connection, "schema_version", "8");
+            SetMetadataValue(connection, "schema_version", "10");
             SetMetadataValueIfMissing(connection, "seed_version", "");
             SetMetadataValueIfMissing(connection, "seed_built_at_utc", "");
             SetMetadataValueIfMissing(connection, "last_startup_check_at_utc", "");
@@ -141,6 +141,46 @@ namespace PitmastersGrill.Persistence
                 updated_at_utc TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (day_utc, character_id, killmail_id, tackle_module_type_id)
             );
+
+            CREATE TABLE IF NOT EXISTS live_killmail_feed_state (
+                feed_name TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                next_sequence_id INTEGER NULL,
+                last_processed_sequence_id INTEGER NULL,
+                last_success_at_utc TEXT NOT NULL DEFAULT '',
+                last_404_at_utc TEXT NOT NULL DEFAULT '',
+                last_error_at_utc TEXT NOT NULL DEFAULT '',
+                last_error TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'disabled',
+                updated_at_utc TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS live_killmail_seen (
+                killmail_id INTEGER PRIMARY KEY,
+                killmail_hash TEXT NOT NULL DEFAULT '',
+                first_sequence_id INTEGER NOT NULL,
+                last_sequence_id INTEGER NOT NULL,
+                killmail_time_utc TEXT NOT NULL DEFAULT '',
+                day_utc TEXT NOT NULL DEFAULT '',
+                uploaded_at_utc TEXT NOT NULL DEFAULT '',
+                processed_at_utc TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'r2z2',
+                processing_status TEXT NOT NULL DEFAULT 'processed',
+                last_error TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS historical_freshness_checkpoint (
+                character_id INTEGER NOT NULL,
+                window_start_day_utc TEXT NOT NULL,
+                window_end_day_utc TEXT NOT NULL,
+                last_checked_at_utc TEXT NOT NULL DEFAULT '',
+                last_status TEXT NOT NULL DEFAULT '',
+                last_imported_count INTEGER NOT NULL DEFAULT 0,
+                last_known_count INTEGER NOT NULL DEFAULT 0,
+                last_failed_count INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (character_id, window_start_day_utc, window_end_day_utc)
+            );
             ";
             command.ExecuteNonQuery();
         }
@@ -197,6 +237,15 @@ namespace PitmastersGrill.Persistence
 
             CREATE INDEX IF NOT EXISTS idx_pilot_cyno_tackle_observations_killmail
                 ON pilot_cyno_tackle_observations_day(killmail_id);
+
+            CREATE INDEX IF NOT EXISTS idx_live_killmail_seen_sequence
+                ON live_killmail_seen(last_sequence_id);
+
+            CREATE INDEX IF NOT EXISTS idx_live_killmail_seen_day
+                ON live_killmail_seen(day_utc);
+
+            CREATE INDEX IF NOT EXISTS idx_historical_freshness_checkpoint_checked
+                ON historical_freshness_checkpoint(last_checked_at_utc);
             ";
             command.ExecuteNonQuery();
         }

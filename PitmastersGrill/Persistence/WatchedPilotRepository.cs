@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 
 namespace PitmastersGrill.Persistence
@@ -71,6 +72,42 @@ namespace PitmastersGrill.Persistence
             command.Parameters.AddWithValue("$characterId", normalizedCharacterId);
             command.ExecuteNonQuery();
             return true;
+        }
+
+        public List<long> GetWatchedCharacterIds(int maxCount)
+        {
+            var results = new List<long>();
+            var limit = maxCount <= 0 ? 50 : maxCount;
+
+            using var connection = OpenConnection();
+            EnsureTableExists(connection);
+
+            using var command = connection.CreateCommand();
+            command.CommandText =
+            @"
+            SELECT character_id
+            FROM watched_pilots
+            ORDER BY watched_at_utc DESC
+            LIMIT $limit;
+            ";
+            command.Parameters.AddWithValue("$limit", limit);
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0))
+                {
+                    continue;
+                }
+
+                var text = reader.GetString(0);
+                if (long.TryParse(text, out var parsed) && parsed > 0)
+                {
+                    results.Add(parsed);
+                }
+            }
+
+            return results;
         }
 
         private SqliteConnection OpenConnection()

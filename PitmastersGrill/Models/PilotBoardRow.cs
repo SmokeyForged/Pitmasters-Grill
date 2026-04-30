@@ -35,6 +35,7 @@ namespace PitmastersGrill.Models
         private string _boardSignalKind = "None";
         private string _boardSignalIcon = "";
         private string _boardSignalToolTip = "No cyno signal";
+        private string _boardHoverToolTip = "No board signal.";
         private bool _isResolved;
         private string _resolverConfidence = "";
         private string _resolvedAtUtc = "";
@@ -258,6 +259,12 @@ namespace PitmastersGrill.Models
         {
             get => _boardSignalToolTip;
             set => SetField(ref _boardSignalToolTip, value);
+        }
+
+        public string BoardHoverToolTip
+        {
+            get => _boardHoverToolTip;
+            set => SetField(ref _boardHoverToolTip, value);
         }
 
         public bool IsResolved

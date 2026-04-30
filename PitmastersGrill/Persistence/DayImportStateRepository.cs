@@ -2,6 +2,7 @@
 using PitmastersGrill.Models;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace PitmastersGrill.Persistence
 {
@@ -208,6 +209,47 @@ namespace PitmastersGrill.Persistence
             return results;
         }
 
+        public List<string> GetCompleteDaysInRange(string startDayUtc, string endDayUtc)
+        {
+            var results = new List<string>();
+
+            if (!TryParseDay(startDayUtc, out _) || !TryParseDay(endDayUtc, out _))
+            {
+                return results;
+            }
+
+            var connectionString = $"Data Source={_databasePath}";
+
+            using var connection = new SqliteConnection(connectionString);
+            connection.Open();
+
+            using var command = connection.CreateCommand();
+            command.CommandText =
+            @"
+            SELECT day_utc
+            FROM day_import_state
+            WHERE state = 'complete'
+              AND day_utc >= $startDayUtc
+              AND day_utc <= $endDayUtc
+            ORDER BY day_utc ASC;
+            ";
+            command.Parameters.AddWithValue("$startDayUtc", startDayUtc);
+            command.Parameters.AddWithValue("$endDayUtc", endDayUtc);
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var day = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                if (!string.IsNullOrWhiteSpace(day))
+                {
+                    results.Add(day);
+                }
+            }
+
+            return results;
+        }
+
         public List<DayImportState> GetIncompleteDays()
         {
             var results = new List<DayImportState>();
@@ -264,6 +306,16 @@ namespace PitmastersGrill.Persistence
                 CompletedAtUtc = reader.GetString(10),
                 LastError = reader.GetString(11)
             };
+        }
+
+        private static bool TryParseDay(string dayUtc, out DateTime parsedDay)
+        {
+            return DateTime.TryParseExact(
+                dayUtc,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out parsedDay);
         }
     }
 }

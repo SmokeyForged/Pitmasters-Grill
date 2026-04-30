@@ -18,7 +18,7 @@ namespace PitmastersGrill
             base.OnStartup(e);
 
             RegisterGlobalExceptionLogging();
-            AppLogger.Initialize("Technical Preview-v0.9.5.1", e.Args);
+            AppLogger.Initialize("Technical Preview-v0.9.6", e.Args);
             AppLogger.AppInfo("Application startup invoked.");
 
             try
@@ -247,6 +247,7 @@ namespace PitmastersGrill
 
         private async Task RunNormalStartupAsync()
         {
+            AppLogger.AppInfo("Normal startup sequence begin.");
             var splash = new Views.StartupSplashWindow();
             splash.ApplyState(new StartupUpdateState
             {
@@ -262,33 +263,65 @@ namespace PitmastersGrill
             {
                 var killmailDbPath = KillmailPaths.GetKillmailDatabasePath();
 
+                AppLogger.AppInfo("Killmail DB bootstrap begin.");
                 var killmailBootstrap = new KillmailDatabaseBootstrap(killmailDbPath);
                 killmailBootstrap.Initialize();
+                AppLogger.AppInfo("Killmail DB bootstrap end.");
 
                 var metadataRepository = new KillmailDatasetMetadataRepository(killmailDbPath);
                 var dayImportStateRepository = new DayImportStateRepository(killmailDbPath);
                 var archiveProvider = new KillmailDayArchiveProvider();
                 var freshnessService = new KillmailDatasetFreshnessService(metadataRepository);
+                var appSettingsService = new AppSettingsService();
+                var incrementalImportService = new KillmailIncrementalImportService(killmailDbPath);
                 var dayImportService = new KillmailDayImportService(
                     dayImportStateRepository,
                     metadataRepository,
                     archiveProvider);
+                var r2z2LiveKillmailService = new R2Z2LiveKillmailService(appSettingsService, incrementalImportService);
+                var todaysFreshnessService = new TodaysFreshnessService(incrementalImportService);
+                var historicalFreshnessService = new HistoricalFreshnessService(incrementalImportService, appSettingsService);
 
                 var backgroundIntelUpdateService = new BackgroundIntelUpdateService(
                     freshnessService,
-                    dayImportService);
+                    dayImportService,
+                    r2z2LiveKillmailService,
+                    todaysFreshnessService,
+                    historicalFreshnessService);
 
                 metadataRepository.SetUtcNow("last_startup_check_at_utc");
 
+                AppLogger.AppInfo("MainWindow constructor begin.");
                 var mainWindow = new MainWindow(backgroundIntelUpdateService);
+                AppLogger.AppInfo("MainWindow constructor end.");
                 MainWindow = mainWindow;
 
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
-                mainWindow.Show();
-                splash.Close();
+                mainWindow.ContentRendered += (_, __) =>
+                {
+                    AppLogger.AppInfo("Main window first render complete.");
 
-                AppLogger.AppInfo("Main window shown. Starting background intel update service if needed.");
-                backgroundIntelUpdateService.StartIfNeeded();
+                    try
+                    {
+                        splash.Close();
+                    }
+                    catch
+                    {
+                    }
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        AppLogger.AppInfo("Starting background services after UI shown.");
+                        backgroundIntelUpdateService.StartIfNeeded();
+                        backgroundIntelUpdateService.StartLiveFeedIfConfiguredAfterUiShown();
+                        backgroundIntelUpdateService.ScheduleBackgroundHistoricalRepairAfterUiShown(
+                            () => mainWindow.GetVisibleCharacterIdsForBackgroundHistoricalRepair());
+                        AppLogger.AppInfo("Background services started after UI shown.");
+                    }), DispatcherPriority.Background);
+                };
+
+                mainWindow.Show();
+                AppLogger.AppInfo("Main window show invoked.");
 
                 await Task.CompletedTask;
             }

@@ -5,9 +5,11 @@ using PitmastersGrill.Providers;
 using PitmastersGrill.Services;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -17,6 +19,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -30,12 +33,47 @@ namespace PitmastersGrill
     public partial class MainWindow : Window
     {
         private const int WmClipboardUpdate = 0x031D;
+        private const int WmHotKey = 0x0312;
+        private const uint ModControl = 0x0002;
         private const int ClipboardDebounceMilliseconds = 250;
         private const int DefaultBoardPopulationRetryDelaySeconds = 12;
         private const int MaxBoardPopulationRetryAttempts = 5;
         private const int CompactDragHoldMilliseconds = 300;
         private const int TripleEscapeWindowMilliseconds = 1500;
+        private const int GlobalResetWindowHotKeyId = 0x504D47;
         private const double DetailWindowGap = 8;
+        private const double DefaultWindowWidth = 760;
+        private const double DefaultWindowHeight = 571;
+        private const double MinimumSavedWindowWidth = 420;
+        private const double MinimumSavedWindowHeight = 300;
+        private const double MinimumVisibleWindowEdge = 80;
+        private const double MinimumBoardLayoutHostWidth = 400;
+        private static readonly string[] CanonicalBoardColumnOrder =
+        {
+            "SigColumn",
+            "CharacterColumn",
+            "AllianceColumn",
+            "CorpColumn",
+            "KillsColumn",
+            "LossesColumn",
+            "AvgFleetSizeColumn",
+            "LastShipSeenColumn",
+            "LastSeenColumn",
+            "CynoHullSeenColumn"
+        };
+        private static readonly Dictionary<string, double> CanonicalBoardColumnMinimumWidths = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["SigColumn"] = 42,
+            ["CharacterColumn"] = 120,
+            ["AllianceColumn"] = 120,
+            ["CorpColumn"] = 140,
+            ["KillsColumn"] = 55,
+            ["LossesColumn"] = 55,
+            ["AvgFleetSizeColumn"] = 70,
+            ["LastShipSeenColumn"] = 100,
+            ["LastSeenColumn"] = 90,
+            ["CynoHullSeenColumn"] = 110
+        };
 
         private readonly BackgroundIntelUpdateService _backgroundIntelUpdateService;
         private AppSettings _appSettings = new();
@@ -53,6 +91,7 @@ namespace PitmastersGrill
         private readonly WatchedPilotRepository _watchedPilotRepository;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
+        private readonly EveSessionContextService _eveSessionContextService;
         private readonly MainWindowDiagnostics _diagnostics;
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
@@ -60,6 +99,7 @@ namespace PitmastersGrill
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
         private readonly DispatcherTimer _clipboardDebounceTimer;
         private readonly DispatcherTimer _compactDragHoldTimer;
+        private readonly DispatcherTimer _boardColumnLayoutSaveTimer;
         private readonly CancellationTokenSource _windowShutdownCts = new();
         private readonly SystemTrayIconService _systemTrayIconService;
         private IgnoreAllianceListView? _ignoreAllianceListView;
@@ -67,6 +107,8 @@ namespace PitmastersGrill
 
         private readonly ObservableCollection<PilotBoardRow> _currentRows = new();
         private readonly ObservableCollection<ProviderHealthSnapshot> _providerHealthRows = new();
+        private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisAllianceItems = new();
+        private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisCorpItems = new();
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
         private PilotDetailWindow? _activePilotDetailWindow;
@@ -77,11 +119,25 @@ namespace PitmastersGrill
         private DateTime _lastEscapeTapUtc = DateTime.MinValue;
         private int _escapeTapCount;
         private int _processingGeneration;
+        private WindowState _lastNonMinimizedWindowState = WindowState.Normal;
+        private Rect _lastKnownNormalBounds = Rect.Empty;
         private string? _activeBoardSortMemberPath;
         private ListSortDirection? _activeBoardSortDirection;
+        private string _pendingBoardColumnLayoutSaveReason = string.Empty;
+        private readonly Dictionary<string, DataGridColumn> _boardColumnsByKey = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, BoardColumnLayoutSetting> _defaultBoardColumnLayout = new(StringComparer.OrdinalIgnoreCase);
+        private DependencyPropertyDescriptor? _boardColumnWidthDescriptor;
+        private bool? _lastAppliedCompactMode;
+        private bool _isApplyingBoardColumnLayout;
+        private bool _isBoardColumnLayoutReadyForPersistence;
+        private bool _globalResetWindowHotKeyRegistered;
+        private EveSessionContext? _currentEveSessionContext;
+        private DateTime _lastSessionContextRefreshUtc = DateTime.MinValue;
+        private bool _isSessionContextRefreshInFlight;
 
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
+            AppLogger.UiInfo("MainWindow constructor begin.");
             _backgroundIntelUpdateService = backgroundIntelUpdateService;
             _backgroundIntelUpdateService.StatusChanged += OnIntelUpdateStatusChanged;
 
@@ -90,8 +146,11 @@ namespace PitmastersGrill
             _boardPopulationStatusController = new BoardPopulationStatusController();
 
             _isApplyingSettings = true;
+            AppLogger.UiInfo("MainWindow InitializeComponent begin.");
             InitializeComponent();
+            AppLogger.UiInfo("MainWindow InitializeComponent end.");
             RegisterCompactBoardDragHandlers();
+            Loaded += MainWindow_Loaded;
 
             _diagnostics = new MainWindowDiagnostics(Dispatcher);
             _systemTrayIconService = new SystemTrayIconService(
@@ -107,6 +166,11 @@ namespace PitmastersGrill
                 Interval = TimeSpan.FromMilliseconds(CompactDragHoldMilliseconds)
             };
             _compactDragHoldTimer.Tick += CompactDragHoldTimer_Tick;
+            _boardColumnLayoutSaveTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(500)
+            };
+            _boardColumnLayoutSaveTimer.Tick += BoardColumnLayoutSaveTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
@@ -132,6 +196,7 @@ namespace PitmastersGrill
             _ignoreAllianceBoardController = composed.IgnoreAllianceBoardController;
             _zkillUrlBuilder = composed.ZkillUrlBuilder;
             _browserLauncher = composed.BrowserLauncher;
+            _eveSessionContextService = new EveSessionContextService();
 
             _ignoreAllianceListView = IgnoreAllianceListViewControl;
             _ignoreAllianceListView.Initialize(_ignoreAllianceCoordinator);
@@ -157,8 +222,11 @@ namespace PitmastersGrill
                 return;
             }
 
+            _isApplyingSettings = true;
+
             _appSettings = appSettingsService.Load();
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
+            CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
             _mainWindowAppearanceController.InitializeSettingsUi(
                 _appSettings,
@@ -176,8 +244,10 @@ namespace PitmastersGrill
                 VisualThemeComboBox,
                 ColorBlindModeComboBox,
                 LogLevelComboBox);
+            EnableLiveZkillFeedCheckBox.IsChecked = _appSettings.LiveZkillFeedEnabled;
 
             InitializeBoardColumnVisibilityUi();
+            InitializeBoardColumnLayoutUi();
             InitializePilotDetailPlacementUi();
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
@@ -188,6 +258,9 @@ namespace PitmastersGrill
             _mainWindowAppearanceController.ApplyWindowSettings(this, _appSettings, WindowOpacityValueText, Resources);
 
             PilotBoard.ItemsSource = _currentRows;
+            _currentRows.CollectionChanged += CurrentRows_CollectionChanged;
+            AnalysisAllianceListBox.ItemsSource = _analysisAllianceItems;
+            AnalysisCorpListBox.ItemsSource = _analysisCorpItems;
             ProviderHealthGrid.ItemsSource = _providerHealthRows;
             RefreshProviderHealthUi();
             RefreshCacheStatsUi();
@@ -195,14 +268,19 @@ namespace PitmastersGrill
             UpdateBoardPopulationStatus("Board population idle", BoardPopulationStatusKind.Neutral);
             HideDetailPane();
             UpdateOpenDetailsButtonState();
+            MainTabControl.SelectedIndex = 1;
             ApplyCompactModeUi();
+            UpdateBoardSummaryBanner();
+            UpdateAnalysisTab();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
+            ApplyEveSessionContext(new EveSessionContext());
 
             AppLogger.DatabaseInfo(
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
 
             AppLogger.UiInfo(
                 $"MainWindow ready. darkMode={_appSettings.DarkModeEnabled} alwaysOnTop={_appSettings.AlwaysOnTopEnabled} panelMode={_appSettings.PanelModeEnabled} opacityPercent={_mainWindowAppearanceController.CoerceOpacityPercent(_appSettings.WindowOpacityPercent):0} logLevel={_appSettings.LogLevel}");
+            AppLogger.UiInfo("MainWindow constructor end.");
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -216,9 +294,25 @@ namespace PitmastersGrill
             source?.AddHook(WndProc);
 
             _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
+            RestoreWindowLayoutFromSettings();
+            TryRegisterGlobalResetWindowHotKey(hwnd);
             UpdateWindowStateUi();
+            TriggerSessionContextRefresh("startup", force: false);
 
             AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= MainWindow_Loaded;
+            AppLogger.UiInfo("MainWindow loaded.");
+            Dispatcher.BeginInvoke(new Action(FinalizeBoardColumnLayoutInitialization), DispatcherPriority.Loaded);
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            SaveWindowLayoutToSettings("Window closing");
+            base.OnClosing(e);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -236,14 +330,19 @@ namespace PitmastersGrill
             }
 
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
+            _currentRows.CollectionChanged -= CurrentRows_CollectionChanged;
+            UnsubscribeFromAllBoardRows();
             _clipboardDebounceTimer.Stop();
             _clipboardDebounceTimer.Tick -= ClipboardDebounceTimer_Tick;
             _compactDragHoldTimer.Stop();
             _compactDragHoldTimer.Tick -= CompactDragHoldTimer_Tick;
+            _boardColumnLayoutSaveTimer.Stop();
+            _boardColumnLayoutSaveTimer.Tick -= BoardColumnLayoutSaveTimer_Tick;
             _systemTrayIconService.Dispose();
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
+            TryUnregisterGlobalResetWindowHotKey(hwnd);
             RemoveClipboardFormatListener(hwnd);
 
             AppLogger.UiInfo("MainWindow closed. Clipboard listener removed, retry state cancelled, and background work stop requested.");
@@ -270,20 +369,66 @@ namespace PitmastersGrill
             }
 
             var compact = CompactModeToggleButton.IsChecked == true;
+            var previousCompactMode = _lastAppliedCompactMode;
+            _lastAppliedCompactMode = compact;
 
             if (compact)
             {
-                MainTabControl.SelectedIndex = 0;
+                MainTabControl.SelectedIndex = 1;
                 CloseActiveDetailWindow();
             }
 
             TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            BoardStatusFooter.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            TopCommandGrid.Margin = new Thickness(0, 0, 0, 6);
+            BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5);
             MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12);
             MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1);
             MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0);
 
-            AppLogger.UiInfo($"Compact mode changed. enabled={compact}");
+            if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact)
+            {
+                _appSettings.CompactModeEnabled = compact;
+                _mainWindowAppearanceController.SaveSettings(_appSettings);
+            }
+
+            if (!_isApplyingSettings &&
+                (!previousCompactMode.HasValue || previousCompactMode.Value != compact))
+            {
+                AppLogger.UiInfo($"Display mode changed. boardMode={compact}");
+            }
+
+            UpdateBoardFooterVisibility();
+            UpdateBoardSummaryBanner();
+            UpdateAnalysisTab();
+        }
+
+        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(sender, MainTabControl))
+            {
+                return;
+            }
+
+            UpdateBoardFooterVisibility();
+
+            if (MainTabControl.SelectedIndex == 0)
+            {
+                TriggerSessionContextRefresh("analysis tab selection", force: IsSessionContextStale());
+            }
+        }
+
+        private void UpdateBoardFooterVisibility()
+        {
+            if (CompactModeToggleButton == null || MainTabControl == null || BoardStatusFooter == null)
+            {
+                return;
+            }
+
+            var boardMode = CompactModeToggleButton.IsChecked == true;
+            var analysisTabSelected = MainTabControl.SelectedIndex == 0;
+            BoardStatusFooter.Visibility = boardMode || analysisTabSelected
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         }
 
         private void ToggleCompactModeFromHotkey()
@@ -314,6 +459,22 @@ namespace PitmastersGrill
             var isMaximized = WindowState == WindowState.Maximized;
             MaximizeRestoreWindowButton.Content = isMaximized ? "O" : "[]";
             MaximizeRestoreWindowButton.ToolTip = isMaximized ? "Restore PMG" : "Maximize PMG";
+        }
+
+        private void TrackCurrentNormalWindowBounds(string reason)
+        {
+            if (WindowState != WindowState.Normal)
+            {
+                return;
+            }
+
+            var currentBounds = new Rect(Left, Top, Width, Height);
+            if (!IsUsableWindowBounds(currentBounds))
+            {
+                return;
+            }
+
+            _lastKnownNormalBounds = currentBounds;
         }
 
         private void RequestApplicationShutdown(string reason)
@@ -410,7 +571,31 @@ namespace PitmastersGrill
 
         private void Window_StateChanged(object? sender, EventArgs e)
         {
+            if (WindowState != WindowState.Minimized)
+            {
+                _lastNonMinimizedWindowState = WindowState;
+            }
+
+            if (WindowState == WindowState.Maximized && IsUsableWindowBounds(RestoreBounds))
+            {
+                _lastKnownNormalBounds = RestoreBounds;
+            }
+            else if (WindowState == WindowState.Normal)
+            {
+                TrackCurrentNormalWindowBounds("StateChanged");
+            }
+
             UpdateWindowStateUi();
+        }
+
+        private void Window_LocationChanged(object sender, EventArgs e)
+        {
+            TrackCurrentNormalWindowBounds("LocationChanged");
+        }
+
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            TrackCurrentNormalWindowBounds("SizeChanged");
         }
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -483,6 +668,45 @@ namespace PitmastersGrill
                 WindowOpacityValueText,
                 Resources);
             _activePilotDetailWindow?.ApplyThemeResources(Resources);
+        }
+
+        private void ResetWindowLayoutButton_Click(object sender, RoutedEventArgs e)
+        {
+            ResetWindowLayout(showConfirmation: true, reason: "Reset window layout button");
+        }
+
+        private void ResetWindowLayout(bool showConfirmation, string reason)
+        {
+            ClearSavedWindowLayoutSettings();
+
+            var resetBounds = GetDefaultWindowBoundsForCurrentDisplay();
+            WindowState = WindowState.Normal;
+            Left = resetBounds.Left;
+            Top = resetBounds.Top;
+            Width = resetBounds.Width;
+            Height = resetBounds.Height;
+            _lastKnownNormalBounds = resetBounds;
+            _lastNonMinimizedWindowState = WindowState.Normal;
+
+            SaveWindowLayoutToSettings(reason);
+
+            AppLogger.UiInfo(
+                $"Window layout reset. reason='{reason}' left={Left:0.##} top={Top:0.##} width={Width:0.##} height={Height:0.##}");
+
+            if (showConfirmation)
+            {
+                MessageBox.Show(
+                    "Window layout reset to a safe default position and size.",
+                    "PMG Window Layout",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+
+        private void RequestWindowLayoutResetFromHotkey(string source)
+        {
+            AppLogger.UiInfo($"Window layout reset requested from {source}.");
+            ResetWindowLayout(showConfirmation: false, reason: source);
         }
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -562,6 +786,14 @@ namespace PitmastersGrill
             ApplyBoardColumnVisibility();
         }
 
+        private void InitializeBoardColumnLayoutUi()
+        {
+            CacheBoardColumnsByKey();
+            ApplyBoardColumnMinimumWidths();
+            BuildCanonicalBoardColumnLayout();
+            ApplyCanonicalBoardColumnLayout("Apply canonical default board layout");
+        }
+
         private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             if (_isApplyingSettings)
@@ -611,6 +843,15 @@ namespace PitmastersGrill
             AppLogger.UiInfo("Board column visibility reset to defaults.");
         }
 
+        private void ResetBoardLayoutButton_Click(object sender, RoutedEventArgs e)
+        {
+            _appSettings.BoardColumnLayout.Clear();
+            ApplyCanonicalBoardColumnLayout("Reset board layout to canonical defaults");
+            SaveCurrentBoardColumnLayout("Reset layout");
+
+            AppLogger.UiInfo("Board column layout reset to canonical defaults.");
+        }
+
         private void ApplyBoardColumnSettingsToCheckBoxes()
         {
             if (ShowSigColumnCheckBox == null)
@@ -655,16 +896,455 @@ namespace PitmastersGrill
 
         private void ApplyBoardColumnVisibility()
         {
-            SetColumnVisibility(SigColumn, _appSettings.ShowSigColumn);
-            CharacterColumn.Visibility = Visibility.Visible;
-            SetColumnVisibility(AllianceColumn, _appSettings.ShowAllianceColumn);
-            SetColumnVisibility(CorpColumn, _appSettings.ShowCorpColumn);
-            SetColumnVisibility(KillsColumn, _appSettings.ShowKillsColumn);
-            SetColumnVisibility(LossesColumn, _appSettings.ShowLossesColumn);
-            SetColumnVisibility(AvgFleetSizeColumn, _appSettings.ShowAvgFleetSizeColumn);
-            SetColumnVisibility(LastShipSeenColumn, _appSettings.ShowLastShipSeenColumn);
-            SetColumnVisibility(LastSeenColumn, _appSettings.ShowLastSeenColumn);
-            SetColumnVisibility(CynoHullSeenColumn, _appSettings.ShowCynoHullSeenColumn);
+            _isApplyingBoardColumnLayout = true;
+
+            try
+            {
+                SetColumnVisibility(SigColumn, _appSettings.ShowSigColumn);
+                CharacterColumn.Visibility = Visibility.Visible;
+                SetColumnVisibility(AllianceColumn, _appSettings.ShowAllianceColumn);
+                SetColumnVisibility(CorpColumn, _appSettings.ShowCorpColumn);
+                SetColumnVisibility(KillsColumn, _appSettings.ShowKillsColumn);
+                SetColumnVisibility(LossesColumn, _appSettings.ShowLossesColumn);
+                SetColumnVisibility(AvgFleetSizeColumn, _appSettings.ShowAvgFleetSizeColumn);
+                SetColumnVisibility(LastShipSeenColumn, _appSettings.ShowLastShipSeenColumn);
+                SetColumnVisibility(LastSeenColumn, _appSettings.ShowLastSeenColumn);
+                SetColumnVisibility(CynoHullSeenColumn, _appSettings.ShowCynoHullSeenColumn);
+            }
+            finally
+            {
+                _isApplyingBoardColumnLayout = false;
+            }
+        }
+
+        private void ApplyBoardColumnMinimumWidths()
+        {
+            foreach (var pair in _boardColumnsByKey)
+            {
+                pair.Value.MinWidth = GetBoardColumnMinimumWidth(pair.Key);
+            }
+        }
+
+        private void CacheBoardColumnsByKey()
+        {
+            _boardColumnsByKey.Clear();
+            RegisterBoardColumn("SigColumn", SigColumn);
+            RegisterBoardColumn("CharacterColumn", CharacterColumn);
+            RegisterBoardColumn("AllianceColumn", AllianceColumn);
+            RegisterBoardColumn("CorpColumn", CorpColumn);
+            RegisterBoardColumn("KillsColumn", KillsColumn);
+            RegisterBoardColumn("LossesColumn", LossesColumn);
+            RegisterBoardColumn("AvgFleetSizeColumn", AvgFleetSizeColumn);
+            RegisterBoardColumn("LastShipSeenColumn", LastShipSeenColumn);
+            RegisterBoardColumn("LastSeenColumn", LastSeenColumn);
+            RegisterBoardColumn("CynoHullSeenColumn", CynoHullSeenColumn);
+        }
+
+        private void RegisterBoardColumn(string key, DataGridColumn column)
+        {
+            if (column == null)
+            {
+                return;
+            }
+
+            _boardColumnsByKey[key] = column;
+        }
+
+        private void BuildCanonicalBoardColumnLayout()
+        {
+            _defaultBoardColumnLayout.Clear();
+
+            for (var index = 0; index < CanonicalBoardColumnOrder.Length; index++)
+            {
+                var key = CanonicalBoardColumnOrder[index];
+                if (!_boardColumnsByKey.TryGetValue(key, out var column))
+                {
+                    continue;
+                }
+
+                _defaultBoardColumnLayout[key] = CreateCanonicalBoardColumnLayoutSetting(key, index);
+            }
+        }
+
+        private void HookBoardColumnWidthTracking()
+        {
+            if (_boardColumnWidthDescriptor != null)
+            {
+                return;
+            }
+
+            _boardColumnWidthDescriptor = DependencyPropertyDescriptor.FromProperty(
+                DataGridColumn.WidthProperty,
+                typeof(DataGridColumn));
+
+            if (_boardColumnWidthDescriptor == null)
+            {
+                AppLogger.UiWarn("Board column width tracking could not be initialized.");
+                return;
+            }
+
+            foreach (var column in _boardColumnsByKey.Values)
+            {
+                _boardColumnWidthDescriptor.AddValueChanged(column, BoardColumnWidth_ValueChanged);
+            }
+        }
+
+        private void ApplySavedBoardColumnLayout()
+        {
+            if (_appSettings.BoardColumnLayout == null || _appSettings.BoardColumnLayout.Count == 0)
+            {
+                return;
+            }
+
+            if (!TryValidateSavedBoardColumnLayout(_appSettings.BoardColumnLayout, out var validSavedSettings, out var validationFailureReason))
+            {
+                AppLogger.UiWarn($"Saved board column layout discarded. reason='{validationFailureReason}'");
+                _appSettings.BoardColumnLayout.Clear();
+                _mainWindowAppearanceController.SaveSettings(_appSettings);
+                ApplyCanonicalBoardColumnLayout("Discard invalid saved board layout");
+                return;
+            }
+
+            ApplyBoardColumnLayout(validSavedSettings, "Restore saved board layout");
+        }
+
+        private void ApplyCanonicalBoardColumnLayout(string reason)
+        {
+            ApplyBoardColumnLayout(
+                CanonicalBoardColumnOrder
+                    .Where(key => _defaultBoardColumnLayout.ContainsKey(key))
+                    .Select(key => _defaultBoardColumnLayout[key])
+                    .ToList(),
+                reason);
+        }
+
+        private void ApplyBoardColumnLayout(IEnumerable<BoardColumnLayoutSetting> layoutSettings, string reason)
+        {
+            if (layoutSettings == null)
+            {
+                return;
+            }
+
+            _isApplyingBoardColumnLayout = true;
+
+            try
+            {
+                var widthSettings = layoutSettings
+                    .Where(setting => setting != null && !string.IsNullOrWhiteSpace(setting.ColumnKey))
+                    .Where(setting => _boardColumnsByKey.ContainsKey(setting.ColumnKey))
+                    .ToList();
+
+                foreach (var setting in widthSettings)
+                {
+                    if (TryBuildDataGridLength(setting, out var width))
+                    {
+                        _boardColumnsByKey[setting.ColumnKey].Width = width;
+                    }
+                }
+
+                var orderedKeys = widthSettings
+                    .OrderBy(setting => setting.DisplayIndex)
+                    .ThenBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
+                    .Select(setting => setting.ColumnKey)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                foreach (var defaultKey in CanonicalBoardColumnOrder)
+                {
+                    if (!orderedKeys.Contains(defaultKey, StringComparer.OrdinalIgnoreCase))
+                    {
+                        orderedKeys.Add(defaultKey);
+                    }
+                }
+
+                for (var index = 0; index < orderedKeys.Count; index++)
+                {
+                    if (_boardColumnsByKey.TryGetValue(orderedKeys[index], out var column) &&
+                        column.DisplayIndex != index)
+                    {
+                        column.DisplayIndex = index;
+                    }
+                }
+
+                AppLogger.UiInfo($"Board column layout applied. reason='{reason}'");
+            }
+            finally
+            {
+                _isApplyingBoardColumnLayout = false;
+            }
+        }
+
+        private static bool TryBuildDataGridLength(BoardColumnLayoutSetting setting, out DataGridLength width)
+        {
+            width = DataGridLength.Auto;
+
+            if (setting == null || string.IsNullOrWhiteSpace(setting.WidthUnitType))
+            {
+                return false;
+            }
+
+            if (double.IsNaN(setting.WidthValue) || double.IsInfinity(setting.WidthValue) || setting.WidthValue <= 0)
+            {
+                return false;
+            }
+
+            width = new DataGridLength(setting.WidthValue, DataGridLengthUnitType.Pixel);
+            return true;
+        }
+
+        private void PilotBoard_ColumnReordered(object sender, DataGridColumnEventArgs e)
+        {
+            ScheduleBoardColumnLayoutSave("Column reordered");
+        }
+
+        private void BoardColumnWidth_ValueChanged(object? sender, EventArgs e)
+        {
+            ScheduleBoardColumnLayoutSave("Column width changed");
+        }
+
+        private void ScheduleBoardColumnLayoutSave(string reason)
+        {
+            if (_isApplyingSettings || _isApplyingBoardColumnLayout || !CanPersistBoardColumnLayout())
+            {
+                return;
+            }
+
+            _boardColumnLayoutSaveTimer.Stop();
+            _pendingBoardColumnLayoutSaveReason = reason;
+            _boardColumnLayoutSaveTimer.Start();
+        }
+
+        private void BoardColumnLayoutSaveTimer_Tick(object? sender, EventArgs e)
+        {
+            _boardColumnLayoutSaveTimer.Stop();
+            var reason = string.IsNullOrWhiteSpace(_pendingBoardColumnLayoutSaveReason)
+                ? "Board layout changed"
+                : _pendingBoardColumnLayoutSaveReason;
+            _pendingBoardColumnLayoutSaveReason = string.Empty;
+            SaveCurrentBoardColumnLayout(reason);
+        }
+
+        private void SaveCurrentBoardColumnLayout(string reason)
+        {
+            if (!CanPersistBoardColumnLayout())
+            {
+                AppLogger.UiDebug($"Board column layout save skipped. reason='{reason}' hostReady=false");
+                return;
+            }
+
+            var currentLayout = _boardColumnsByKey
+                .Select(pair => CreateBoardColumnLayoutSetting(pair.Key, pair.Value))
+                .OrderBy(setting => setting.DisplayIndex)
+                .ThenBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!TryValidateSavedBoardColumnLayout(currentLayout, out var sanitizedLayout, out var validationFailureReason))
+            {
+                AppLogger.UiWarn($"Board column layout save skipped. reason='{reason}' validationFailure='{validationFailureReason}'");
+                return;
+            }
+
+            if (BoardColumnLayoutsMatch(_appSettings.BoardColumnLayout, sanitizedLayout))
+            {
+                return;
+            }
+
+            _appSettings.BoardColumnLayout = sanitizedLayout;
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+            AppLogger.UiInfo($"Board column layout saved. reason='{reason}'");
+        }
+
+        private static bool BoardColumnLayoutsMatch(
+            IReadOnlyList<BoardColumnLayoutSetting>? left,
+            IReadOnlyList<BoardColumnLayoutSetting>? right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null || left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < left.Count; index++)
+            {
+                var leftItem = left[index];
+                var rightItem = right[index];
+
+                if (!string.Equals(leftItem?.ColumnKey, rightItem?.ColumnKey, StringComparison.OrdinalIgnoreCase) ||
+                    leftItem?.DisplayIndex != rightItem?.DisplayIndex ||
+                    leftItem?.WidthUnitType != rightItem?.WidthUnitType ||
+                    Math.Abs((leftItem?.WidthValue ?? 0d) - (rightItem?.WidthValue ?? 0d)) > 0.01d)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static BoardColumnLayoutSetting CreateBoardColumnLayoutSetting(string key, DataGridColumn column, int? displayIndexOverride = null)
+        {
+            var width = column.ActualWidth;
+            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
+            {
+                width = column.Width.DisplayValue;
+            }
+
+            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
+            {
+                width = GetBoardColumnMinimumWidth(key);
+            }
+
+            return new BoardColumnLayoutSetting
+            {
+                ColumnKey = key,
+                DisplayIndex = displayIndexOverride ?? column.DisplayIndex,
+                WidthValue = Math.Max(GetBoardColumnMinimumWidth(key), width),
+                WidthUnitType = DataGridLengthUnitType.Pixel.ToString()
+            };
+        }
+
+        private static BoardColumnLayoutSetting CreateCanonicalBoardColumnLayoutSetting(string key, int displayIndex)
+        {
+            return new BoardColumnLayoutSetting
+            {
+                ColumnKey = key,
+                DisplayIndex = displayIndex,
+                WidthValue = GetBoardColumnMinimumWidth(key),
+                WidthUnitType = DataGridLengthUnitType.Pixel.ToString()
+            };
+        }
+
+        private void FinalizeBoardColumnLayoutInitialization()
+        {
+            ApplyCanonicalBoardColumnLayout("Finalize board layout after load");
+            ApplySavedBoardColumnLayout();
+            HookBoardColumnWidthTracking();
+            _isBoardColumnLayoutReadyForPersistence = true;
+            AppLogger.UiInfo($"Board column layout initialization complete. hostReady={IsBoardLayoutHostReady()} actualWidth={PilotBoard?.ActualWidth ?? 0:0.##}");
+        }
+
+        private bool CanPersistBoardColumnLayout()
+        {
+            return _isBoardColumnLayoutReadyForPersistence && IsBoardLayoutHostReady();
+        }
+
+        private bool IsBoardLayoutHostReady()
+        {
+            return PilotBoard != null &&
+                   IsLoaded &&
+                   PilotBoard.IsLoaded &&
+                   PilotBoard.ActualWidth >= MinimumBoardLayoutHostWidth;
+        }
+
+        private bool TryValidateSavedBoardColumnLayout(
+            IReadOnlyList<BoardColumnLayoutSetting>? layoutSettings,
+            out List<BoardColumnLayoutSetting> validLayout,
+            out string failureReason)
+        {
+            validLayout = new List<BoardColumnLayoutSetting>();
+            failureReason = string.Empty;
+
+            if (layoutSettings == null || layoutSettings.Count == 0)
+            {
+                failureReason = "No layout settings were present.";
+                return false;
+            }
+
+            var knownSettings = layoutSettings
+                .Where(setting => setting != null && !string.IsNullOrWhiteSpace(setting.ColumnKey))
+                .Where(setting => _boardColumnsByKey.ContainsKey(setting.ColumnKey))
+                .GroupBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            if (knownSettings.Count == 0)
+            {
+                failureReason = "No known board column keys were present.";
+                return false;
+            }
+
+            var usedDisplayIndexes = new HashSet<int>();
+            foreach (var setting in knownSettings)
+            {
+                if (!string.Equals(setting.WidthUnitType, DataGridLengthUnitType.Pixel.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    failureReason = $"Unsupported width unit '{setting.WidthUnitType}' for column '{setting.ColumnKey}'.";
+                    return false;
+                }
+
+                if (setting.DisplayIndex < 0 || setting.DisplayIndex >= CanonicalBoardColumnOrder.Length)
+                {
+                    failureReason = $"DisplayIndex out of range for column '{setting.ColumnKey}'.";
+                    return false;
+                }
+
+                if (!usedDisplayIndexes.Add(setting.DisplayIndex))
+                {
+                    failureReason = $"Duplicate DisplayIndex '{setting.DisplayIndex}' detected.";
+                    return false;
+                }
+
+                if (double.IsNaN(setting.WidthValue) || double.IsInfinity(setting.WidthValue))
+                {
+                    failureReason = $"Non-finite width detected for column '{setting.ColumnKey}'.";
+                    return false;
+                }
+
+                if (setting.WidthValue < GetBoardColumnMinimumWidth(setting.ColumnKey))
+                {
+                    failureReason = $"Width below minimum for column '{setting.ColumnKey}'.";
+                    return false;
+                }
+            }
+
+            var orderedKeys = knownSettings
+                .OrderBy(setting => setting.DisplayIndex)
+                .ThenBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
+                .Select(setting => setting.ColumnKey)
+                .ToList();
+
+            foreach (var key in CanonicalBoardColumnOrder)
+            {
+                if (!orderedKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
+                {
+                    orderedKeys.Add(key);
+                }
+            }
+
+            for (var index = 0; index < orderedKeys.Count; index++)
+            {
+                var key = orderedKeys[index];
+                var existing = knownSettings.FirstOrDefault(setting => string.Equals(setting.ColumnKey, key, StringComparison.OrdinalIgnoreCase));
+                validLayout.Add(existing != null
+                    ? new BoardColumnLayoutSetting
+                    {
+                        ColumnKey = existing.ColumnKey,
+                        DisplayIndex = index,
+                        WidthValue = existing.WidthValue,
+                        WidthUnitType = existing.WidthUnitType
+                    }
+                    : CreateCanonicalBoardColumnLayoutSetting(key, index));
+            }
+
+            var totalWidth = validLayout.Sum(setting => Math.Max(GetBoardColumnMinimumWidth(setting.ColumnKey), setting.WidthValue));
+            if (totalWidth < CanonicalBoardColumnMinimumWidths.Values.Sum() * 0.8d)
+            {
+                failureReason = $"Total saved width was too small. totalWidth={totalWidth:0.##}";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static double GetBoardColumnMinimumWidth(string key)
+        {
+            return CanonicalBoardColumnMinimumWidths.TryGetValue(key, out var width)
+                ? width
+                : 60;
         }
 
         private void SetAllOptionalBoardColumnSettings(bool isVisible)
@@ -740,6 +1420,15 @@ namespace PitmastersGrill
                 IntelUpdateBanner,
                 IntelUpdateStatusText,
                 IntelUpdateDetailText);
+
+            if (Dispatcher.CheckAccess())
+            {
+                ApplyIntelStatusDetails(snapshot);
+            }
+            else
+            {
+                Dispatcher.Invoke(() => ApplyIntelStatusDetails(snapshot));
+            }
         }
 
         private void ApplyIntelUpdateSnapshot(IntelUpdateStatusSnapshot snapshot)
@@ -749,6 +1438,387 @@ namespace PitmastersGrill
                 IntelUpdateBanner,
                 IntelUpdateStatusText,
                 IntelUpdateDetailText);
+
+            ApplyIntelStatusDetails(snapshot);
+        }
+
+        private void ApplyIntelStatusDetails(IntelUpdateStatusSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            if (IntelLastUpdatedText != null)
+            {
+                IntelLastUpdatedText.Text = FormatIntelTimestamp(snapshot.LastSuccessfulUpdateAtUtc, "No successful local intel update recorded yet.");
+            }
+
+            if (IntelOldestKillmailDayText != null)
+            {
+                IntelOldestKillmailDayText.Text = FormatIntelDay(snapshot.EarliestCompleteDayUtc, "No local killmail days recorded yet.");
+            }
+
+            if (IntelNewestKillmailDayText != null)
+            {
+                IntelNewestKillmailDayText.Text = FormatIntelDay(snapshot.LatestCompleteDayUtc, "No local killmail days recorded yet.");
+            }
+
+            if (IntelCurrentUpdateStatusText != null)
+            {
+                IntelCurrentUpdateStatusText.Text = BuildIntelCurrentUpdateStatusText(snapshot);
+            }
+
+            if (IntelTotalProgressBar != null)
+            {
+                IntelTotalProgressBar.IsIndeterminate = snapshot.TotalProgressIsIndeterminate;
+                IntelTotalProgressBar.Value = snapshot.TotalProgressIsIndeterminate
+                    ? 0
+                    : Math.Max(0, Math.Min(100, snapshot.TotalProgressPercent));
+            }
+
+            if (IntelTotalProgressText != null)
+            {
+                IntelTotalProgressText.Text = string.IsNullOrWhiteSpace(snapshot.TotalProgressText)
+                    ? "No update currently running."
+                    : snapshot.TotalProgressText;
+            }
+
+            if (IntelCurrentDayProgressBar != null)
+            {
+                IntelCurrentDayProgressBar.IsIndeterminate = snapshot.CurrentDayProgressIsIndeterminate;
+                IntelCurrentDayProgressBar.Value = snapshot.CurrentDayProgressIsIndeterminate
+                    ? 0
+                    : Math.Max(0, Math.Min(100, snapshot.CurrentDayProgressPercent));
+            }
+
+            if (IntelCurrentDayProgressText != null)
+            {
+                IntelCurrentDayProgressText.Text = string.IsNullOrWhiteSpace(snapshot.CurrentDayProgressText)
+                    ? "No update currently running."
+                    : snapshot.CurrentDayProgressText;
+            }
+
+            var liveFeed = snapshot.LiveFeed ?? new R2Z2LiveFeedSnapshot();
+
+            if (IntelLiveFeedSourceText != null)
+            {
+                IntelLiveFeedSourceText.Text = string.IsNullOrWhiteSpace(liveFeed.Source)
+                    ? "R2Z2"
+                    : liveFeed.Source;
+            }
+
+            if (IntelLiveFeedStatusText != null)
+            {
+                var statusText = string.IsNullOrWhiteSpace(liveFeed.Status)
+                    ? "Disabled"
+                    : liveFeed.Status;
+
+                var nextRetryText = FormatIntelTimestamp(liveFeed.NextRetryAtUtc, "");
+                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
+                    (statusText.Contains("wait", StringComparison.OrdinalIgnoreCase) ||
+                     statusText.Contains("backing off", StringComparison.OrdinalIgnoreCase)))
+                {
+                    statusText = $"{statusText} (retry {nextRetryText})";
+                }
+
+                IntelLiveFeedStatusText.Text = statusText;
+            }
+
+            if (IntelLiveFeedEnabledText != null)
+            {
+                IntelLiveFeedEnabledText.Text = liveFeed.Enabled ? "Yes" : "No";
+            }
+
+            if (IntelLiveFeedRecentImportsText != null)
+            {
+                IntelLiveFeedRecentImportsText.Text = liveFeed.RecentLiveImportsCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (IntelLiveFeedNextSequenceText != null)
+            {
+                IntelLiveFeedNextSequenceText.Text = liveFeed.NextSequenceId.HasValue
+                    ? liveFeed.NextSequenceId.Value.ToString(CultureInfo.InvariantCulture)
+                    : "Not initialized";
+            }
+
+            if (IntelLiveFeedLastProcessedSequenceText != null)
+            {
+                IntelLiveFeedLastProcessedSequenceText.Text = liveFeed.LastProcessedSequenceId.HasValue
+                    ? liveFeed.LastProcessedSequenceId.Value.ToString(CultureInfo.InvariantCulture)
+                    : "None";
+            }
+
+            if (IntelLiveFeedLastSuccessText != null)
+            {
+                IntelLiveFeedLastSuccessText.Text = FormatIntelTimestamp(
+                    liveFeed.LastSuccessAtUtc,
+                    "No live imports recorded yet.");
+            }
+
+            if (IntelLiveFeedLastCaughtUpText != null)
+            {
+                IntelLiveFeedLastCaughtUpText.Text = FormatIntelTimestamp(
+                    liveFeed.LastCaughtUpAtUtc,
+                    "No caught-up wait recorded yet.");
+            }
+
+            if (IntelLiveFeedLastErrorText != null)
+            {
+                var lastErrorTime = FormatIntelTimestamp(liveFeed.LastErrorAtUtc, "");
+                IntelLiveFeedLastErrorText.Text = string.IsNullOrWhiteSpace(liveFeed.LastError)
+                    ? "No live-feed errors recorded."
+                    : string.IsNullOrWhiteSpace(lastErrorTime)
+                        ? liveFeed.LastError
+                        : $"{lastErrorTime} - {liveFeed.LastError}";
+            }
+
+            var todaysFreshness = snapshot.TodaysFreshness ?? new TodaysFreshnessSnapshot();
+            if (TodaysFreshnessStatusText != null)
+            {
+                var statusText = string.IsNullOrWhiteSpace(todaysFreshness.Status)
+                    ? "Idle"
+                    : todaysFreshness.Status;
+
+                var nextRetryText = FormatIntelTimestamp(todaysFreshness.NextRetryAtUtc, "");
+                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
+                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
+                {
+                    statusText = $"{statusText} (retry {nextRetryText})";
+                }
+
+                TodaysFreshnessStatusText.Text = statusText;
+            }
+
+            if (TodaysFreshnessVisiblePilotsText != null)
+            {
+                TodaysFreshnessVisiblePilotsText.Text = todaysFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessEntitiesQueriedText != null)
+            {
+                TodaysFreshnessEntitiesQueriedText.Text = todaysFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessResultsFoundText != null)
+            {
+                TodaysFreshnessResultsFoundText.Text = todaysFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessKnownSkippedText != null)
+            {
+                TodaysFreshnessKnownSkippedText.Text = todaysFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessImportedText != null)
+            {
+                TodaysFreshnessImportedText.Text = todaysFreshness.NewKillmailsImported.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessFailedText != null)
+            {
+                TodaysFreshnessFailedText.Text = todaysFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (TodaysFreshnessLastRunText != null)
+            {
+                TodaysFreshnessLastRunText.Text = FormatIntelTimestamp(
+                    todaysFreshness.LastRunAtUtc,
+                    "No Today's Freshness run recorded yet.");
+            }
+
+            if (TodaysFreshnessDetailText != null)
+            {
+                TodaysFreshnessDetailText.Text = string.IsNullOrWhiteSpace(todaysFreshness.DetailText)
+                    ? "Today's Freshness is idle."
+                    : todaysFreshness.DetailText;
+            }
+
+            if (TodaysFreshnessLastErrorText != null)
+            {
+                TodaysFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(todaysFreshness.LastError)
+                    ? "No Today's Freshness errors recorded."
+                    : todaysFreshness.LastError;
+            }
+
+            if (RunTodaysFreshnessButton != null)
+            {
+                var isRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
+                RunTodaysFreshnessButton.IsEnabled = !isRunning && !_isShuttingDown;
+                RunTodaysFreshnessButton.Content = isRunning
+                    ? "Today's Freshness Running..."
+                    : "Refresh Today's zKill Intel";
+            }
+
+            var historicalFreshness = snapshot.HistoricalFreshness ?? new HistoricalFreshnessSnapshot();
+            if (HistoricalFreshnessStatusText != null)
+            {
+                var statusText = string.IsNullOrWhiteSpace(historicalFreshness.Status)
+                    ? "Idle"
+                    : historicalFreshness.Status;
+
+                var nextRetryText = FormatIntelTimestamp(historicalFreshness.NextRetryAtUtc, "");
+                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
+                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
+                {
+                    statusText = $"{statusText} (retry {nextRetryText})";
+                }
+
+                HistoricalFreshnessStatusText.Text = statusText;
+            }
+
+            if (HistoricalFreshnessModeText != null)
+            {
+                HistoricalFreshnessModeText.Text = string.IsNullOrWhiteSpace(historicalFreshness.Mode)
+                    ? "Not run yet"
+                    : historicalFreshness.Mode;
+            }
+
+            if (HistoricalFreshnessVisiblePilotsText != null)
+            {
+                HistoricalFreshnessVisiblePilotsText.Text = historicalFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessCandidatesConsideredText != null)
+            {
+                HistoricalFreshnessCandidatesConsideredText.Text = historicalFreshness.CandidatePilotsConsidered.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessCandidatesSkippedCooldownText != null)
+            {
+                HistoricalFreshnessCandidatesSkippedCooldownText.Text = historicalFreshness.CandidatePilotsSkippedCooldown.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessPilotsCheckedText != null)
+            {
+                HistoricalFreshnessPilotsCheckedText.Text = historicalFreshness.PilotsChecked.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessDaysCheckedText != null)
+            {
+                HistoricalFreshnessDaysCheckedText.Text = historicalFreshness.HistoricalDaysChecked.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessEntitiesQueriedText != null)
+            {
+                HistoricalFreshnessEntitiesQueriedText.Text = historicalFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessResultsFoundText != null)
+            {
+                HistoricalFreshnessResultsFoundText.Text = historicalFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessKnownSkippedText != null)
+            {
+                HistoricalFreshnessKnownSkippedText.Text = historicalFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessImportedText != null)
+            {
+                HistoricalFreshnessImportedText.Text = historicalFreshness.MissingImportedCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessFailedText != null)
+            {
+                HistoricalFreshnessFailedText.Text = historicalFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (HistoricalFreshnessLastRunText != null)
+            {
+                HistoricalFreshnessLastRunText.Text = FormatIntelTimestamp(
+                    historicalFreshness.LastRunAtUtc,
+                    "No Historical Freshness run recorded yet.");
+            }
+
+            if (HistoricalFreshnessDetailText != null)
+            {
+                HistoricalFreshnessDetailText.Text = string.IsNullOrWhiteSpace(historicalFreshness.DetailText)
+                    ? "Historical Freshness is idle."
+                    : historicalFreshness.DetailText;
+            }
+
+            if (HistoricalFreshnessLastErrorText != null)
+            {
+                HistoricalFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(historicalFreshness.LastError)
+                    ? "No Historical Freshness errors recorded."
+                    : historicalFreshness.LastError;
+            }
+
+            if (RunHistoricalFreshnessButton != null)
+            {
+                var isRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
+                RunHistoricalFreshnessButton.IsEnabled = !isRunning && !_isShuttingDown;
+                RunHistoricalFreshnessButton.Content = isRunning
+                    ? "Historical Freshness Running..."
+                    : "Repair Recent Historical Intel";
+            }
+        }
+
+        private static string BuildIntelCurrentUpdateStatusText(IntelUpdateStatusSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return "No update currently running.";
+            }
+
+            if (snapshot.HasError)
+            {
+                return string.IsNullOrWhiteSpace(snapshot.ErrorText)
+                    ? "Killmail intel update failed."
+                    : $"Killmail intel update failed: {snapshot.ErrorText}";
+            }
+
+            if (snapshot.IsRunning)
+            {
+                if (snapshot.IsForegroundPriorityActive)
+                {
+                    return "Updating killmail intel is paused for foreground activity.";
+                }
+
+                return string.IsNullOrWhiteSpace(snapshot.CurrentImportDayUtc)
+                    ? "Updating killmail intel…"
+                    : $"Updating killmail intel… Current day {snapshot.CurrentImportDayUtc}.";
+            }
+
+            if (snapshot.HasRequestedCoverageWindow && snapshot.RequestedCoverageDays > 0)
+            {
+                if (!snapshot.IsRequestedCoverageComplete)
+                {
+                    return $"Killmail intel partially populated. Local coverage is {snapshot.LocalCoverageDays} of {snapshot.RequestedCoverageDays} requested days.";
+                }
+            }
+
+            if (snapshot.IsCurrentThroughYesterday)
+            {
+                return "Killmail intel is current.";
+            }
+
+            if (snapshot.MissingDayCount > 0)
+            {
+                return $"Killmail intel is waiting to catch up {snapshot.MissingDayCount} day(s).";
+            }
+
+            return "No update currently running.";
+        }
+
+        private static string FormatIntelTimestamp(string value, string emptyText)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return emptyText;
+            }
+
+            return DateTime.TryParse(value, out var parsed)
+                ? parsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                : value;
+        }
+
+        private static string FormatIntelDay(string value, string emptyText)
+        {
+            return string.IsNullOrWhiteSpace(value) ? emptyText : value;
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -757,8 +1827,54 @@ namespace PitmastersGrill
             {
                 ScheduleClipboardProcessing();
             }
+            else if (msg == WmHotKey && wParam.ToInt32() == GlobalResetWindowHotKeyId)
+            {
+                handled = true;
+
+                if (!IsActive)
+                {
+                    RequestWindowLayoutResetFromHotkey("global Ctrl+Home hotkey");
+                }
+            }
 
             return IntPtr.Zero;
+        }
+
+        private void TryRegisterGlobalResetWindowHotKey(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            _globalResetWindowHotKeyRegistered = RegisterHotKey(
+                hwnd,
+                GlobalResetWindowHotKeyId,
+                ModControl,
+                (uint)KeyInterop.VirtualKeyFromKey(Key.Home));
+
+            if (_globalResetWindowHotKeyRegistered)
+            {
+                AppLogger.UiInfo("Global Ctrl+Home reset-window hotkey registered.");
+                return;
+            }
+
+            AppLogger.UiWarn($"Global Ctrl+Home hotkey registration failed. win32Error={Marshal.GetLastWin32Error()}");
+        }
+
+        private void TryUnregisterGlobalResetWindowHotKey(IntPtr hwnd)
+        {
+            if (!_globalResetWindowHotKeyRegistered || hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (!UnregisterHotKey(hwnd, GlobalResetWindowHotKeyId))
+            {
+                AppLogger.UiWarn($"Global Ctrl+Home hotkey unregistration failed. win32Error={Marshal.GetLastWin32Error()}");
+            }
+
+            _globalResetWindowHotKeyRegistered = false;
         }
 
         private void ScheduleClipboardProcessing()
@@ -794,6 +1910,10 @@ namespace PitmastersGrill
 
         private Task ProcessNamesAsync(List<string> characterNames, bool isRetryPass)
         {
+            TriggerSessionContextRefresh(
+                isRetryPass ? "board retry pass" : "accepted local clipboard",
+                force: !isRetryPass);
+
             return _boardPopulationEntryController.ProcessNamesAsync(
                 characterNames,
                 isRetryPass,
@@ -997,6 +2117,7 @@ namespace PitmastersGrill
             var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
 
             ResetManualBoardSort();
+            UnsubscribeFromAllBoardRows();
             _currentRows.Clear();
 
             foreach (var row in initialRows)
@@ -1006,6 +2127,7 @@ namespace PitmastersGrill
                 row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
                 ApplyWatchedState(row);
                 _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
+                SubscribeToBoardRow(row);
                 _currentRows.Add(row);
             }
 
@@ -1045,6 +2167,7 @@ namespace PitmastersGrill
                 UpdateOpenDetailsButtonState();
             }
 
+            UnsubscribeFromBoardRow(row);
             AppLogger.UiInfo($"Ignored alliance filter removed a resolved row from current board. character='{row.CharacterName}' allianceId='{row.AllianceId}'");
             RecomputeCorpAllianceCounts();
         }
@@ -1061,6 +2184,7 @@ namespace PitmastersGrill
 
             foreach (var removedRow in applyResult.RemovedRows)
             {
+                UnsubscribeFromBoardRow(removedRow);
                 _currentRows.Remove(removedRow);
             }
 
@@ -1138,6 +2262,9 @@ namespace PitmastersGrill
                     ? allianceCount
                     : 0;
             }
+
+            UpdateBoardSummaryBanner();
+            UpdateAnalysisTab();
         }
 
         private static string GetCorpCountKey(PilotBoardRow row)
@@ -1431,6 +2558,7 @@ namespace PitmastersGrill
             _processingGeneration++;
             ResetEntryAndRetryTracking();
             ResetManualBoardSort();
+            UnsubscribeFromAllBoardRows();
 
             PilotBoard.SelectedItem = null;
             _currentRows.Clear();
@@ -1454,17 +2582,6 @@ namespace PitmastersGrill
             }
 
             OpenZkillForRow(selectedRow);
-        }
-
-        private void OpenDetailsButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (PilotBoard.SelectedItem is not PilotBoardRow selectedRow)
-            {
-                AppLogger.UiWarn("Open details requested with no selected row.");
-                return;
-            }
-
-            OpenDetailsWindow(selectedRow);
         }
 
         private async void EnableKillmailDbPullButton_Click(object sender, RoutedEventArgs e)
@@ -1793,6 +2910,148 @@ namespace PitmastersGrill
                 EffectiveKillmailDataPathText);
         }
 
+        private async void EnableLiveZkillFeedCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            var enabled = EnableLiveZkillFeedCheckBox.IsChecked == true;
+            _appSettings.LiveZkillFeedEnabled = enabled;
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+            AppLogger.UiInfo($"Live zKill feed setting changed. enabled={enabled}");
+
+            try
+            {
+                await _backgroundIntelUpdateService.SetLiveFeedEnabledAsync(enabled, _windowShutdownCts.Token);
+            }
+            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
+            {
+                AppLogger.UiInfo("Live zKill feed toggle cancelled during shutdown.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Live zKill feed toggle failed.", ex);
+
+                MessageBox.Show(
+                    $"Failed to update the live zKill feed setting.\n\n{ex.Message}",
+                    "PMG Live Feed Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
+        {
+            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
+            if (visibleCharacterIds.Count == 0)
+            {
+                MessageBox.Show(
+                    "Today's Freshness needs at least one visible Grill pilot with a resolved character ID.",
+                    "PMG Today's Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
+                var result = await _backgroundIntelUpdateService.RunTodaysFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
+
+                if (!_isShuttingDown && result.NewKillmailsImported > 0)
+                {
+                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Today's Freshness");
+                }
+            }
+            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
+            {
+                AppLogger.UiInfo("Today's Freshness cancelled during shutdown.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Today's Freshness failed from the Intel UI.", ex);
+
+                MessageBox.Show(
+                    $"Today's Freshness failed.\n\n{ex.Message}",
+                    "PMG Today's Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void RunHistoricalFreshnessButton_Click(object sender, RoutedEventArgs e)
+        {
+            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
+            if (visibleCharacterIds.Count == 0)
+            {
+                MessageBox.Show(
+                    "Historical Freshness needs at least one visible Grill pilot with a resolved character ID.",
+                    "PMG Historical Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
+                var result = await _backgroundIntelUpdateService.RunHistoricalFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
+
+                if (!_isShuttingDown && result.MissingImportedCount > 0)
+                {
+                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Historical Freshness");
+                }
+            }
+            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
+            {
+                AppLogger.UiInfo("Historical Freshness cancelled during shutdown.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError("Historical Freshness failed from the Intel UI.", ex);
+
+                MessageBox.Show(
+                    $"Historical Freshness failed.\n\n{ex.Message}",
+                    "PMG Historical Freshness",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        public List<long> GetVisibleCharacterIdsForBackgroundHistoricalRepair()
+        {
+            return GetVisibleCharacterIdsForTodaysFreshness();
+        }
+
+        private List<long> GetVisibleCharacterIdsForTodaysFreshness()
+        {
+            return _currentRows
+                .Select(row => row.CharacterId)
+                .Where(characterId => long.TryParse(characterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                .Select(characterId => long.Parse(characterId!, CultureInfo.InvariantCulture))
+                .Distinct()
+                .ToList();
+        }
+
+        private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
+        {
+            if (_currentRows.Count == 0)
+            {
+                return;
+            }
+
+            AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentRows.Count}");
+            CancelBoardPopulationRetry();
+
+            var generation = ++_processingGeneration;
+            UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral);
+            await ProcessRowBatchAsync(_currentRows.ToList(), generation);
+            FinalizeBoardPopulationPass(generation);
+            UpdateLastRefreshed();
+        }
+
         private void OpenZkillForRow(PilotBoardRow selectedRow)
         {
             try
@@ -1840,6 +3099,13 @@ namespace PitmastersGrill
                     return;
 
                 case Key.Home:
+                    if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+                    {
+                        RequestWindowLayoutResetFromHotkey("Ctrl+Home hotkey");
+                        e.Handled = true;
+                        return;
+                    }
+
                     AppLogger.UiInfo("Manual clipboard refresh requested from Home hotkey.");
                     _boardPopulationEntryController.InvalidateLastProcessedClipboard();
                     _ = ProcessClipboardIfValidAsync();
@@ -2251,12 +3517,6 @@ namespace PitmastersGrill
 
         private void UpdateOpenDetailsButtonState()
         {
-            if (OpenDetailsButton == null)
-            {
-                return;
-            }
-
-            OpenDetailsButton.IsEnabled = PilotBoard?.SelectedItem is PilotBoardRow;
         }
 
 
@@ -2659,6 +3919,823 @@ namespace PitmastersGrill
             LastRefreshedText.Text = $"Last Refreshed: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
         }
 
+        private void UpdateBoardSummaryBanner()
+        {
+            if (BoardSummaryText == null)
+            {
+                return;
+            }
+
+            var visibleRows = _currentRows.ToList();
+            var watchedCount = visibleRows.Count(row => row.IsWatched);
+            var baitCount = visibleRows.Count(row => row.BaitOverride || row.HasDerivedBaitEvidence);
+            var hardCynoCount = visibleRows.Count(row =>
+                string.Equals(row.BoardSignalKind, "ConfirmedNormal", StringComparison.OrdinalIgnoreCase));
+            var covertCynoCount = visibleRows.Count(row =>
+                string.Equals(row.BoardSignalKind, "ConfirmedCovert", StringComparison.OrdinalIgnoreCase));
+
+            BoardSummaryText.Text = string.Join(" | ", new[]
+            {
+                $"Visible {visibleRows.Count}",
+                $"Watched {watchedCount}",
+                $"Bait {baitCount}",
+                $"Hard Cyno {hardCynoCount}",
+                $"Covert Cyno {covertCynoCount}"
+            });
+        }
+
+        private static int CountDistinctVisibleAffiliations(
+            IEnumerable<PilotBoardRow> rows,
+            Func<PilotBoardRow, string> selector)
+        {
+            return rows
+                .Select(row => selector(row)?.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+        }
+
+        private static List<string> BuildTopVisibleAffiliationSummaries(
+            IEnumerable<PilotBoardRow> rows,
+            Func<PilotBoardRow, string> selector,
+            int maxCount)
+        {
+            return rows
+                .Select(row => selector(row)?.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .GroupBy(value => value!, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Take(maxCount)
+                .Select(group => $"{group.Key} [{group.Count()}]")
+                .ToList();
+        }
+
+        private static List<AnalysisAffiliationSummary> BuildTopVisibleAffiliationDetails(
+            IEnumerable<PilotBoardRow> rows,
+            Func<PilotBoardRow, string> nameSelector,
+            Func<PilotBoardRow, string> idSelector,
+            int maxCount)
+        {
+            return rows
+                .Select(row => new
+                {
+                    Name = nameSelector(row)?.Trim(),
+                    Id = idSelector(row)?.Trim()
+                })
+                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                .GroupBy(
+                    item => item.Name!,
+                    StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Take(maxCount)
+                .Select(group => new AnalysisAffiliationSummary(
+                    group.Key,
+                    group.Count(),
+                    group.Select(item => item.Id).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) ?? string.Empty))
+                .ToList();
+        }
+
+        private static List<AnalysisAffiliationSummary> BuildVisibleAffiliationDetails(
+            IEnumerable<PilotBoardRow> rows,
+            Func<PilotBoardRow, string> nameSelector,
+            Func<PilotBoardRow, string> idSelector)
+        {
+            return rows
+                .Select(row => new
+                {
+                    Name = nameSelector(row)?.Trim(),
+                    Id = idSelector(row)?.Trim()
+                })
+                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                .GroupBy(
+                    item => item.Name!,
+                    StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new AnalysisAffiliationSummary(
+                    group.Key,
+                    group.Count(),
+                    group.Select(item => item.Id).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) ?? string.Empty))
+                .ToList();
+        }
+
+        private void CurrentRows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateBoardSummaryBanner();
+            UpdateAnalysisTab();
+        }
+
+        private void SubscribeToBoardRow(PilotBoardRow row)
+        {
+            row.PropertyChanged -= BoardRow_PropertyChanged;
+            row.PropertyChanged += BoardRow_PropertyChanged;
+        }
+
+        private void UnsubscribeFromBoardRow(PilotBoardRow row)
+        {
+            row.PropertyChanged -= BoardRow_PropertyChanged;
+        }
+
+        private void UnsubscribeFromAllBoardRows()
+        {
+            foreach (var row in _currentRows)
+            {
+                row.PropertyChanged -= BoardRow_PropertyChanged;
+            }
+        }
+
+        private void BoardRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(PilotBoardRow.IsWatched) or
+                nameof(PilotBoardRow.BaitOverride) or
+                nameof(PilotBoardRow.HasDerivedBaitEvidence) or
+                nameof(PilotBoardRow.BoardSignalKind) or
+                nameof(PilotBoardRow.CorpName) or
+                nameof(PilotBoardRow.AllianceName))
+            {
+                UpdateBoardSummaryBanner();
+                UpdateAnalysisTab();
+            }
+        }
+
+        private void UpdateAnalysisTab()
+        {
+            if (AnalysisEmptyStateText == null ||
+                AnalysisDetailsPanel == null ||
+                AnalysisVisibleCountsText == null ||
+                AnalysisUniqueCountsText == null ||
+                AnalysisAllianceTopText == null ||
+                AnalysisCorpTopText == null ||
+                AnalysisSignalsText == null ||
+                AnalysisHighlightsText == null)
+            {
+                return;
+            }
+
+            var visibleRows = _currentRows.ToList();
+            if (visibleRows.Count == 0)
+            {
+                AnalysisEmptyStateText.Visibility = Visibility.Visible;
+                AnalysisDetailsPanel.Visibility = Visibility.Collapsed;
+                AnalysisEmptyStateText.Text = "No visible pilots yet. Load or refresh the Grill to see aggregate analysis.";
+                return;
+            }
+
+            var watchedCount = visibleRows.Count(row => row.IsWatched);
+            var uniqueCorpCount = CountDistinctVisibleAffiliations(visibleRows, row => row.CorpName);
+            var uniqueAllianceCount = CountDistinctVisibleAffiliations(visibleRows, row => row.AllianceName);
+            var topAllianceDetails = BuildTopVisibleAffiliationDetails(
+                visibleRows,
+                row => row.AllianceName,
+                row => row.AllianceId,
+                maxCount: 3);
+            var topCorpDetails = BuildTopVisibleAffiliationDetails(
+                visibleRows,
+                row => row.CorpName,
+                row => row.CorpId,
+                maxCount: 3);
+            var allAllianceDetails = BuildVisibleAffiliationDetails(
+                visibleRows,
+                row => row.AllianceName,
+                row => row.AllianceId);
+            var allCorpDetails = BuildVisibleAffiliationDetails(
+                visibleRows,
+                row => row.CorpName,
+                row => row.CorpId);
+            var baitCount = visibleRows.Count(row => row.BaitOverride || row.HasDerivedBaitEvidence);
+            var hardCynoCount = visibleRows.Count(row =>
+                string.Equals(row.BoardSignalKind, "ConfirmedNormal", StringComparison.OrdinalIgnoreCase));
+            var covertCynoCount = visibleRows.Count(row =>
+                string.Equals(row.BoardSignalKind, "ConfirmedCovert", StringComparison.OrdinalIgnoreCase));
+
+            AnalysisEmptyStateText.Visibility = Visibility.Collapsed;
+            AnalysisDetailsPanel.Visibility = Visibility.Visible;
+            AnalysisVisibleCountsText.Text = $"Visible pilots: {visibleRows.Count} | Watched pilots: {watchedCount} | Confirmed cynos: Hard {hardCynoCount} | Covert {covertCynoCount} | Bait {baitCount}";
+            AnalysisUniqueCountsText.Text = $"Unique corps: {uniqueCorpCount} | Unique alliances: {uniqueAllianceCount}";
+            PopulateAnalysisAllianceTopText(topAllianceDetails);
+            PopulateAnalysisCorpTopText(topCorpDetails);
+            PopulateAnalysisAffiliationList(_analysisAllianceItems, allAllianceDetails, "alliance");
+            PopulateAnalysisAffiliationList(_analysisCorpItems, allCorpDetails, "corporation");
+            AnalysisSignalsText.Text = string.Empty;
+            PopulateAnalysisHighlightsText(visibleRows);
+        }
+
+        private static void PopulateAnalysisAffiliationList(
+            ObservableCollection<AnalysisAffiliationListItem> target,
+            IReadOnlyList<AnalysisAffiliationSummary> summaries,
+            string entityType)
+        {
+            target.Clear();
+            foreach (var summary in summaries)
+            {
+                target.Add(new AnalysisAffiliationListItem(
+                    summary.Name,
+                    summary.Id,
+                    entityType,
+                    $"{summary.Name} [{summary.Count}]"));
+            }
+        }
+
+        private bool IsSessionContextStale()
+        {
+            return _currentEveSessionContext == null ||
+                   (DateTime.UtcNow - _lastSessionContextRefreshUtc) > TimeSpan.FromMinutes(3);
+        }
+
+        private void TriggerSessionContextRefresh(string reason, bool force)
+        {
+            if (_isShuttingDown)
+            {
+                return;
+            }
+
+            if (!force && !IsSessionContextStale())
+            {
+                return;
+            }
+
+            if (_isSessionContextRefreshInFlight)
+            {
+                return;
+            }
+
+            _ = RefreshSessionContextAsync(reason);
+        }
+
+        private async Task RefreshSessionContextAsync(string reason)
+        {
+            if (_isSessionContextRefreshInFlight || _isShuttingDown)
+            {
+                return;
+            }
+
+            _isSessionContextRefreshInFlight = true;
+            try
+            {
+                AppLogger.UiDebug($"EVE session context refresh started. reason='{reason}'");
+                var context = await _eveSessionContextService.CaptureAsync(_windowShutdownCts.Token);
+                _lastSessionContextRefreshUtc = DateTime.UtcNow;
+                _currentEveSessionContext = context;
+
+                await Dispatcher.InvokeAsync(() => ApplyEveSessionContext(context));
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown or refresh cancellation is expected.
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiWarn($"EVE session context refresh failed. reason='{reason}' message={ex.Message}");
+                var fallback = new EveSessionContext
+                {
+                    CharacterName = "Not detected",
+                    SolarSystemName = "Not detected",
+                    EvidenceSource = "Unable to read local evidence",
+                    EvidenceTimestampUtc = null,
+                    Confidence = "None",
+                    StatusMessage = "Unable to infer EVE context"
+                };
+
+                _lastSessionContextRefreshUtc = DateTime.UtcNow;
+                _currentEveSessionContext = fallback;
+                await Dispatcher.InvokeAsync(() => ApplyEveSessionContext(fallback));
+            }
+            finally
+            {
+                _isSessionContextRefreshInFlight = false;
+            }
+        }
+
+        private void ApplyEveSessionContext(EveSessionContext context)
+        {
+            if (AnalysisCurrentCharacterText == null ||
+                AnalysisCurrentSystemText == null ||
+                AnalysisEvidenceSourceText == null ||
+                AnalysisObservedAtText == null ||
+                AnalysisContextStatusText == null)
+            {
+                return;
+            }
+
+            AnalysisCurrentCharacterText.Text = string.IsNullOrWhiteSpace(context.CharacterName)
+                ? "Not detected"
+                : context.CharacterName;
+            AnalysisCurrentSystemText.Text = string.IsNullOrWhiteSpace(context.SolarSystemName)
+                ? "Not detected"
+                : context.SolarSystemName;
+            AnalysisEvidenceSourceText.Text = string.IsNullOrWhiteSpace(context.EvidenceSource)
+                ? "Not configured"
+                : context.EvidenceSource;
+            AnalysisObservedAtText.Text = context.EvidenceTimestampUtc.HasValue
+                ? context.EvidenceTimestampUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                : "Not detected";
+
+            var statusParts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(context.Confidence))
+            {
+                statusParts.Add(context.Confidence);
+            }
+
+            if (!string.IsNullOrWhiteSpace(context.StatusMessage))
+            {
+                statusParts.Add(context.StatusMessage);
+            }
+
+            AnalysisContextStatusText.Text = statusParts.Count > 0
+                ? string.Join(" | ", statusParts)
+                : "Unable to infer EVE context";
+        }
+
+        private void PopulateAnalysisAllianceTopText(IReadOnlyList<AnalysisAffiliationSummary> alliances)
+        {
+            AnalysisAllianceTopText.Inlines.Clear();
+            AnalysisAllianceTopText.Inlines.Add(new Run("Top alliances: "));
+
+            if (alliances.Count == 0)
+            {
+                AnalysisAllianceTopText.Inlines.Add(new Run("none visible"));
+                return;
+            }
+
+            for (var index = 0; index < alliances.Count; index++)
+            {
+                if (index > 0)
+                {
+                    AnalysisAllianceTopText.Inlines.Add(new Run(" | "));
+                }
+
+                var alliance = alliances[index];
+                if (!string.IsNullOrWhiteSpace(alliance.Id) &&
+                    long.TryParse(alliance.Id, out _))
+                {
+                    AddHyperlinkInline(
+                        AnalysisAllianceTopText,
+                        alliance.Name,
+                        BuildAllianceZkillUrl(alliance.Id),
+                        $"Open {alliance.Name} on zKill");
+                }
+                else
+                {
+                    AnalysisAllianceTopText.Inlines.Add(new Run(alliance.Name));
+                }
+
+                AnalysisAllianceTopText.Inlines.Add(new Run($" [{alliance.Count}]"));
+            }
+        }
+
+        private void PopulateAnalysisCorpTopText(IReadOnlyList<AnalysisAffiliationSummary> corps)
+        {
+            AnalysisCorpTopText.Inlines.Clear();
+            AnalysisCorpTopText.Inlines.Add(new Run("Top corps: "));
+
+            if (corps.Count == 0)
+            {
+                AnalysisCorpTopText.Inlines.Add(new Run("none visible"));
+                return;
+            }
+
+            for (var index = 0; index < corps.Count; index++)
+            {
+                if (index > 0)
+                {
+                    AnalysisCorpTopText.Inlines.Add(new Run(" | "));
+                }
+
+                var corp = corps[index];
+                if (!string.IsNullOrWhiteSpace(corp.Id) &&
+                    long.TryParse(corp.Id, out _))
+                {
+                    AddHyperlinkInline(
+                        AnalysisCorpTopText,
+                        corp.Name,
+                        BuildCorporationZkillUrl(corp.Id),
+                        $"Open {corp.Name} on zKill");
+                }
+                else
+                {
+                    AnalysisCorpTopText.Inlines.Add(new Run(corp.Name));
+                }
+
+                AnalysisCorpTopText.Inlines.Add(new Run($" [{corp.Count}]"));
+            }
+        }
+
+        private void PopulateAnalysisHighlightsText(IReadOnlyList<PilotBoardRow> visibleRows)
+        {
+            AnalysisHighlightsText.Inlines.Clear();
+            AnalysisHighlightsText.Inlines.Add(new Run("Highlights: "));
+
+            var topDangerousPilots = visibleRows
+                .Where(row => (row.KillCount ?? 0) > 0 || (row.LossCount ?? 0) > 0)
+                .OrderByDescending(row => ComputeDangerPercent(row))
+                .ThenByDescending(row => row.KillCount ?? 0)
+                .ThenBy(row => row.CharacterName, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(
+                    row => !string.IsNullOrWhiteSpace(row.CharacterId)
+                        ? $"id:{row.CharacterId.Trim()}"
+                        : $"name:{row.CharacterName.Trim().ToUpperInvariant()}",
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .Take(3)
+                .ToList();
+
+            var addedAny = false;
+            for (var index = 0; index < topDangerousPilots.Count; index++)
+            {
+                var pilot = topDangerousPilots[index];
+                AddHighlightCharacterLink(
+                    AnalysisHighlightsText,
+                    index == 0 ? "Top Dangerous" : string.Empty,
+                    pilot.CharacterName,
+                    pilot.CharacterId,
+                    $"{ComputeDangerPercent(pilot):0.#}%",
+                    ref addedAny);
+            }
+
+            if (!addedAny)
+            {
+                AnalysisHighlightsText.Inlines.Add(new Run("none visible"));
+            }
+        }
+
+        private void AddHighlightCharacterLink(
+            TextBlock target,
+            string label,
+            string characterName,
+            string characterId,
+            string valueText,
+            ref bool addedAny)
+        {
+            if (addedAny)
+            {
+                target.Inlines.Add(new Run(" | "));
+            }
+
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                target.Inlines.Add(new Run($"{label}: "));
+            }
+
+            var hasCharacterId = !string.IsNullOrWhiteSpace(characterId) && long.TryParse(characterId, out _);
+            if (hasCharacterId)
+            {
+                AddHyperlinkInline(
+                    target,
+                    characterName,
+                    _zkillUrlBuilder.BuildCharacterUrl(characterId),
+                    $"Open {characterName} on zKill");
+            }
+            else
+            {
+                target.Inlines.Add(new Run(characterName));
+            }
+
+            target.Inlines.Add(new Run($" [{valueText}]"));
+            addedAny = true;
+        }
+
+        private static double ComputeDangerPercent(PilotBoardRow row)
+        {
+            var kills = Math.Max(0, row.KillCount ?? 0);
+            var losses = Math.Max(0, row.LossCount ?? 0);
+            var total = kills + losses;
+
+            return total <= 0
+                ? 0
+                : (double)kills / total * 100d;
+        }
+
+        private void AddHyperlinkInline(TextBlock target, string text, string url, string toolTip)
+        {
+            var hyperlink = new Hyperlink(new Run(text))
+            {
+                NavigateUri = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri : null,
+                ToolTip = toolTip
+            };
+            hyperlink.RequestNavigate += AnalysisHyperlink_RequestNavigate;
+            target.Inlines.Add(hyperlink);
+        }
+
+        private string BuildAllianceZkillUrl(string allianceId)
+        {
+            return string.IsNullOrWhiteSpace(allianceId)
+                ? string.Empty
+                : $"https://zkillboard.com/alliance/{Uri.EscapeDataString(allianceId.Trim())}/";
+        }
+
+        private string BuildCorporationZkillUrl(string corporationId)
+        {
+            return string.IsNullOrWhiteSpace(corporationId)
+                ? string.Empty
+                : $"https://zkillboard.com/corporation/{Uri.EscapeDataString(corporationId.Trim())}/";
+        }
+
+        private void AnalysisHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            e.Handled = true;
+
+            var url = e.Uri?.AbsoluteUri;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            try
+            {
+                _browserLauncher.OpenUrl(url);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError($"Failed to open analysis hyperlink. url='{url}'", ex);
+            }
+        }
+
+        private void AnalysisAllianceListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            OpenAnalysisAffiliationItem(AnalysisAllianceListBox?.SelectedItem as AnalysisAffiliationListItem);
+        }
+
+        private void AnalysisCorpListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            OpenAnalysisAffiliationItem(AnalysisCorpListBox?.SelectedItem as AnalysisAffiliationListItem);
+        }
+
+        private void OpenAnalysisAffiliationItem(AnalysisAffiliationListItem? item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.Id) || !long.TryParse(item.Id, out _))
+            {
+                return;
+            }
+
+            var url = string.Equals(item.EntityType, "alliance", StringComparison.OrdinalIgnoreCase)
+                ? BuildAllianceZkillUrl(item.Id)
+                : BuildCorporationZkillUrl(item.Id);
+
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            try
+            {
+                _browserLauncher.OpenUrl(url);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.UiError($"Failed to open analysis affiliation item. type='{item.EntityType}' id='{item.Id}'", ex);
+            }
+        }
+
+        private sealed record AnalysisAffiliationSummary(string Name, int Count, string Id);
+        private sealed record AnalysisAffiliationListItem(string Name, string Id, string EntityType, string DisplayText);
+
+        private void RestoreWindowLayoutFromSettings()
+        {
+            var virtualDesktopSummary = BuildVirtualDesktopSummary();
+            var fallbackBounds = GetDefaultWindowBoundsForCurrentDisplay();
+            var hasSavedBounds = TryGetSavedWindowBounds(out var savedBounds);
+
+            Rect targetBounds;
+            string restoreDecision;
+            string restoreReason;
+
+            if (!hasSavedBounds)
+            {
+                targetBounds = fallbackBounds;
+                restoreDecision = "Fallback";
+                restoreReason = "No saved bounds were available.";
+            }
+            else if (!TryValidateWindowBounds(savedBounds, out var failureReason))
+            {
+                targetBounds = fallbackBounds;
+                restoreDecision = "Fallback";
+                restoreReason = failureReason;
+            }
+            else
+            {
+                targetBounds = savedBounds;
+                restoreDecision = "Applied";
+                restoreReason = "Saved bounds are visible on the current monitor layout.";
+            }
+
+            AppLogger.UiInfo(
+                $"Window layout restore decision={restoreDecision} savedBounds={DescribeRect(hasSavedBounds ? savedBounds : Rect.Empty)} fallbackReason='{restoreReason}' wasMaximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={virtualDesktopSummary}");
+
+            WindowState = WindowState.Normal;
+            Left = targetBounds.Left;
+            Top = targetBounds.Top;
+            Width = targetBounds.Width;
+            Height = targetBounds.Height;
+            _lastKnownNormalBounds = targetBounds;
+
+            if (_appSettings.SavedWindowIsMaximized)
+            {
+                WindowState = WindowState.Maximized;
+            }
+
+            _lastNonMinimizedWindowState = _appSettings.SavedWindowIsMaximized
+                ? WindowState.Maximized
+                : WindowState.Normal;
+
+            AppLogger.UiInfo(
+                $"Window layout restore applied finalBounds={DescribeRect(targetBounds)} finalWindowState={WindowState}");
+        }
+
+        private void SaveWindowLayoutToSettings(string reason)
+        {
+            var effectiveState = WindowState == WindowState.Minimized
+                ? _lastNonMinimizedWindowState
+                : WindowState;
+
+            if (effectiveState == WindowState.Maximized && IsUsableWindowBounds(RestoreBounds))
+            {
+                _lastKnownNormalBounds = RestoreBounds;
+            }
+            else if (WindowState == WindowState.Normal)
+            {
+                TrackCurrentNormalWindowBounds("Save");
+            }
+
+            var bounds = IsUsableWindowBounds(_lastKnownNormalBounds)
+                ? _lastKnownNormalBounds
+                : effectiveState == WindowState.Maximized
+                    ? RestoreBounds
+                    : new Rect(Left, Top, Width, Height);
+
+            if (!TryValidateWindowBounds(bounds, out var failureReason))
+            {
+                AppLogger.UiWarn(
+                    $"Window layout save skipped. reason='{reason}' bounds={DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={BuildVirtualDesktopSummary()}");
+                return;
+            }
+
+            _appSettings.SavedWindowLeft = bounds.Left;
+            _appSettings.SavedWindowTop = bounds.Top;
+            _appSettings.SavedWindowWidth = bounds.Width;
+            _appSettings.SavedWindowHeight = bounds.Height;
+            _appSettings.SavedWindowIsMaximized = effectiveState == WindowState.Maximized;
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo(
+                $"Window layout saved. reason='{reason}' bounds={DescribeRect(bounds)} maximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={BuildVirtualDesktopSummary()}");
+        }
+
+        private void ClearSavedWindowLayoutSettings()
+        {
+            _appSettings.SavedWindowLeft = null;
+            _appSettings.SavedWindowTop = null;
+            _appSettings.SavedWindowWidth = null;
+            _appSettings.SavedWindowHeight = null;
+            _appSettings.SavedWindowIsMaximized = false;
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+        }
+
+        private bool TryGetSavedWindowBounds(out Rect bounds)
+        {
+            bounds = Rect.Empty;
+
+            if (!_appSettings.SavedWindowLeft.HasValue ||
+                !_appSettings.SavedWindowTop.HasValue ||
+                !_appSettings.SavedWindowWidth.HasValue ||
+                !_appSettings.SavedWindowHeight.HasValue)
+            {
+                return false;
+            }
+
+            bounds = new Rect(
+                _appSettings.SavedWindowLeft.Value,
+                _appSettings.SavedWindowTop.Value,
+                _appSettings.SavedWindowWidth.Value,
+                _appSettings.SavedWindowHeight.Value);
+
+            return true;
+        }
+
+        private bool TryValidateWindowBounds(Rect bounds, out string failureReason)
+        {
+            if (double.IsNaN(bounds.Left) || double.IsInfinity(bounds.Left) ||
+                double.IsNaN(bounds.Top) || double.IsInfinity(bounds.Top) ||
+                double.IsNaN(bounds.Width) || double.IsInfinity(bounds.Width) ||
+                double.IsNaN(bounds.Height) || double.IsInfinity(bounds.Height))
+            {
+                failureReason = "Bounds contained NaN or Infinity.";
+                return false;
+            }
+
+            if (bounds.Width < Math.Max(MinWidth, MinimumSavedWindowWidth) ||
+                bounds.Height < Math.Max(MinHeight, MinimumSavedWindowHeight))
+            {
+                failureReason = "Bounds were smaller than the minimum safe size.";
+                return false;
+            }
+
+            foreach (var workArea in GetMonitorWorkAreasDip())
+            {
+                var intersection = Rect.Intersect(
+                    bounds,
+                    workArea);
+
+                if (!intersection.IsEmpty &&
+                    intersection.Width >= MinimumVisibleWindowEdge &&
+                    intersection.Height >= MinimumVisibleWindowEdge)
+                {
+                    failureReason = string.Empty;
+                    return true;
+                }
+            }
+
+            failureReason = "Bounds were outside the current monitor work areas.";
+            return false;
+        }
+
+        private Rect GetDefaultWindowBoundsForCurrentDisplay()
+        {
+            var fallbackScreen = FormsScreen.PrimaryScreen
+                ?? FormsScreen.AllScreens.FirstOrDefault();
+            var workArea = fallbackScreen != null
+                ? GetScreenWorkAreaDip(fallbackScreen)
+                : new Rect(0, 0, 1280, 800);
+
+            var width = Math.Max(MinimumSavedWindowWidth, DefaultWindowWidth);
+            var height = Math.Max(MinimumSavedWindowHeight, DefaultWindowHeight);
+
+            width = Math.Min(width, workArea.Width);
+            height = Math.Min(height, workArea.Height);
+
+            var left = workArea.Left + Math.Max(0, (workArea.Width - width) / 2);
+            var top = workArea.Top + Math.Max(0, (workArea.Height - height) / 2);
+
+            return new Rect(left, top, width, height);
+        }
+
+        private bool IsUsableWindowBounds(Rect bounds)
+        {
+            return !bounds.IsEmpty &&
+                   !double.IsNaN(bounds.Left) &&
+                   !double.IsNaN(bounds.Top) &&
+                   !double.IsNaN(bounds.Width) &&
+                   !double.IsNaN(bounds.Height) &&
+                   !double.IsInfinity(bounds.Left) &&
+                   !double.IsInfinity(bounds.Top) &&
+                   !double.IsInfinity(bounds.Width) &&
+                   !double.IsInfinity(bounds.Height) &&
+                   bounds.Width > 0 &&
+                   bounds.Height > 0;
+        }
+
+        private IReadOnlyList<Rect> GetMonitorWorkAreasDip()
+        {
+            return FormsScreen.AllScreens
+                .Select(GetScreenWorkAreaDip)
+                .Where(IsUsableWindowBounds)
+                .ToList();
+        }
+
+        private Rect GetScreenWorkAreaDip(FormsScreen screen)
+        {
+            var workArea = screen.WorkingArea;
+            var topLeft = DevicePixelsToDip(new Point(workArea.Left, workArea.Top));
+            var bottomRight = DevicePixelsToDip(new Point(workArea.Right, workArea.Bottom));
+            return new Rect(topLeft, bottomRight);
+        }
+
+        private Point DevicePixelsToDip(Point devicePoint)
+        {
+            var source = PresentationSource.FromVisual(this);
+            if (source?.CompositionTarget != null)
+            {
+                return source.CompositionTarget.TransformFromDevice.Transform(devicePoint);
+            }
+
+            return devicePoint;
+        }
+
+        private string BuildVirtualDesktopSummary()
+        {
+            var workAreas = GetMonitorWorkAreasDip();
+            if (workAreas.Count == 0)
+            {
+                return "none";
+            }
+
+            var virtualBounds = workAreas[0];
+            foreach (var workArea in workAreas.Skip(1))
+            {
+                virtualBounds = Rect.Union(virtualBounds, workArea);
+            }
+
+            return $"virtual={DescribeRect(virtualBounds)} workAreas={string.Join(";", workAreas.Select(DescribeRect))}";
+        }
+
+        private static string DescribeRect(Rect bounds)
+        {
+            return bounds.IsEmpty
+                ? "<empty>"
+                : $"[{bounds.Left:0.##},{bounds.Top:0.##},{bounds.Width:0.##},{bounds.Height:0.##}]";
+        }
+
         private async Task RunEnableKillmailDbPullAsync()
         {
             try
@@ -2703,6 +4780,12 @@ namespace PitmastersGrill
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
 
     }
 }
