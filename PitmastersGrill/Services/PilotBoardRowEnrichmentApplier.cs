@@ -141,21 +141,7 @@ namespace PitmastersGrill.Services
 
         private static string FormatLastSeenDate(string utcValue)
         {
-            if (string.IsNullOrWhiteSpace(utcValue))
-            {
-                return string.Empty;
-            }
-
-            if (!DateTime.TryParse(
-                    utcValue,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsed))
-            {
-                return string.Empty;
-            }
-
-            return parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return LastSeenDisplayFormatter.FormatLastSeen(utcValue);
         }
 
         private static EnrichmentStageState MapOutcomeToStageState(ProviderOutcomeKind outcomeKind)

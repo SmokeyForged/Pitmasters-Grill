@@ -16,7 +16,7 @@ namespace PitmastersGrill.Models
 
         public double WindowOpacityPercent { get; set; } = 100;
 
-        public bool PanelModeEnabled { get; set; } = false;
+        public bool PanelModeEnabled { get; set; } = true;
 
         public bool CompactModeEnabled { get; set; } = false;
 

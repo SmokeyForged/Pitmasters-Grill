@@ -209,21 +209,7 @@ namespace PitmastersGrill.Services
 
         private static string FormatLastSeenDate(string utcValue)
         {
-            if (string.IsNullOrWhiteSpace(utcValue))
-            {
-                return "";
-            }
-
-            if (!DateTime.TryParse(
-                    utcValue,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsed))
-            {
-                return "";
-            }
-
-            return parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return LastSeenDisplayFormatter.FormatLastSeen(utcValue);
         }
     }
 }

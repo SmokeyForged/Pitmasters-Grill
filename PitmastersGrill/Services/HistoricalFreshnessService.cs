@@ -504,7 +504,8 @@ namespace PitmastersGrill.Services
                         uploadedAtUtc: "",
                         killmailTimeUtc: killmailRef.KillmailTimeUtc,
                         dayUtc: killmailRef.DayUtc,
-                        error: killmailFetch.Error), cancellationToken);
+                        error: killmailFetch.Error,
+                        cancellationToken: cancellationToken), cancellationToken);
                     continue;
                 }
 
@@ -527,7 +528,7 @@ namespace PitmastersGrill.Services
                         Source = HistoricalFreshnessSource,
                         SequenceId = 0,
                         UploadedAtUtc = ""
-                    }),
+                    }, cancellationToken),
                     cancellationToken);
 
                 AppLogger.KillmailImportDebug(

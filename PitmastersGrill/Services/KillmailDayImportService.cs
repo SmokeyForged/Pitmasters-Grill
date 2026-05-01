@@ -13,6 +13,7 @@ namespace PitmastersGrill.Services
 {
     public class KillmailDayImportService
     {
+        private readonly KillmailDbWriteGate _writeGate;
         private readonly DayImportStateRepository _dayImportStateRepository;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly KillmailDayArchiveProvider _killmailDayArchiveProvider;
@@ -26,10 +27,12 @@ namespace PitmastersGrill.Services
         private static readonly KillmailDerivedObservationParser SharedKillmailParser = new();
 
         public KillmailDayImportService(
+            KillmailDbWriteGate writeGate,
             DayImportStateRepository dayImportStateRepository,
             KillmailDatasetMetadataRepository metadataRepository,
             KillmailDayArchiveProvider killmailDayArchiveProvider)
         {
+            _writeGate = writeGate ?? throw new ArgumentNullException(nameof(writeGate));
             _dayImportStateRepository = dayImportStateRepository;
             _metadataRepository = metadataRepository;
             _killmailDayArchiveProvider = killmailDayArchiveProvider;
@@ -50,6 +53,9 @@ namespace PitmastersGrill.Services
         {
             var totalStopwatch = Stopwatch.StartNew();
             var utcNow = DateTime.UtcNow.ToString("o");
+            using var writeGate = await _writeGate.EnterAsync(
+                $"archive day import day={remoteDay.DayUtc}",
+                cancellationToken);
 
             DebugTraceWriter.WriteLine(
                 $"killmail import start: day={remoteDay.DayUtc}, remoteTotalCount={remoteDay.RemoteTotalCount}");

@@ -361,7 +361,7 @@ namespace PitmastersGrill.Services
                 Source = "r2z2",
                 SequenceId = envelope.SequenceId,
                 UploadedAtUtc = envelope.UploadedAtUtc
-            });
+            }, CancellationToken.None);
 
             if (!importResult.Success)
             {

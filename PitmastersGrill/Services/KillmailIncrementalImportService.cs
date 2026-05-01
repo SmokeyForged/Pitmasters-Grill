@@ -4,21 +4,24 @@ using PitmastersGrill.Persistence;
 using PitmastersGrill.Providers;
 using System;
 using System.Globalization;
+using System.Threading;
 
 namespace PitmastersGrill.Services
 {
     public sealed class KillmailIncrementalImportService
     {
         private readonly string _databasePath;
+        private readonly KillmailDbWriteGate _writeGate;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly KillmailDerivedObservationParser _parser = new();
         private readonly CynoShipCatalog _cynoShipCatalog = new();
 
-        public KillmailIncrementalImportService(string databasePath)
+        public KillmailIncrementalImportService(string databasePath, KillmailDbWriteGate writeGate)
         {
             _databasePath = string.IsNullOrWhiteSpace(databasePath)
                 ? throw new ArgumentException("Database path is required.", nameof(databasePath))
                 : databasePath;
+            _writeGate = writeGate ?? throw new ArgumentNullException(nameof(writeGate));
             _metadataRepository = new KillmailDatasetMetadataRepository(databasePath);
         }
 
@@ -29,12 +32,18 @@ namespace PitmastersGrill.Services
             return LoadSeenRecord(connection, transaction: null, killmailId);
         }
 
-        public IncrementalKillmailImportResult ImportKillmailJson(IncrementalKillmailImportRequest request)
+        public IncrementalKillmailImportResult ImportKillmailJson(
+            IncrementalKillmailImportRequest request,
+            CancellationToken cancellationToken = default)
         {
             if (request == null)
             {
                 throw new ArgumentNullException(nameof(request));
             }
+
+            using var writeGate = _writeGate.Enter(
+                $"incremental import source={request.Source} killmailId={request.KillmailId}",
+                cancellationToken);
 
             var parsed = _parser.ParseKillmailEntry(request.KillmailJson);
             if (parsed == null)
@@ -173,8 +182,13 @@ namespace PitmastersGrill.Services
             string uploadedAtUtc,
             string killmailTimeUtc,
             string dayUtc,
-            string error)
+            string error,
+            CancellationToken cancellationToken = default)
         {
+            using var writeGate = _writeGate.Enter(
+                $"incremental failure source={source} killmailId={killmailId}",
+                cancellationToken);
+
             using var connection = new SqliteConnection($"Data Source={_databasePath}");
             connection.Open();
 

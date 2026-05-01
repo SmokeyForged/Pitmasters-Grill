@@ -11,10 +11,13 @@ namespace PitmastersGrill.Services
     public class BackgroundIntelUpdateService
     {
         private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(10);
+        private const string ForegroundFreshnessBusyMessage = "Another freshness operation is already running.";
 
         private readonly object _sync = new();
         private readonly SemaphoreSlim _wakeSignal = new(0, 1);
+        private readonly SemaphoreSlim _foregroundFreshnessOperationGate = new(1, 1);
         private readonly KillmailDatasetFreshnessService _freshnessService;
+        private readonly KillmailDbWriteGate _writeGate;
         private readonly KillmailDayImportService _killmailDayImportService;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly R2Z2LiveKillmailService _r2z2LiveKillmailService;
@@ -37,12 +40,14 @@ namespace PitmastersGrill.Services
 
         public BackgroundIntelUpdateService(
             KillmailDatasetFreshnessService freshnessService,
+            KillmailDbWriteGate writeGate,
             KillmailDayImportService killmailDayImportService,
             R2Z2LiveKillmailService r2z2LiveKillmailService,
             TodaysFreshnessService todaysFreshnessService,
             HistoricalFreshnessService historicalFreshnessService)
         {
             _freshnessService = freshnessService;
+            _writeGate = writeGate ?? throw new ArgumentNullException(nameof(writeGate));
             _killmailDayImportService = killmailDayImportService;
             _metadataRepository = new KillmailDatasetMetadataRepository(KillmailPaths.GetKillmailDatabasePath());
             _r2z2LiveKillmailService = r2z2LiveKillmailService;
@@ -98,14 +103,40 @@ namespace PitmastersGrill.Services
             return _r2z2LiveKillmailService.SetEnabledAsync(enabled, cancellationToken);
         }
 
-        public Task<TodaysFreshnessRunResult> RunTodaysFreshnessAsync(IReadOnlyCollection<long> characterIds, CancellationToken cancellationToken = default)
+        public async Task<TodaysFreshnessRunResult> RunTodaysFreshnessAsync(IReadOnlyCollection<long> characterIds, CancellationToken cancellationToken = default)
         {
-            return _todaysFreshnessService.RunAsync(characterIds, cancellationToken);
+            if (!await _foregroundFreshnessOperationGate.WaitAsync(0, cancellationToken))
+            {
+                AppLogger.KillmailImportInfo("Today's Freshness start skipped because another foreground freshness operation is already active.");
+                return CreateForegroundFreshnessBusyTodaysResult(characterIds);
+            }
+
+            try
+            {
+                return await _todaysFreshnessService.RunAsync(characterIds, cancellationToken);
+            }
+            finally
+            {
+                _foregroundFreshnessOperationGate.Release();
+            }
         }
 
-        public Task<HistoricalFreshnessRunResult> RunHistoricalFreshnessAsync(IReadOnlyCollection<long> characterIds, CancellationToken cancellationToken = default)
+        public async Task<HistoricalFreshnessRunResult> RunHistoricalFreshnessAsync(IReadOnlyCollection<long> characterIds, CancellationToken cancellationToken = default)
         {
-            return _historicalFreshnessService.RunAsync(characterIds, cancellationToken);
+            if (!await _foregroundFreshnessOperationGate.WaitAsync(0, cancellationToken))
+            {
+                AppLogger.KillmailImportInfo("Historical Freshness start skipped because another foreground freshness operation is already active.");
+                return CreateForegroundFreshnessBusyHistoricalResult(characterIds);
+            }
+
+            try
+            {
+                return await _historicalFreshnessService.RunAsync(characterIds, cancellationToken);
+            }
+            finally
+            {
+                _foregroundFreshnessOperationGate.Release();
+            }
         }
 
         public void ScheduleBackgroundHistoricalRepairAfterUiShown(Func<IReadOnlyCollection<long>> visibleCharacterIdsProvider)
@@ -432,6 +463,9 @@ namespace PitmastersGrill.Services
             KillmailPaths.ClearArchiveCacheBestEffort();
 
             cancellationToken.ThrowIfCancellationRequested();
+            using var writeGate = _writeGate.Enter(
+                $"killmail reset/reseed startDay={bootstrapStartDayUtc}",
+                cancellationToken);
 
             var connectionString = $"Data Source={KillmailPaths.GetKillmailDatabasePath()}";
             using var connection = new SqliteConnection(connectionString);
@@ -447,9 +481,12 @@ namespace PitmastersGrill.Services
             ExecuteNonQuery(connection, transaction, "DELETE FROM pilot_cyno_tackle_observations_day;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM live_killmail_seen;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM live_killmail_feed_state;");
+            ExecuteNonQuery(connection, transaction, "DELETE FROM historical_freshness_checkpoint;");
             transaction.Commit();
 
             cancellationToken.ThrowIfCancellationRequested();
+
+            AppLogger.KillmailImportInfo("Historical freshness checkpoints cleared during full killmail reset/reseed.");
 
             _metadataRepository.SetValue("latest_complete_day_utc", "");
             _metadataRepository.SetValue("last_successful_update_at_utc", "");
@@ -465,6 +502,30 @@ namespace PitmastersGrill.Services
             command.Transaction = transaction;
             command.CommandText = sql;
             command.ExecuteNonQuery();
+        }
+
+        private static TodaysFreshnessRunResult CreateForegroundFreshnessBusyTodaysResult(IReadOnlyCollection<long> characterIds)
+        {
+            return new TodaysFreshnessRunResult
+            {
+                Success = false,
+                VisiblePilotsTargeted = characterIds?.Count ?? 0,
+                LastError = ForegroundFreshnessBusyMessage,
+                DetailText = ForegroundFreshnessBusyMessage
+            };
+        }
+
+        private static HistoricalFreshnessRunResult CreateForegroundFreshnessBusyHistoricalResult(IReadOnlyCollection<long> characterIds)
+        {
+            return new HistoricalFreshnessRunResult
+            {
+                Success = false,
+                Mode = "Manual",
+                VisiblePilotsTargeted = characterIds?.Count ?? 0,
+                CandidatePilotsConsidered = characterIds?.Count ?? 0,
+                LastError = ForegroundFreshnessBusyMessage,
+                DetailText = ForegroundFreshnessBusyMessage
+            };
         }
 
         private async Task WaitForForegroundPriorityToClearAsync(CancellationToken cancellationToken)
@@ -557,11 +618,14 @@ namespace PitmastersGrill.Services
 
             if (!string.IsNullOrWhiteSpace(_notPublishedBoundaryDayUtc))
             {
-                var isCoverageComplete = freshness.IsRequestedCoverageComplete;
+                var isBlockedOnlyByUnpublishedBoundary = IsBlockedOnlyByUnpublishedBoundary(freshness, _notPublishedBoundaryDayUtc);
+                var isCurrentThroughLatestPublishedArchive = freshness.IsRequestedCoverageComplete || isBlockedOnlyByUnpublishedBoundary;
+                var notPublishedDetail = BuildLatestPublishedArchiveDetail(freshness, _notPublishedBoundaryDayUtc);
+
                 return new IntelUpdateStatusSnapshot
                 {
                     IsRunning = false,
-                    IsCurrentThroughYesterday = freshness.IsCurrentThroughRequiredDay && isCoverageComplete,
+                    IsCurrentThroughYesterday = isCurrentThroughLatestPublishedArchive,
                     HasError = false,
                     IsForegroundPriorityActive = foregroundActive,
                     EarliestCompleteDayUtc = freshness.EarliestCompleteDayUtc,
@@ -570,7 +634,7 @@ namespace PitmastersGrill.Services
                     RequestedStartDayUtc = freshness.RequestedStartDayUtc,
                     CurrentImportDayUtc = "",
                     LastSuccessfulUpdateAtUtc = lastSuccessfulUpdateAtUtc,
-                    IsRequestedCoverageComplete = freshness.IsRequestedCoverageComplete,
+                    IsRequestedCoverageComplete = isCurrentThroughLatestPublishedArchive,
                     HasRequestedCoverageWindow = freshness.HasRequestedCoverageWindow,
                     RequestedHistoryDays = freshness.RequestedHistoryDays,
                     RequestedCoverageDays = freshness.RequestedCoverageDays,
@@ -578,17 +642,17 @@ namespace PitmastersGrill.Services
                     MissingDayCount = 0,
                     TotalDaysInCurrentRun = 0,
                     CompletedDaysInCurrentRun = 0,
-                    StatusText = isCoverageComplete
+                    StatusText = isCurrentThroughLatestPublishedArchive
                         ? "LOCAL INTEL CURRENT — through latest published archive"
                         : "LOCAL INTEL PARTIALLY POPULATED — latest published archive reached",
-                    DetailText = coverageDetail,
+                    DetailText = notPublishedDetail,
                     ErrorText = "",
                     TotalProgressIsIndeterminate = false,
                     TotalProgressPercent = 100,
-                    TotalProgressText = "Local killmail intel is current through the latest published archive.",
+                    TotalProgressText = $"Local killmail intel is current through the latest published archive. Waiting for archive day {_notPublishedBoundaryDayUtc} to publish.",
                     CurrentDayProgressIsIndeterminate = false,
                     CurrentDayProgressPercent = 0,
-                    CurrentDayProgressText = "No update currently running.",
+                    CurrentDayProgressText = $"Archive day {_notPublishedBoundaryDayUtc} is not published yet. PMG will retry automatically.",
                     LiveFeed = liveFeedSnapshot,
                     TodaysFreshness = todaysFreshnessSnapshot,
                     HistoricalFreshness = historicalFreshnessSnapshot
@@ -792,6 +856,32 @@ namespace PitmastersGrill.Services
             }
 
             return "No update currently running.";
+        }
+
+        private static bool IsBlockedOnlyByUnpublishedBoundary(KillmailDatasetFreshnessStatus freshness, string boundaryDayUtc)
+        {
+            if (freshness == null || string.IsNullOrWhiteSpace(boundaryDayUtc))
+            {
+                return false;
+            }
+
+            if (freshness.MissingDayCount <= 0)
+            {
+                return true;
+            }
+
+            return string.Equals(freshness.FirstMissingDayUtc, boundaryDayUtc, StringComparison.Ordinal);
+        }
+
+        private static string BuildLatestPublishedArchiveDetail(KillmailDatasetFreshnessStatus freshness, string boundaryDayUtc)
+        {
+            var baseDetail = BuildCoverageDetail(freshness);
+            if (string.IsNullOrWhiteSpace(boundaryDayUtc))
+            {
+                return baseDetail;
+            }
+
+            return $"{baseDetail} Archive day {boundaryDayUtc} is not published yet; PMG will retry automatically.";
         }
 
         private static string BuildCoverageDetail(KillmailDatasetFreshnessStatus freshness)

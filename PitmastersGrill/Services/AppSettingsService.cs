@@ -92,7 +92,7 @@ namespace PitmastersGrill.Services
                 settings.PilotDetailPlacementPreference = PilotDetailPlacementPreference.AutoPreferRight.ToString();
             }
 
-            settings.PanelModeEnabled = settings.PanelModeEnabled;
+            settings.PanelModeEnabled = true;
             settings.ShowCorpAllianceCounts = settings.ShowCorpAllianceCounts;
 
             settings.ShowSigColumn ??= true;

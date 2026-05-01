@@ -63,6 +63,19 @@ namespace PitmastersGrill
         };
         private static readonly Dictionary<string, double> CanonicalBoardColumnMinimumWidths = new(StringComparer.OrdinalIgnoreCase)
         {
+            ["SigColumn"] = 34,
+            ["CharacterColumn"] = 72,
+            ["AllianceColumn"] = 72,
+            ["CorpColumn"] = 82,
+            ["KillsColumn"] = 42,
+            ["LossesColumn"] = 42,
+            ["AvgFleetSizeColumn"] = 48,
+            ["LastShipSeenColumn"] = 64,
+            ["LastSeenColumn"] = 54,
+            ["CynoHullSeenColumn"] = 70
+        };
+        private static readonly Dictionary<string, double> CanonicalBoardColumnDefaultWidths = new(StringComparer.OrdinalIgnoreCase)
+        {
             ["SigColumn"] = 42,
             ["CharacterColumn"] = 120,
             ["AllianceColumn"] = 120,
@@ -129,6 +142,7 @@ namespace PitmastersGrill
         private DependencyPropertyDescriptor? _boardColumnWidthDescriptor;
         private bool? _lastAppliedCompactMode;
         private bool _isApplyingBoardColumnLayout;
+        private bool _isBoardColumnAutoFitPending;
         private bool _isBoardColumnLayoutReadyForPersistence;
         private bool _globalResetWindowHotKeyRegistered;
         private EveSessionContext? _currentEveSessionContext;
@@ -245,6 +259,7 @@ namespace PitmastersGrill
                 ColorBlindModeComboBox,
                 LogLevelComboBox);
             EnableLiveZkillFeedCheckBox.IsChecked = _appSettings.LiveZkillFeedEnabled;
+            BackgroundHistoricalRepairEnabledCheckBox.IsChecked = _appSettings.BackgroundHistoricalRepairEnabled;
 
             InitializeBoardColumnVisibilityUi();
             InitializeBoardColumnLayoutUi();
@@ -414,6 +429,10 @@ namespace PitmastersGrill
             if (MainTabControl.SelectedIndex == 0)
             {
                 TriggerSessionContextRefresh("analysis tab selection", force: IsSessionContextStale());
+            }
+            else if (MainTabControl.SelectedIndex == 1)
+            {
+                ScheduleFitVisibleBoardColumnsToViewport(force: true);
             }
         }
 
@@ -915,6 +934,8 @@ namespace PitmastersGrill
             {
                 _isApplyingBoardColumnLayout = false;
             }
+
+            ScheduleFitVisibleBoardColumnsToViewport(force: true);
         }
 
         private void ApplyBoardColumnMinimumWidths()
@@ -1066,6 +1087,8 @@ namespace PitmastersGrill
                     }
                 }
 
+                ScheduleFitVisibleBoardColumnsToViewport();
+
                 AppLogger.UiInfo($"Board column layout applied. reason='{reason}'");
             }
             finally
@@ -1094,7 +1117,13 @@ namespace PitmastersGrill
 
         private void PilotBoard_ColumnReordered(object sender, DataGridColumnEventArgs e)
         {
+            ScheduleFitVisibleBoardColumnsToViewport();
             ScheduleBoardColumnLayoutSave("Column reordered");
+        }
+
+        private void PilotBoard_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            ScheduleFitVisibleBoardColumnsToViewport();
         }
 
         private void BoardColumnWidth_ValueChanged(object? sender, EventArgs e)
@@ -1213,7 +1242,7 @@ namespace PitmastersGrill
             {
                 ColumnKey = key,
                 DisplayIndex = displayIndex,
-                WidthValue = GetBoardColumnMinimumWidth(key),
+                WidthValue = GetBoardColumnDefaultWidth(key),
                 WidthUnitType = DataGridLengthUnitType.Pixel.ToString()
             };
         }
@@ -1344,7 +1373,211 @@ namespace PitmastersGrill
         {
             return CanonicalBoardColumnMinimumWidths.TryGetValue(key, out var width)
                 ? width
-                : 60;
+                : 50;
+        }
+
+        private static double GetBoardColumnDefaultWidth(string key)
+        {
+            return CanonicalBoardColumnDefaultWidths.TryGetValue(key, out var width)
+                ? width
+                : Math.Max(GetBoardColumnMinimumWidth(key), 80);
+        }
+
+        private void ScheduleFitVisibleBoardColumnsToViewport(bool force = false)
+        {
+            if (PilotBoard == null)
+            {
+                return;
+            }
+
+            if (_isBoardColumnAutoFitPending && !force)
+            {
+                return;
+            }
+
+            _isBoardColumnAutoFitPending = true;
+            Dispatcher.BeginInvoke(
+                new Action(() =>
+                {
+                    _isBoardColumnAutoFitPending = false;
+                    FitVisibleBoardColumnsToViewport();
+                }),
+                DispatcherPriority.ContextIdle);
+        }
+
+        private double GetPilotBoardViewportWidth()
+        {
+            if (PilotBoard == null)
+            {
+                return 0d;
+            }
+
+            try
+            {
+                var scrollViewer = FindVisualDescendant<ScrollViewer>(PilotBoard);
+                if (scrollViewer != null && scrollViewer.ViewportWidth > 0d)
+                {
+                    // Subtract a single device-independent pixel as a safety margin so WPF
+                    // does not decide a horizontal scrollbar is required from rounding.
+                    return Math.Max(0d, scrollViewer.ViewportWidth - 1d);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Visual tree may not be ready during early layout passes. Fall back below.
+            }
+
+            return Math.Max(0d, PilotBoard.ActualWidth - 1d);
+        }
+
+        private void FitVisibleBoardColumnsToViewport()
+        {
+            if (PilotBoard == null || _boardColumnsByKey.Count == 0 || PilotBoard.ActualWidth <= 0)
+            {
+                return;
+            }
+
+            PilotBoard.UpdateLayout();
+
+            var visibleColumns = _boardColumnsByKey.Values
+                .Where(column => column.Visibility == Visibility.Visible)
+                .OrderBy(column => column.DisplayIndex)
+                .ToList();
+
+            if (visibleColumns.Count == 0)
+            {
+                return;
+            }
+
+            var availableWidth = GetPilotBoardViewportWidth();
+            if (double.IsNaN(availableWidth) || double.IsInfinity(availableWidth) || availableWidth <= 40d)
+            {
+                return;
+            }
+
+            var columnPlans = visibleColumns
+                .Select(column =>
+                {
+                    var key = GetBoardColumnKey(column);
+                    var minimum = Math.Max(12d, GetBoardColumnMinimumWidth(key));
+                    var current = Math.Max(minimum, GetEffectiveBoardColumnWidth(column));
+                    return new BoardColumnFitPlan(column, minimum, current);
+                })
+                .ToList();
+
+            var minimumTotal = columnPlans.Sum(plan => plan.MinimumWidth);
+            var preferredTotal = columnPlans.Sum(plan => plan.CurrentWidth);
+
+            if (minimumTotal <= 0d || preferredTotal <= 0d)
+            {
+                return;
+            }
+
+            var wasApplyingLayout = _isApplyingBoardColumnLayout;
+            _isApplyingBoardColumnLayout = true;
+
+            try
+            {
+                if (minimumTotal >= availableWidth)
+                {
+                    var scale = Math.Max(0.6d, availableWidth / minimumTotal);
+                    foreach (var plan in columnPlans)
+                    {
+                        SetBoardColumnPixelWidth(plan.Column, Math.Max(18d, plan.MinimumWidth * scale));
+                    }
+
+                    return;
+                }
+
+                if (preferredTotal > availableWidth)
+                {
+                    var shortage = preferredTotal - availableWidth;
+                    var shrinkCapacity = columnPlans.Sum(plan => Math.Max(0d, plan.CurrentWidth - plan.MinimumWidth));
+
+                    foreach (var plan in columnPlans)
+                    {
+                        var targetWidth = plan.CurrentWidth;
+                        if (shrinkCapacity > 0d)
+                        {
+                            var share = Math.Max(0d, plan.CurrentWidth - plan.MinimumWidth) / shrinkCapacity;
+                            targetWidth = Math.Max(plan.MinimumWidth, plan.CurrentWidth - shortage * share);
+                        }
+
+                        SetBoardColumnPixelWidth(plan.Column, targetWidth);
+                    }
+
+                    return;
+                }
+
+                var extra = availableWidth - preferredTotal;
+                var expandableTotal = columnPlans.Sum(plan => Math.Max(plan.MinimumWidth, plan.CurrentWidth));
+                foreach (var plan in columnPlans)
+                {
+                    var share = expandableTotal > 0d
+                        ? Math.Max(plan.MinimumWidth, plan.CurrentWidth) / expandableTotal
+                        : 1d / columnPlans.Count;
+                    SetBoardColumnPixelWidth(plan.Column, plan.CurrentWidth + extra * share);
+                }
+            }
+            finally
+            {
+                _isApplyingBoardColumnLayout = wasApplyingLayout;
+            }
+        }
+
+        private static void SetBoardColumnPixelWidth(DataGridColumn column, double width)
+        {
+            if (column == null || double.IsNaN(width) || double.IsInfinity(width) || width <= 0d)
+            {
+                return;
+            }
+
+            var roundedWidth = Math.Round(width, 1);
+            if (Math.Abs(GetEffectiveBoardColumnWidth(column) - roundedWidth) < 0.5d &&
+                column.Width.UnitType == DataGridLengthUnitType.Pixel)
+            {
+                return;
+            }
+
+            column.Width = new DataGridLength(roundedWidth, DataGridLengthUnitType.Pixel);
+        }
+
+        private static double GetEffectiveBoardColumnWidth(DataGridColumn column)
+        {
+            if (column == null)
+            {
+                return 0d;
+            }
+
+            var width = column.ActualWidth;
+            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
+            {
+                width = column.Width.DisplayValue;
+            }
+
+            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
+            {
+                width = column.MinWidth;
+            }
+
+            return double.IsNaN(width) || double.IsInfinity(width) || width <= 0
+                ? 0d
+                : width;
+        }
+
+        private sealed record BoardColumnFitPlan(DataGridColumn Column, double MinimumWidth, double CurrentWidth);
+
+        private string GetBoardColumnKey(DataGridColumn column)
+        {
+            foreach (var pair in _boardColumnsByKey)
+            {
+                if (ReferenceEquals(pair.Value, column))
+                {
+                    return pair.Key;
+                }
+            }
+
+            return string.Empty;
         }
 
         private void SetAllOptionalBoardColumnSettings(bool isVisible)
@@ -1641,17 +1874,22 @@ namespace PitmastersGrill
                     : todaysFreshness.LastError;
             }
 
+            var historicalFreshness = snapshot.HistoricalFreshness ?? new HistoricalFreshnessSnapshot();
+
             if (RunTodaysFreshnessButton != null)
             {
                 var isRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                RunTodaysFreshnessButton.IsEnabled = !isRunning && !_isShuttingDown;
+                var historicalIsRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
+                                          string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
+                RunTodaysFreshnessButton.IsEnabled = !isRunning && !historicalIsRunning && !_isShuttingDown;
                 RunTodaysFreshnessButton.Content = isRunning
                     ? "Today's Freshness Running..."
+                    : historicalIsRunning
+                        ? "Historical Freshness Running..."
                     : "Refresh Today's zKill Intel";
             }
 
-            var historicalFreshness = snapshot.HistoricalFreshness ?? new HistoricalFreshnessSnapshot();
             if (HistoricalFreshnessStatusText != null)
             {
                 var statusText = string.IsNullOrWhiteSpace(historicalFreshness.Status)
@@ -1750,9 +1988,13 @@ namespace PitmastersGrill
             {
                 var isRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                RunHistoricalFreshnessButton.IsEnabled = !isRunning && !_isShuttingDown;
+                var todaysIsRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
+                                      string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
+                RunHistoricalFreshnessButton.IsEnabled = !isRunning && !todaysIsRunning && !_isShuttingDown;
                 RunHistoricalFreshnessButton.Content = isRunning
                     ? "Historical Freshness Running..."
+                    : todaysIsRunning
+                        ? "Today's Freshness Running..."
                     : "Repair Recent Historical Intel";
             }
         }
@@ -2942,6 +3184,19 @@ namespace PitmastersGrill
             }
         }
 
+        private void BackgroundHistoricalRepairEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            var enabled = BackgroundHistoricalRepairEnabledCheckBox.IsChecked == true;
+            _appSettings.BackgroundHistoricalRepairEnabled = enabled;
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+            AppLogger.UiInfo($"Background historical repair setting changed. enabled={enabled}");
+        }
+
         private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
             var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
@@ -2959,6 +3214,17 @@ namespace PitmastersGrill
             {
                 using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
                 var result = await _backgroundIntelUpdateService.RunTodaysFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
+
+                if (!result.Success &&
+                    string.Equals(result.LastError, "Another freshness operation is already running.", StringComparison.Ordinal))
+                {
+                    MessageBox.Show(
+                        "Another freshness operation is already running.",
+                        "PMG Today's Freshness",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
 
                 if (!_isShuttingDown && result.NewKillmailsImported > 0)
                 {
@@ -2998,6 +3264,28 @@ namespace PitmastersGrill
             {
                 using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
                 var result = await _backgroundIntelUpdateService.RunHistoricalFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
+
+                if (!result.Success &&
+                    string.Equals(result.LastError, "Another freshness operation is already running.", StringComparison.Ordinal))
+                {
+                    MessageBox.Show(
+                        "Another freshness operation is already running.",
+                        "PMG Historical Freshness",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                if (!result.Success &&
+                    string.Equals(result.LastError, "Historical Freshness already running.", StringComparison.Ordinal))
+                {
+                    MessageBox.Show(
+                        "Historical Freshness is already running.",
+                        "PMG Historical Freshness",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
 
                 if (!_isShuttingDown && result.MissingImportedCount > 0)
                 {
@@ -3543,6 +3831,33 @@ namespace PitmastersGrill
                    FindVisualParent<Thumb>(source) != null;
         }
 
+        private static T? FindVisualDescendant<T>(DependencyObject? root)
+            where T : DependencyObject
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            var childCount = VisualTreeHelper.GetChildrenCount(root);
+            for (var index = 0; index < childCount; index++)
+            {
+                var child = VisualTreeHelper.GetChild(root, index);
+                if (child is T match)
+                {
+                    return match;
+                }
+
+                var nested = FindVisualDescendant<T>(child);
+                if (nested != null)
+                {
+                    return nested;
+                }
+            }
+
+            return null;
+        }
+
         private static T? FindVisualParent<T>(DependencyObject? source)
             where T : DependencyObject
         {
@@ -3833,7 +4148,8 @@ namespace PitmastersGrill
                 nameof(PilotBoardRow.LossCount) => row.LossCount,
                 nameof(PilotBoardRow.AvgAttackersWhenAttacking) => row.AvgAttackersWhenAttacking,
                 nameof(PilotBoardRow.LastShipSeenName) => row.LastShipSeenName,
-                nameof(PilotBoardRow.LastShipSeenDateDisplay) => row.LastShipSeenDateDisplay,
+                nameof(PilotBoardRow.LastShipSeenDateDisplay) => row.LastShipSeenAtUtc,
+                nameof(PilotBoardRow.LastShipSeenAtUtc) => row.LastShipSeenAtUtc,
                 nameof(PilotBoardRow.LastPublicCynoCapableHull) => row.LastPublicCynoCapableHull,
                 _ => GetBoardSortValueByReflection(row, sortMemberPath)
             };
@@ -3847,8 +4163,15 @@ namespace PitmastersGrill
 
         private void ResetManualBoardSort()
         {
-            _activeBoardSortMemberPath = null;
-            _activeBoardSortDirection = null;
+            _activeBoardSortMemberPath = nameof(PilotBoardRow.CharacterName);
+            _activeBoardSortDirection = ListSortDirection.Ascending;
+
+            if (CharacterColumn != null)
+            {
+                ApplySortIndicatorState(CharacterColumn, ListSortDirection.Ascending);
+                return;
+            }
+
             ClearBoardSortIndicators();
         }
 

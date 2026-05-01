@@ -11,7 +11,6 @@
         Width="760"
         MinHeight="300"
         MinWidth="420"
-        Icon="Assets/PMGIcon.ico"
         Background="{DynamicResource WindowBackgroundBrush}"
         PreviewKeyDown="Window_PreviewKeyDown"
         LocationChanged="Window_LocationChanged"
@@ -410,12 +409,29 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0"
-                                Orientation="Vertical"
+                                Orientation="Horizontal"
                                 VerticalAlignment="Center"
                                 Margin="0,0,20,0">
+                        <Border HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="#14000000"
+                                BorderBrush="#24F28C28"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="3"
+                                Margin="0,0,8,0">
+                            <Image x:Name="HeaderLogoImage"
+                                   Source="pack://application:,,,/Assets/AppIcon.png"
+                                   Width="32"
+                                   Height="32"
+                                   Stretch="Uniform"
+                                   SnapsToDevicePixels="True"
+                                   UseLayoutRounding="True"/>
+                        </Border>
                         <TextBlock Text="Pitmasters Grill"
                                    FontSize="20"
                                    FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
                                    Foreground="{DynamicResource HeaderTextBrush}"/>
                     </StackPanel>
 
@@ -803,6 +819,7 @@
                                       AutoGenerateColumns="False"
                                       CanUserAddRows="False"
                                       IsReadOnly="True"
+                                      CanUserResizeColumns="True"
                                       SelectionMode="Single"
                                       SelectionUnit="FullRow"
                                       EnableRowVirtualization="True"
@@ -818,13 +835,14 @@
                                       PreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
                                       PreviewMouseLeftButtonDown="PilotBoard_PreviewMouseLeftButtonDown"
                                       PreviewMouseLeftButtonUp="PilotBoard_PreviewMouseLeftButtonUp"
-                                      PreviewMouseMove="PilotBoard_PreviewMouseMove" Grid.ColumnSpan="4">
+                                      PreviewMouseMove="PilotBoard_PreviewMouseMove"
+                                      SizeChanged="PilotBoard_SizeChanged" Grid.ColumnSpan="4">
                                 <DataGrid.Resources>
                                     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
                                     <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
                                 </DataGrid.Resources>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42" MinWidth="42">
+                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42" MinWidth="34">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock HorizontalAlignment="Center"
@@ -837,7 +855,7 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
 
-                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="2*" MinWidth="120">
+                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="120" MinWidth="72">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <DockPanel LastChildFill="True">
@@ -872,17 +890,17 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="1.8*" MinWidth="120"/>
-                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="1.8*" MinWidth="140"/>
-                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="0.9*" MinWidth="55"/>
-                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="0.9*" MinWidth="55"/>
+                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="120" MinWidth="72"/>
+                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="140" MinWidth="82"/>
+                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="55" MinWidth="42"/>
+                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="55" MinWidth="42"/>
                                     <DataGridTextColumn x:Name="AvgFleetSizeColumn"
                                                         Header="Avg Fleet Size"
                                                         Binding="{Binding AvgAttackersWhenAttacking, StringFormat={}{0:0}}"
-                                                        Width="1.2*" MinWidth="70"/>
-                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="1.8*" MinWidth="100"/>
-                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" Width="1.2*" MinWidth="90"/>
-                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="1.8*" MinWidth="110"/>
+                                                        Width="70" MinWidth="48"/>
+                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="100" MinWidth="64"/>
+                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" SortMemberPath="LastShipSeenAtUtc" Width="90" MinWidth="54"/>
+                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="110" MinWidth="70"/>
                                 </DataGrid.Columns>
                             </DataGrid>
 
@@ -1690,6 +1708,23 @@
                                                    TextWrapping="Wrap"
                                                    Text="Optional live delta feed for recent zKill-known killmails after the latest completed daily archive. Disabling stops live polling but keeps any already imported live records."/>
 
+                                        <TextBlock Text="Background Historical Repair"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource HeaderTextBrush}"
+                                                   Margin="0,8,0,8"/>
+
+                                        <CheckBox x:Name="BackgroundHistoricalRepairEnabledCheckBox"
+                                                  Content="Run Background Historical Repair after startup"
+                                                  Margin="0,0,0,8"
+                                                  Checked="BackgroundHistoricalRepairEnabledCheckBox_Checked"
+                                                  Unchecked="BackgroundHistoricalRepairEnabledCheckBox_Checked"/>
+
+                                        <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,12"
+                                                   TextWrapping="Wrap"
+                                                   Text="Checks recent known pilots after startup for missing zKill-known historical killmails. Runs after the UI loads and respects cooldown/rate limits."/>
+
                                         <TextBlock Text="Pilot Detail Placement"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
@@ -1783,7 +1818,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <CheckBox x:Name="DarkModeCheckBox"
-                                                      Content="Enable Dark Mode"
+                                                      Content="Enable PMG Themes"
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Margin="0,0,0,10"
                                                       Checked="DarkModeCheckBox_Changed"
@@ -1806,7 +1841,7 @@
                                             <TextBlock Foreground="{DynamicResource MutedTextBrush}"
                                                        FontSize="12"
                                                        Margin="0,0,0,12"
-                                                       Text="Grill themes apply immediately while Dark Mode is enabled. Disable Dark Mode to use the legacy light palette."/>
+                                                       Text="PMG themes apply immediately when enabled. Disable PMG Themes to use the legacy light palette."/>
 
                                             <CheckBox x:Name="AlwaysOnTopCheckBox"
                                                       Content="Always On Top"
@@ -1819,6 +1854,7 @@
                                                       Content="Enable Panel Mode on next launch"
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Margin="0,0,0,6"
+                                                      Visibility="Collapsed"
                                                       Checked="PanelModeCheckBox_Changed"
                                                       Unchecked="PanelModeCheckBox_Changed"/>
 
@@ -1826,7 +1862,8 @@
                                                        Foreground="{DynamicResource MutedTextBrush}"
                                                        FontSize="12"
                                                        Margin="24,0,0,14"
-                                                       Text="Panel Mode is disabled. Enable it to use the transparent overlay shell after restart."/>
+                                                       Visibility="Collapsed"
+                                                       Text="Panel Mode is always enabled for PMG 1.0."/>
 
                                             <TextBlock Text="Window Surface Opacity"
                                                        Foreground="{DynamicResource BodyTextBrush}"
@@ -2047,7 +2084,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="Technical Preview-v0.9.6"/>
+                                                       Text="General Release-v1.0"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"
@@ -2220,6 +2257,137 @@
 
                         </TabControl>
                     </Grid>
+                </TabItem>
+
+                <TabItem Header="Help">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="16">
+                            <TextBlock Text="PMG Help"
+                                       FontSize="22"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Text="Quick reference for common PMG shortcuts and interactions."
+                                       Style="{StaticResource SettingsLabelStyle}"
+                                       Margin="0,0,0,16"/>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="14"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Global / Window"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl+Home — Reset and recover the PMG window position/size if it is moved off-screen or the layout gets awkward."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Panel Mode — PMG uses the compact panel-style window by default."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="14"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Grill"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <TextBlock Text="Copy EVE Local — PMG watches the clipboard and populates Grill when it sees a valid EVE Local pilot list."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Right-click any Grill row — Open pilot details."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Double-click a Grill row — Open that pilot on zKillboard."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Column layout — Drag column headers to reorder, drag separators to resize, and use Settings → Board Columns to show/hide or reset columns."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="14"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Analysis"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <TextBlock Text="Double-click supported pilots, corporations, or alliances in Analysis lists — Open the matching zKillboard page."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="EVE Session Context — PMG can infer character/system context from local-only EVE window/log evidence when available."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="14"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Intel Freshness"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <TextBlock Text="Today’s Freshness — Checks visible pilots for recent same-day zKill-known killmails that may not have arrived through the live feed yet."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Historical Freshness — Checks visible pilots for missing zKill-known killmails from recent completed UTC days."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Background Historical Repair — If enabled, PMG runs a bounded repair pass after startup using local known pilots and cooldown protection."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="R2Z2 Live zKill Feed — Optional live zKill-known killmail feed. It is separate from daily archive backfill and freshness repair."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="Diagnostics"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <TextBlock Text="Settings → Diagnostics — Open logs or package diagnostics for troubleshooting provider, clipboard, import, database, freshness, and UI issues."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
                 </TabItem>
             </TabControl>
 

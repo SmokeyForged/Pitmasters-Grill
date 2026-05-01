@@ -10,7 +10,7 @@ namespace PitmastersGrill.Persistence
 {
     public static class DiagnosticBundleService
     {
-        private const string VersionLabel = "Technical Preview-v0.9.6";
+        private const string VersionLabel = "General Release-v1.0";
         private const int MaximumBundlesToRetain = 20;
 
         public static string GetDiagnosticsDirectory()
@@ -34,6 +34,7 @@ namespace PitmastersGrill.Persistence
                 AddBundleNotes(archive);
                 AddSettingsSummary(archive);
                 AddLiveFeedSummary(archive);
+                AddFreshnessRepairSummary(archive);
                 AddProviderHealthSummary(archive);
                 AddPerformanceSummary(archive);
                 AddCacheSummary(archive);
@@ -115,6 +116,12 @@ namespace PitmastersGrill.Persistence
                 writer.WriteLine($"darkMode={settings.DarkModeEnabled}");
                 writer.WriteLine($"logLevel={AppLogger.CurrentLogLevel}");
                 writer.WriteLine($"liveZkillFeedEnabled={settings.LiveZkillFeedEnabled}");
+                writer.WriteLine($"backgroundHistoricalRepairEnabled={settings.BackgroundHistoricalRepairEnabled}");
+                writer.WriteLine($"backgroundHistoricalRepairDelaySeconds={settings.BackgroundHistoricalRepairDelaySeconds}");
+                writer.WriteLine($"backgroundHistoricalRepairCooldownHours={settings.BackgroundHistoricalRepairCooldownHours}");
+                writer.WriteLine($"backgroundHistoricalRepairLookbackDays={settings.BackgroundHistoricalRepairLookbackDays}");
+                writer.WriteLine($"backgroundHistoricalRepairMaxPilotsPerRun={settings.BackgroundHistoricalRepairMaxPilotsPerRun}");
+                writer.WriteLine($"backgroundHistoricalRepairRecentPilotWindowDays={settings.BackgroundHistoricalRepairRecentPilotWindowDays}");
                 writer.WriteLine($"killmailDataPath={RedactSensitiveDiagnosticsText(KillmailPaths.GetKillmailDataDirectoryDisplayPath())}");
                 writer.WriteLine($"killmailDataPathSource={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
                 writer.WriteLine("Secrets/tokens/credentials are not collected.");
@@ -179,6 +186,95 @@ namespace PitmastersGrill.Persistence
                     writer.WriteLine($"liveFeedSummaryError={Sanitize(ex.Message)}");
                 }
             });
+        }
+
+        private static void AddFreshnessRepairSummary(ZipArchive archive)
+        {
+            AddTextEntry(archive, "freshness-repair-status.txt", writer =>
+            {
+                try
+                {
+                    using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={KillmailPaths.GetKillmailDatabasePath()}");
+                    connection.Open();
+
+                    writer.WriteLine("Freshness repair summary");
+                    var checkpointCount = ExecuteScalar(connection, "SELECT COUNT(*) FROM historical_freshness_checkpoint;");
+                    writer.WriteLine($"historicalFreshnessCheckpointCount={checkpointCount}");
+
+                    writer.WriteLine();
+                    writer.WriteLine("live_killmail_seen counts by source");
+                    using (var sourceCommand = connection.CreateCommand())
+                    {
+                        sourceCommand.CommandText =
+                        @"
+                        SELECT COALESCE(NULLIF(source, ''), 'unknown') AS source_name, COUNT(*) AS source_count
+                        FROM live_killmail_seen
+                        GROUP BY COALESCE(NULLIF(source, ''), 'unknown')
+                        ORDER BY source_name;
+                        ";
+
+                        using var reader = sourceCommand.ExecuteReader();
+                        var wroteSource = false;
+                        while (reader.Read())
+                        {
+                            wroteSource = true;
+                            writer.WriteLine($"source={Sanitize(SafeValue(reader, 0))}; count={SafeValue(reader, 1)}");
+                        }
+
+                        if (!wroteSource)
+                        {
+                            writer.WriteLine("No live_killmail_seen rows recorded.");
+                        }
+                    }
+
+                    writer.WriteLine();
+                    writer.WriteLine("recent historical freshness checkpoints");
+                    using (var checkpointCommand = connection.CreateCommand())
+                    {
+                        checkpointCommand.CommandText =
+                        @"
+                        SELECT
+                            character_id,
+                            window_start_day_utc,
+                            window_end_day_utc,
+                            last_checked_at_utc,
+                            last_status,
+                            last_imported_count,
+                            last_known_count,
+                            last_failed_count,
+                            last_error
+                        FROM historical_freshness_checkpoint
+                        ORDER BY last_checked_at_utc DESC
+                        LIMIT 20;
+                        ";
+
+                        using var reader = checkpointCommand.ExecuteReader();
+                        var wroteCheckpoint = false;
+                        while (reader.Read())
+                        {
+                            wroteCheckpoint = true;
+                            writer.WriteLine(
+                                $"characterId={SafeValue(reader, 0)}; windowStart={SafeValue(reader, 1)}; windowEnd={SafeValue(reader, 2)}; lastChecked={SafeValue(reader, 3)}; status={Sanitize(SafeValue(reader, 4))}; imported={SafeValue(reader, 5)}; known={SafeValue(reader, 6)}; failed={SafeValue(reader, 7)}; error={Sanitize(SafeValue(reader, 8))}");
+                        }
+
+                        if (!wroteCheckpoint)
+                        {
+                            writer.WriteLine("No historical freshness checkpoints recorded.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    writer.WriteLine($"freshnessRepairSummaryError={Sanitize(ex.Message)}");
+                }
+            });
+        }
+
+        private static object ExecuteScalar(Microsoft.Data.Sqlite.SqliteConnection connection, string commandText)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = commandText;
+            return command.ExecuteScalar() ?? 0;
         }
 
         private static void AddProviderHealthSummary(ZipArchive archive)

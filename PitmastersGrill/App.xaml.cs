@@ -13,12 +13,13 @@ namespace PitmastersGrill
 {
     public partial class App : Application
     {
+        private PmgTrayIconService? _trayIconService;
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
             RegisterGlobalExceptionLogging();
-            AppLogger.Initialize("Technical Preview-v0.9.6", e.Args);
+            AppLogger.Initialize("General Release-v1.0", e.Args);
             AppLogger.AppInfo("Application startup invoked.");
 
             try
@@ -55,6 +56,8 @@ namespace PitmastersGrill
         {
             try
             {
+                _trayIconService?.Dispose();
+                _trayIconService = null;
                 AppLogger.AppInfo($"Application exit. exitCode={e.ApplicationExitCode}");
                 AppLogger.Shutdown();
             }
@@ -164,8 +167,10 @@ namespace PitmastersGrill
             var metadataRepository = new KillmailDatasetMetadataRepository(killmailDbPath);
             var dayImportStateRepository = new DayImportStateRepository(killmailDbPath);
             var archiveProvider = new KillmailDayArchiveProvider();
+            var writeGate = new KillmailDbWriteGate();
 
             var dayImportService = new KillmailDayImportService(
+                writeGate,
                 dayImportStateRepository,
                 metadataRepository,
                 archiveProvider);
@@ -273,8 +278,10 @@ namespace PitmastersGrill
                 var archiveProvider = new KillmailDayArchiveProvider();
                 var freshnessService = new KillmailDatasetFreshnessService(metadataRepository);
                 var appSettingsService = new AppSettingsService();
-                var incrementalImportService = new KillmailIncrementalImportService(killmailDbPath);
+                var writeGate = new KillmailDbWriteGate();
+                var incrementalImportService = new KillmailIncrementalImportService(killmailDbPath, writeGate);
                 var dayImportService = new KillmailDayImportService(
+                    writeGate,
                     dayImportStateRepository,
                     metadataRepository,
                     archiveProvider);
@@ -284,6 +291,7 @@ namespace PitmastersGrill
 
                 var backgroundIntelUpdateService = new BackgroundIntelUpdateService(
                     freshnessService,
+                    writeGate,
                     dayImportService,
                     r2z2LiveKillmailService,
                     todaysFreshnessService,
@@ -295,6 +303,7 @@ namespace PitmastersGrill
                 var mainWindow = new MainWindow(backgroundIntelUpdateService);
                 AppLogger.AppInfo("MainWindow constructor end.");
                 MainWindow = mainWindow;
+                _trayIconService = new PmgTrayIconService(this, mainWindow);
 
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
                 mainWindow.ContentRendered += (_, __) =>
