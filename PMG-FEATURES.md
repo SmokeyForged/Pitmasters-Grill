@@ -119,7 +119,6 @@ Intel includes:
 - Today’s Freshness
 - Historical Freshness
 - background historical repair status
-- diagnostics export
 - killmail cache controls
 
 The Intel tab is also where PMG makes its limits more visible. Public intel can be stale, incomplete, delayed, or missing. PMG reports what it knows locally and provides tools to repair that local view where possible.
