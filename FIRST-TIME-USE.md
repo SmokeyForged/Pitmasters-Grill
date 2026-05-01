@@ -95,6 +95,7 @@ It can show:
 
 Useful actions:
 
+- With Pitmaster selected, 'insert' will toggle between Board Mode and Normal Mode
 - right-click a row for details
 - double-click a row to open zKill
 - resize columns
