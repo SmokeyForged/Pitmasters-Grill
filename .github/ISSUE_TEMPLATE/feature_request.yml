@@ -1,0 +1,73 @@
+name: Feature Request
+description: Suggest a PMG improvement or new capability.
+title: "[Feature]: "
+labels: ["triage", "feature-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement.
+
+        PMG is intended to stay within public-data, user-driven, EVE-safe boundaries. Please avoid requests that require reading the EVE client, automating gameplay, scraping private data, inspecting network traffic, or bypassing CCP rules.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or pain point
+      description: What are you trying to solve while using PMG?
+      placeholder: "When I am using PMG, I wish I could..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or improvement.
+      placeholder: "PMG should..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area of PMG
+      options:
+        - Grill board
+        - Analysis tab
+        - Intel tab
+        - Clipboard / local parsing
+        - Ignore list
+        - Settings
+        - R2Z2 / live feed
+        - Killmail database / freshness
+        - Diagnostics
+        - Installer / updates
+        - Documentation
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Are there other ways this could be handled?
+      placeholder: "Another option might be..."
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Example use case
+      description: Optional. Give a practical in-game example.
+      placeholder: "Example: I copy local before taking a fight and want to..."
+
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Boundary check
+      options:
+        - label: This request can be implemented using user-provided input and/or public EVE data.
+          required: true
+        - label: This request does not require reading the EVE client, automating gameplay, inspecting traffic, or using private ESI scopes.
+          required: true
