@@ -240,6 +240,46 @@ Displayed values may include:
 
 Display values are based on what PMG knows locally. They are evidence summaries, not current certainty.
 
+### Board Mode Discoverability and Compact Display
+
+PMG includes a dense **Board Mode** intended for live play.
+
+- `Insert` toggles Board Mode on or off.
+- When Board Mode is enabled, PMG shows a brief non-blocking in-app hint reminding the user to press `Insert` again to return to normal mode.
+- The hint is temporary and is intended to avoid interrupting clipboard-driven board use.
+
+Board display density is configurable without changing the rest of the app layout.
+
+Board-only display options include:
+
+- showing or hiding Grill grid lines
+- changing Grill board text size within bounded safe values
+- changing the Grill board font family from the supported in-app options
+
+These settings apply to the Grill/Board presentation only. They do not retheme or compress Analysis, Intel, Ignore List, or unrelated tabs.
+
+### Board Mode Minimum Height
+
+Board Mode can be resized much smaller than the normal PMG layout.
+
+The intent is to allow users to shrink PMG down toward a one-row live board if they want, while still keeping normal mode at a safer minimum size.
+
+The minimum Board Mode height is based on the current compact layout and board presentation rather than a fixed per-screen assumption. That means the practical minimum can vary slightly with the current board text size and board row/header sizing.
+
+### Keyboard Shortcuts and Window Recovery
+
+PMG documents its user-facing shortcuts in the Help tab.
+
+Important shortcut behaviors include:
+
+- `Insert` for Board Mode
+- `Delete` to clear the current Grill board
+- `Home` to reprocess the clipboard
+- `Ctrl+Home` to recover/reset the PMG window position
+- `Esc` three times quickly to exit PMG
+
+`Ctrl+Home` is intended as a window recovery shortcut, not a normal workflow command. Depending on current focus and Windows routing behavior, users may need to click the PMG window background, title/header area, or another non-editing part of the window first before retrying the shortcut.
+
 ---
 
 ## Last Seen

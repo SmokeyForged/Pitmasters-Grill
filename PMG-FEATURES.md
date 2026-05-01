@@ -76,6 +76,7 @@ Common Grill actions:
 
 - copy EVE local to populate the board
 - press `Insert` to toggle Board Mode on or off, then press `Insert` again to return to the normal layout
+- receive a brief non-blocking in-app reminder when Board Mode is enabled
 - right-click a row for pilot details
 - double-click a row to open zKill
 - hover over a row for quick sig details
@@ -85,6 +86,8 @@ Common Grill actions:
 - hide board grid lines, reduce board text size, or switch the Grill board font from Settings -> Board Columns
 
 The board is designed to stay readable in a compact panel-style workflow.
+
+Board Mode can also be resized much smaller than the normal PMG layout, down toward a one-row live board if the user wants a very compact overlay.
 
 ---
 
@@ -217,6 +220,9 @@ Settings may include:
 
 - PMG Themes
 - column visibility
+- board grid-line visibility
+- board text size
+- board font family
 - board layout reset
 - background historical repair behavior
 - R2Z2 live feed enablement
@@ -240,6 +246,8 @@ Examples include:
 - double-clicking supported entities to open zKill
 - using Intel freshness tools
 - exporting diagnostics
+
+`Ctrl+Home` is intended as a window recovery shortcut. If focus is inside certain editing controls and the shortcut does not seem to respond, click the PMG window background, title/header area, or another non-editing area first and try again.
 
 ---
 
@@ -375,7 +383,7 @@ PMG is in General Release.
 
 Current release:
 
-- **Pitmasters Grill v1.0.0**
+- **Pitmasters Grill v1.1.0**
 - General Release
 - Windows desktop application
 

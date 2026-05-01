@@ -19,8 +19,8 @@ PMG turns copied EVE local lists into a readable board of public pilot context. 
 
 PMG is now in **General Release**.
 
-Current release: **Pitmasters Grill v1.0.0**  
-Latest release: **[v1.0.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.0.0)**  
+Current release: **Pitmasters Grill v1.1.0**  
+Latest release: **[v1.1.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.1.0)**  
 Full release history: **[GitHub Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**
 
 ---

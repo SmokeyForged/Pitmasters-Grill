@@ -97,12 +97,17 @@ Useful actions:
 
 - Press `Insert` to toggle Board Mode on or off.
 - If you enter Board Mode and want the normal layout back, press `Insert` again.
+- When Board Mode first opens, PMG shows a brief non-blocking hint reminding you that `Insert` returns to normal mode.
 - right-click a row for details
 - double-click a row to open zKill
 - resize columns
 - hide optional columns from Settings
 - use Settings -> Board Columns to hide Grill grid lines, reduce board text size, or switch the board font
 - reset/recover the window with `Ctrl+Home`
+
+Board Mode is also allowed to resize much smaller than the normal PMG layout. If you want a very compact overlay, you can shrink it down toward a one-row board view and then expand it again later.
+
+If `Ctrl+Home` does not seem to respond, click the PMG window background, title/header area, or another non-editing part of the window first and try again. It is intended as a window recovery shortcut, not a text-entry shortcut.
 
 ---
 
@@ -194,6 +199,9 @@ Settings include app behavior and visual options such as:
 
 - PMG Themes
 - column visibility
+- board grid-line visibility
+- board text size
+- board font family
 - board layout reset
 - background historical repair
 - R2Z2 live feed
@@ -205,7 +213,7 @@ Panel-style behavior is the default PMG experience.
 
 ## Help Tab
 
-The Help tab lists common PMG shortcuts and interactions.
+The Help tab lists common PMG shortcuts and interactions, including Board Mode, clipboard refresh, board clearing, notes saving, and window recovery shortcuts.
 
 Use it as a quick in-app reference.
 
