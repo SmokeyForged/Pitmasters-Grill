@@ -1,234 +1,225 @@
-# Pitmasters Grill — EVE Policy / ToS Compliance Position
+# EVE ToS Compliance and Client Boundaries
 
-This document explains the intended policy posture of **Pitmasters Grill (PMG)** with respect to EVE Online third-party tool boundaries.
+This document explains the safety boundaries Pitmaster's Grill follows around EVE Online.
 
-It is written to answer a practical question:
+This is not legal advice. It is the project’s design and operating posture.
 
-**How is PMG being designed to stay on the conservative side of CCP's published rules for third-party tools?**
-
-This document is **not legal advice**, **not a guarantee of CCP approval**, and **not a certification of compliance**. It is a good-faith statement of design intent, operating boundaries, and current project posture based on publicly available CCP policy material.
+PMG is built as a public-intel companion. It is intended to help users interpret copied local lists and public data without automating gameplay or touching private client internals.
 
 ---
 
-## Important policy notice
+## Short Version
 
-CCP has publicly stated that it does **not** authorize or otherwise sanction third-party software in advance, and that players use third-party applications at their own risk.
+PMG does:
 
-At the same time, CCP has also said it may tolerate applications that simply enhance player enjoyment in a way that maintains fair gameplay.
+- parse copied local-style text provided by the user
+- use public zKill/ESI-style data where available
+- cache public intel locally
+- open public zKill pages
+- show evidence summaries
+- export diagnostics for troubleshooting
 
-PMG is therefore not presented as a CCP-approved tool.
-It is presented as a project that is being intentionally designed to fit the most conservative reasonable reading of CCP's tolerated third-party companion-tool model.
+PMG does not:
 
-In plain language:
-
-**PMG is being built to help a player understand information faster, not to play EVE for them, modify the client, or create unfair advantage through automation.**
-
----
-
-## Compliance posture in one sentence
-
-PMG is being built as a **read-only, player-supporting intel companion** that helps a human player understand public or otherwise permitted context faster, without modifying the EVE client, automating gameplay, scraping restricted client data, or replacing player decision-making.
-
----
-
-## What PMG is intended to be
-
-PMG is intended to be:
-
-* a desktop companion tool
-* a pilot-intel summarization tool
-* a board that helps users read local population context faster
-* a support tool for human decision-making
-* a free community project by project choice
-
-PMG is **not** intended to act on the EVE client, play the game for the user, or create gameplay actions that the player did not personally perform.
+- read EVE client memory
+- inject into the EVE client
+- automate gameplay
+- send EVE input
+- inspect network traffic
+- scrape hidden client internals
+- use private ESI character scopes
+- bypass game mechanics
+- claim hidden, cloaked, grid, or location certainty
 
 ---
 
-## Core policy boundaries
+## Input Boundary
 
-The project is being shaped around a few hard boundaries.
+PMG is clipboard-driven.
 
-### 1. No client modification
+The user copies text, and PMG attempts to determine whether it looks like an EVE local-style pilot list.
 
-PMG is not intended to modify the EVE client, rewrite the user interface, inject into the game, or alter game content.
+PMG does not require:
 
-That means the project should remain outside any design approach that changes how the EVE client itself behaves.
+- EVE client hooks
+- file watchers for private client internals
+- input automation
+- memory inspection
+- private character authentication
 
-### 2. No gameplay automation
-
-PMG is not intended to automate gameplay.
-
-It should not:
-
-* control ships
-* activate modules
-* perform navigation
-* automate market actions
-* issue in-game commands
-* play the game while the user is absent
-
-PMG may help a user understand information faster, but the player remains the one who must interpret that information and act on it.
-
-### 3. No macro or stored-input behavior
-
-PMG is not intended to generate, relay, or orchestrate gameplay input patterns in a way that would function as macro behavior, stored rapid keystrokes, or similar input automation.
-
-If a future feature would cross that line, it should be treated as out of bounds unless CCP policy clearly allows it.
-
-### 4. No bypass of CCP access architecture
-
-PMG is not intended to bypass login architecture, simulate direct game access, emulate CCP services, or provide an alternate access path into EVE.
-
-It is a companion tool, not a substitute game client.
-
-### 5. No cache scraping, packet inspection, or reverse-engineering behavior
-
-PMG is not intended to scrape the EVE client cache, inspect packet traffic, sniff transmissions, reverse engineer client behavior, or derive information from restricted client/system paths.
-
-If a feature idea depends on those methods, it should be treated as out of bounds.
-
-### 6. No unfair hidden advantage
-
-PMG is not being built to create advantage through concealed automation, client manipulation, prohibited data extraction, or background play.
-
-Its role is to summarize context, not to covertly produce gameplay outcomes.
-
-### 7. No unreasonable load on CCP systems
-
-PMG should be operated in a way that avoids imposing unreasonable or disproportionate load on CCP-operated systems or related official services.
-
-That means source usage, request pacing, and refresh behavior should be designed conservatively and revisited if scale increases.
+Clipboard guardrails are used to reject unrelated clipboard content.
 
 ---
 
-## Data and source posture
+## Public Data Boundary
 
-PMG is being designed around public or otherwise permitted third-party-accessible information sources and project-local processing.
+PMG works with public evidence.
 
-The operating model is:
+Examples include:
 
-* resolve relevant external context
-* normalize it into a readable board
-* show freshness where practical
-* preserve the human player's role in judgment
+- public pilot/corp/alliance identifiers
+- public zKill-known killmail data
+- public ESI killmail retrieval where killmail ID/hash are available
+- locally cached public-derived data
 
-The intended posture is to use information in a way that supports player understanding, not to extract unauthorized data from the EVE client.
+PMG does not require private ESI OAuth scopes.
 
-Where CCP-provided APIs or official services are used, PMG should identify itself appropriately and operate with reasonable request hygiene.
-
----
-
-## Human-in-the-loop principle
-
-A central part of PMG's policy posture is that the user stays in control.
-
-PMG can:
-
-* summarize
-* highlight
-* sort
-* surface patterns
-* link out to deeper review
-
-PMG should not:
-
-* decide for the player
-* execute actions for the player
-* transform intel into automatic gameplay behavior
-
-This matters because the tool is intended to remain a companion, not an operator.
+PMG does not ask users to authorize a character.
 
 ---
 
-## Free project note
+## Local Chat / Session Context Boundary
 
-PMG is intended to be released as a **free community tool**.
+PMG may use local, user-owned client-side context only for limited display context where implemented, such as identifying likely EVE session/system context from user-accessible local information.
 
-That is a project-values choice and a conservative public posture.
-It should not be read as a claim that all paid or monetized third-party EVE applications are automatically disallowed in every form.
+This is not used to automate gameplay.
 
-For PMG, the design goal is straightforward: keep the project simple, community-oriented, and clearly separated from any questionable "pay for advantage" framing.
+This is not treated as omniscient state.
 
----
-
-## Project commitments
-
-The PMG project intends to stay aligned with the following commitments:
-
-* do not modify the EVE client
-* do not automate gameplay
-* do not introduce macro-like behavior
-* do not scrape restricted client or packet data
-* do not impose unreasonable load on official services
-* do not misrepresent PMG as an official CCP product
-* do not hide material behavior from users
-* do not use the tool to replace player agency
-* do not knowingly move into questionable territory without re-reviewing policy first
-
-If a proposed feature creates uncertainty against these commitments, the safer path is to stop, review, and either redesign the feature or leave it out.
+Any displayed session context should be treated as contextual evidence and may be wrong, stale, or incomplete.
 
 ---
 
-## Branding and relationship to CCP
+## No Automation
 
-PMG is an independent third-party project.
+PMG is not a bot.
 
-It is **not affiliated with, endorsed by, sponsored by, or operated by CCP**.
+PMG does not:
 
-Any use of EVE-related names, references, or context should be handled in a way that respects CCP ownership and avoids implying official status.
+- click buttons for the player
+- control the EVE client
+- issue commands
+- automate targeting
+- automate movement
+- automate intel reporting into EVE
+- automate combat decisions
 
----
-
-## Living-document warning
-
-CCP policies can change.
-Interpretations can change.
-Enforcement priorities can change.
-
-Because of that, this document should be treated as a **living compliance-position note**, not a permanent one-time certification.
-
-If PMG expands in a way that touches:
-
-* authenticated EVE data
-* deeper integrations
-* overlays
-* input handling
-* monetization
-* automation-adjacent workflows
-* broader public scale
-
-then this document should be revisited against the then-current CCP EULA, Terms of Service, third-party policies, developer rules, and any applicable API guidance.
+PMG only assists review of information.
 
 ---
 
-## Conservative rule for future features
+## No Client Memory Access
 
-If a future feature causes the question
+PMG does not read or inspect EVE client memory.
 
-**"Is this still just helping the player understand information, or is it starting to play for them, extract prohibited data, or create hidden advantage?"**
+PMG does not inject code into the EVE process.
 
-then that feature deserves immediate policy review before it is built or released.
-
-That is the safest line in the sand for this project.
+PMG does not hook rendering or client internals.
 
 ---
 
-## Summary
+## No Network Inspection
 
-PMG's intended EVE policy posture is straightforward:
+PMG does not inspect, intercept, or decode EVE network traffic.
 
-* read, summarize, and present useful context
-* keep the player in control
-* avoid client modification
-* avoid automation
-* avoid macro behavior
-* avoid cache scraping and packet inspection
-* avoid unfair hidden advantage
-* avoid excessive load on official services
-* remain an independent free community tool
-* make no claim of CCP approval
+Public internet requests made by PMG are for public data enrichment and normal app functionality.
 
-In plain language:
+---
 
-**PMG should help a pilot think faster, not play EVE for them.**
+## No Private ESI Scopes
+
+PMG is designed around public data and local user-provided text.
+
+PMG does not require character login.
+
+PMG does not use private ESI character scopes such as mail, contacts, location, skills, assets, wallet, or fleet.
+
+---
+
+## zKill and Public Killmail Limits
+
+PMG uses public killmail-derived evidence where available.
+
+Important limits:
+
+- zKill may not have every killmail.
+- Some killmails are posted late.
+- Archive days can change after initial import.
+- Live feeds can miss data outside PMG’s local window.
+- Public ship observations do not prove current ship.
+
+PMG’s freshness tools improve local public evidence. They do not create certainty.
+
+---
+
+## What PMG Claims
+
+PMG may claim:
+
+- this pilot was present in a copied list
+- PMG resolved this pilot/corp/alliance from public data
+- PMG has local public evidence for a recent ship observation
+- PMG imported public killmail-derived context
+- PMG sees public evidence of cyno/tackle/bait-related patterns
+- PMG has stale/missing/partial local intel
+
+PMG should not claim:
+
+- this pilot is currently flying a specific ship
+- this pilot is currently in a specific system unless supported by local context and clearly framed
+- this pilot is cloaked
+- this pilot is on grid
+- this pilot is hostile by certainty
+- public data is complete
+- hidden/private game state is known
+
+---
+
+## Human Judgment Boundary
+
+PMG supports human judgment.
+
+The user remains responsible for interpreting evidence.
+
+The app should make unknowns and limits visible rather than hiding them behind overconfident labels.
+
+---
+
+## Diagnostics Boundary
+
+Diagnostics are intended for troubleshooting.
+
+Diagnostics should not include:
+
+- private credentials
+- secrets
+- unrelated local files
+- private browser data
+- raw killmail JSON
+- unnecessary chat logs
+- private EVE client data
+
+Users should review diagnostics before posting them publicly.
+
+---
+
+## Reporting Concerns
+
+If you believe PMG crosses a safety boundary, open an issue and describe:
+
+- the feature or behavior
+- why it may be risky
+- what PMG did
+- what you expected instead
+- any relevant screenshots or diagnostics
+
+Do not include private credentials or unrelated sensitive files.
+
+---
+
+## Maintainer Rule of Thumb
+
+When in doubt:
+
+```text
+Prefer copied user-provided text.
+Prefer public APIs.
+Prefer explicit user actions.
+Prefer local caching of public data.
+Avoid automation.
+Avoid hidden client state.
+Avoid private scopes.
+Avoid claiming certainty PMG does not have.
+```
+
+PMG should stay a companion tool, not a gameplay automation tool.
