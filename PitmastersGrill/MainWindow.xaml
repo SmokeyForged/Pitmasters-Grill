@@ -2412,7 +2412,7 @@
                                     Padding="14"
                                     Margin="0,0,0,12">
                                 <StackPanel>
-                                    <TextBlock Text="Global / Window"
+                                    <TextBlock Text="Keyboard Shortcuts"
                                                FontSize="17"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource HeaderTextBrush}"
@@ -2421,7 +2421,27 @@
                                                Style="{StaticResource SettingsLabelStyle}"
                                                TextWrapping="Wrap"
                                                Margin="0,0,0,6"/>
-                                    <TextBlock Text="Ctrl+Home — Reset and recover the PMG window position/size if it is moved off-screen or the layout gets awkward."
+                                    <TextBlock Text="Delete — Clear the current Grill board."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Home — Reprocess the current clipboard contents and refresh the Grill if the clipboard contains a valid EVE Local list."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Ctrl+Home — Reset and recover the PMG window position/size if it is moved off-screen or the layout gets awkward. PMG also attempts to register this as a global hotkey while the app is running."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Esc three times quickly — Exit PMG."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Esc in Pilot Detail or Pilot Notes windows — Close that window."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Ctrl+S in the Pilot Notes window — Save the note and close the window."
                                                Style="{StaticResource SettingsLabelStyle}"
                                                TextWrapping="Wrap"
                                                Margin="0,0,0,6"/>

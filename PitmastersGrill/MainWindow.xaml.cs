@@ -43,10 +43,18 @@ namespace PitmastersGrill
         private const int TripleEscapeWindowMilliseconds = 1500;
         private const int GlobalResetWindowHotKeyId = 0x504D47;
         private const double DetailWindowGap = 8;
+        private const double NormalModeMinimumWindowWidth = 420;
+        private const double NormalModeMinimumWindowHeight = 300;
+        private const double BoardModeMinimumWindowWidth = 420;
+        private const double BoardModeFallbackCommandStripHeight = 38;
+        private const double BoardModeFallbackTabHeaderHeight = 32;
+        private const double BoardModeFallbackColumnHeaderHeight = 28;
+        private const double BoardModeFallbackFooterPaddingHeight = 18;
+        private const double BoardModeFallbackRowVerticalPadding = 16;
         private const double DefaultWindowWidth = 760;
         private const double DefaultWindowHeight = 571;
-        private const double MinimumSavedWindowWidth = 420;
-        private const double MinimumSavedWindowHeight = 300;
+        private const double MinimumSavedWindowWidth = NormalModeMinimumWindowWidth;
+        private const double MinimumSavedWindowHeight = NormalModeMinimumWindowHeight;
         private const double MinimumVisibleWindowEdge = 80;
         private const double MinimumBoardLayoutHostWidth = 400;
         private static readonly string[] CanonicalBoardColumnOrder =
@@ -279,6 +287,7 @@ namespace PitmastersGrill
 
             _mainWindowAppearanceController.ApplyTheme(Resources, _appSettings, this, ApplyBoardPopulationStatusVisual);
             _mainWindowAppearanceController.ApplyWindowSettings(this, _appSettings, WindowOpacityValueText, Resources);
+            UpdateWindowMinimumSize();
 
             PilotBoard.ItemsSource = _currentRows;
             _currentRows.CollectionChanged += CurrentRows_CollectionChanged;
@@ -329,6 +338,7 @@ namespace PitmastersGrill
         {
             Loaded -= MainWindow_Loaded;
             AppLogger.UiInfo("MainWindow loaded.");
+            UpdateWindowMinimumSize();
             Dispatcher.BeginInvoke(new Action(FinalizeBoardColumnLayoutInitialization), DispatcherPriority.Loaded);
         }
 
@@ -432,6 +442,7 @@ namespace PitmastersGrill
                 HideBoardModeHint();
             }
 
+            UpdateWindowMinimumSize();
             UpdateBoardFooterVisibility();
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
@@ -507,6 +518,65 @@ namespace PitmastersGrill
         private void BoardModeHintTimer_Tick(object? sender, EventArgs e)
         {
             HideBoardModeHint();
+        }
+
+        private void UpdateWindowMinimumSize()
+        {
+            if (CompactModeToggleButton?.IsChecked == true)
+            {
+                MinWidth = BoardModeMinimumWindowWidth;
+                MinHeight = GetBoardModeMinimumWindowHeight();
+                return;
+            }
+
+            MinWidth = NormalModeMinimumWindowWidth;
+            MinHeight = NormalModeMinimumWindowHeight;
+        }
+
+        private double GetBoardModeMinimumWindowHeight()
+        {
+            var contentMarginHeight = MainContentGrid?.Margin.Top + MainContentGrid?.Margin.Bottom ?? 0;
+            var commandStripHeight = Math.Max(TopCommandGrid?.ActualHeight ?? 0, BoardModeFallbackCommandStripHeight);
+            var tabHeaderHeight = Math.Max(GetTabHeaderHeight(), BoardModeFallbackTabHeaderHeight);
+            var boardColumnHeaderHeight = Math.Max(GetBoardColumnHeaderHeight(), BoardModeFallbackColumnHeaderHeight);
+            var boardRowHeight = Math.Max(GetBoardRowHeight(), Math.Ceiling((PilotBoard?.FontSize ?? 12) + BoardModeFallbackRowVerticalPadding));
+
+            return Math.Ceiling(
+                contentMarginHeight +
+                commandStripHeight +
+                tabHeaderHeight +
+                boardColumnHeaderHeight +
+                boardRowHeight +
+                BoardModeFallbackFooterPaddingHeight);
+        }
+
+        private double GetTabHeaderHeight()
+        {
+            return FindVisualDescendant<TabPanel>(MainTabControl)?.ActualHeight ?? 0;
+        }
+
+        private double GetBoardColumnHeaderHeight()
+        {
+            return FindVisualDescendant<DataGridColumnHeadersPresenter>(PilotBoard)?.ActualHeight ?? 0;
+        }
+
+        private double GetBoardRowHeight()
+        {
+            if (PilotBoard == null)
+            {
+                return 0;
+            }
+
+            for (var index = 0; index < Math.Min(PilotBoard.Items.Count, 3); index++)
+            {
+                if (PilotBoard.ItemContainerGenerator.ContainerFromIndex(index) is DataGridRow row &&
+                    row.ActualHeight > 0)
+                {
+                    return row.ActualHeight;
+                }
+            }
+
+            return 0;
         }
 
         private void ToggleMaximizeRestore()
@@ -663,6 +733,7 @@ namespace PitmastersGrill
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             TrackCurrentNormalWindowBounds("SizeChanged");
+            UpdateWindowMinimumSize();
         }
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -952,6 +1023,7 @@ namespace PitmastersGrill
             _appSettings.BoardTextSize = BoardTextSizeComboBox.SelectedIndex + 10;
 
             ApplyBoardDisplaySettings();
+            UpdateWindowMinimumSize();
             _mainWindowAppearanceController.SaveSettings(_appSettings);
 
             AppLogger.UiInfo($"Board text size changed. size={_appSettings.BoardTextSize}");
@@ -973,6 +1045,7 @@ namespace PitmastersGrill
             };
 
             ApplyBoardDisplaySettings();
+            UpdateWindowMinimumSize();
             _mainWindowAppearanceController.SaveSettings(_appSettings);
 
             AppLogger.UiInfo(
@@ -3535,6 +3608,14 @@ namespace PitmastersGrill
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.Home &&
+                (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                RequestWindowLayoutResetFromHotkey("Ctrl+Home hotkey");
+                e.Handled = true;
+                return;
+            }
+
             if (IsTextEditingElement(e.OriginalSource as DependencyObject))
             {
                 return;
@@ -3553,13 +3634,6 @@ namespace PitmastersGrill
                     return;
 
                 case Key.Home:
-                    if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
-                    {
-                        RequestWindowLayoutResetFromHotkey("Ctrl+Home hotkey");
-                        e.Handled = true;
-                        return;
-                    }
-
                     AppLogger.UiInfo("Manual clipboard refresh requested from Home hotkey.");
                     _boardPopulationEntryController.InvalidateLastProcessedClipboard();
                     _ = ProcessClipboardIfValidAsync();
