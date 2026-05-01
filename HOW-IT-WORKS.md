@@ -1,354 +1,348 @@
-# Pitmaster's Grill - How It Works
+# How PMG Works
 
-This document explains, at a practical level, how **Pitmaster's Grill (PMG)** works in the current main branch.
+This document explains the technical model behind Pitmaster's Grill, or PMG.
 
-The latest tagged release is **v0.9.5.1**. Some UI/manual-state features described here are **unreleased 0.9.6 candidate** behavior from the current main branch.
-
-It is written to answer a simple question:
-
-**How does PMG take a local list of pilot names and turn it into usable intel?**
+PMG is a Windows desktop intel companion for EVE Online. It helps turn copied local lists into readable public-intel context while preserving a clear boundary: PMG assists human review; it does not automate gameplay or claim private certainty.
 
 ---
 
-## Core idea
+## High-Level Flow
 
-PMG is built around a straightforward human-in-the-loop workflow:
+The common flow is:
 
-1. a user provides a local-style pilot list
-2. PMG classifies and accepts only plausible intel input
-3. PMG resolves pilot identity and public context through cache and public providers
-4. PMG adds killmail-derived signals where public evidence supports them
-5. PMG layers in user-owned notes, watchlist state, overrides, and ignores
-6. PMG presents the result as a fast-scanning board plus a sidecar detail view
+```text
+Copied local list
+→ clipboard guardrails
+→ pilot parsing
+→ entity resolution
+→ local cache lookup
+→ public-intel enrichment
+→ Grill / Analysis / Intel display
+```
 
-The goal is not to replace player judgment.
-The goal is to reduce the time between **"local spiked"** and **"I understand what I am looking at."**
+PMG combines immediate clipboard input with locally cached public data.
 
 ---
 
-## Board flow
+## Input Model
 
-The current board flow is easiest to understand as a staged pipeline.
+PMG is clipboard-driven.
 
-### 1. Clipboard or local-list intake
+The user copies a local-style list, and PMG decides whether the clipboard content looks like valid pilot input.
 
-PMG starts with a pilot list, usually from copied local-style text.
-
-The app is designed around the reality of actual use:
-
-- names arrive in batches
-- the user wants answers quickly
-- the input needs to support real gameplay flow rather than idealized one-pilot-at-a-time lookup
-
-PMG can also handle large local-list shaped inputs well in current testing, though that should still be treated as observed test behavior rather than an absolute performance guarantee.
-
-### 2. Guardrails and classification
-
-Before enrichment starts, PMG applies intake guardrails so it does not treat arbitrary clipboard noise as a local list.
-
-That means it tries to reject obvious non-local content such as:
+Clipboard guardrails reject likely non-local content, including:
 
 - code
-- markup
 - stack traces
 - shell output
+- XML/XAML
+- markdown
 - logs
-- file paths
-- oversized unrelated text
+- filesystem paths
+- oversized text
+- obviously invalid pilot-name candidates
 
-The goal is to keep the board pipeline focused on plausible pilot-name input instead of blindly trusting every clipboard payload.
+This protects PMG from trying to resolve unrelated clipboard content.
 
-### 3. Name resolution
+---
 
-Once PMG accepts the input, it resolves identity context for each pilot.
+## Pilot Parsing
 
-That stage can include:
+After clipboard content passes guardrails, PMG extracts plausible pilot names.
 
-- character identity
-- corporation affiliation
-- alliance affiliation
+Parsing is intentionally conservative. The goal is to avoid turning unrelated text into lookup work.
 
-PMG uses local cache where possible so repeat lookups are faster and less dependent on external timing.
+PMG also removes duplicate candidate names case-insensitively.
 
-### 4. Public and cached enrichment
+---
 
-After identity resolution, PMG enriches rows with readable board context such as:
+## Entity Resolution
 
-- kill counts
-- loss counts
+PMG resolves pilots, corporations, and alliances through available public data sources.
+
+Resolved IDs allow PMG to:
+
+- open zKill links
+- cache public context
+- apply watchlist/ignore behavior
+- enrich visible board rows
+- run targeted freshness checks
+
+Resolution can fail or be delayed if a public service is unavailable or if the input does not match known public entities.
+
+---
+
+## Local Data Model
+
+PMG stores public-intel-derived data locally.
+
+Local storage supports:
+
+- faster repeated board population
+- historical baseline intel
+- recent public ship observations
+- cyno/tackle/bait-derived context
+- freshness repair
+- diagnostics
+
+The local database is a cache and evidence store, not a source of absolute truth.
+
+---
+
+## Public Intel Sources
+
+PMG uses public data sources, including public zKill/ESI-style workflows.
+
+PMG does not use private ESI character scopes.
+
+PMG does not require character login.
+
+PMG does not read EVE client memory or inspect network traffic.
+
+---
+
+## Archive Backfill
+
+Archive Backfill is PMG’s historical baseline.
+
+It imports completed public archive days into local derived tables.
+
+Archive Backfill answers:
+
+```text
+What historical public intel should PMG already know for this configured history window?
+```
+
+Archive Backfill is the complete-day authority. Other freshness layers do not mark archive days complete.
+
+---
+
+## R2Z2 Live Feed
+
+R2Z2 is an optional live public killmail feed.
+
+When enabled, PMG can ingest live zKill-known killmail deltas.
+
+R2Z2 helps bridge the gap between daily archives and current public activity. It is disabled by default.
+
+R2Z2 does not guarantee complete same-day coverage. It only improves PMG’s local view for killmails PMG receives and processes from the stream.
+
+---
+
+## Today’s Freshness
+
+Today’s Freshness is a targeted visible-pilot repair flow.
+
+It checks recent public zKill-known activity for pilots currently visible in the Grill.
+
+Flow:
+
+```text
+visible pilots
+→ targeted zKill character queries
+→ missing killmail IDs
+→ ESI full killmail fetch
+→ incremental local import
+→ derived intel update
+→ Grill/Analysis refresh
+```
+
+This repairs gaps where a visible pilot has newer public activity that PMG has not ingested yet.
+
+---
+
+## Historical Freshness
+
+Historical Freshness repairs recent completed-day data for visible pilots.
+
+It exists because a completed archive day can become stale after import if a killmail is posted late.
+
+Flow:
+
+```text
+visible pilots
+→ recent completed-day target window
+→ targeted zKill summaries
+→ killmail ID comparison
+→ ESI full killmail fetch when needed
+→ exact killmail_time day filtering
+→ incremental import
+→ checkpoint/source tracking
+```
+
+Historical Freshness does not replace Archive Backfill.
+
+It does not mark archive days complete.
+
+---
+
+## Background Historical Repair
+
+Background Historical Repair is a bounded startup enrichment pass.
+
+It starts after the UI is usable, waits a configured delay, and checks a bounded local pool of known/recent pilots.
+
+It is designed to be:
+
+- one-shot
+- delayed
+- bounded
+- cancellable
+- cooldown-protected
+- rate-limit aware
+- non-blocking
+
+The candidate pool is local-data-derived. PMG does not globally crawl zKill.
+
+---
+
+## Incremental Import
+
+Freshness repair and live feed ingestion use incremental import.
+
+Incremental import dedupes by killmail ID and updates derived local tables without replacing whole archive days.
+
+This avoids double-counting and keeps freshness repair separate from archive-day completeness.
+
+---
+
+## Write Coordination
+
+PMG has multiple possible writers to the local killmail database:
+
+- archive backfill
+- R2Z2
+- Today’s Freshness
+- Historical Freshness
+- Background Historical Repair
+- reset/reseed workflows
+
+These paths use a shared write coordination approach to reduce SQLite contention and avoid reset/write overlap.
+
+---
+
+## Analysis and Grill Display
+
+The Grill shows enriched pilot rows.
+
+Analysis summarizes the visible set.
+
+Displayed values may include:
+
+- public kill/loss context
 - average fleet-size context
-- recent ship observations
-- recent cyno-capable hull observations
-- freshness/retry state
+- last public ship seen
+- relative last-seen timing
+- corporation/alliance context
+- cyno/tackle/bait signals
+- watchlist state
+- ignore filtering
 
-The purpose is not to mirror raw provider output one-for-one. The purpose is to normalize those results into a consistent operational view.
-
-### 5. Killmail-derived intel
-
-PMG also maintains local derived intel built from public killmail archive data.
-
-That derived layer can provide:
-
-- confirmed cyno-module observations
-- industrial cyno plus tackle bait observations
-- cyno-capable hull tackle observations
-- supporting recent-activity context used by the board and detail views
-
-This lets PMG surface useful historical evidence without pretending it has live fit or location visibility.
-
-### 6. Manual user-state layer
-
-PMG intentionally keeps user-owned judgment separate from public-data-backed evidence.
-
-The manual or local state layer can include:
-
-- pilot notes
-- Watchlist state
-- Known-Cyno override
-- Bait override
-- typed ignores
-
-These are not all the same kind of thing:
-
-- notes are operator memory
-- watchlist is manual attention state
-- overrides are operator judgment
-- ignores are visibility suppression rules
-
-This matters because PMG is trying to keep evidence, local memory, and display behavior distinct.
-
-### 7. Board presentation
-
-Once those layers are combined, PMG presents the result as a board built for quick scanning under pressure.
-
-The board is designed to let the user quickly notice:
-
-- recognizable groupings
-- active pilots
-- suspicious public-evidence patterns
-- manually watched pilots
-- likely escalation signals worth opening in details or zKill
+Display values are based on what PMG knows locally. They are evidence summaries, not current certainty.
 
 ---
 
-## What the board is actually showing
+## Last Seen
 
-The board is not just a list of names. It is a summarized operational view.
+`Last Seen` uses relative display formatting.
 
-It can surface fields such as:
+Examples:
 
-- **Character**
-- **Sig**
-- **Alliance**
-- **Corp**
-- **Kills**
-- **Losses**
-- **Avg Fleet Size**
-- **Last Ship Seen**
-- **Last Seen**
-- **Cyno Hull Seen**
+```text
+12m ago
+3h ago
+3d ago
+```
 
-These fields help answer practical questions like:
+This is easier to scan than raw timestamps.
 
-- who is affiliated together?
-- which pilots appear active?
-- who looks likely to matter?
-- what public evidence suggests escalation risk?
+Sorting should use the underlying timestamp, not the display text.
 
 ---
 
-## Watched-first sorting
+## Ignore and Watchlist
 
-Current main branch includes an unreleased watchlist behavior where watched pilots stay pinned above non-watched pilots.
+Ignore lists reduce noise by hiding or filtering pilots, corporations, and alliances.
 
-The important system rule is:
+Watchlist marks entities the user wants to track more closely.
 
-**watched-first is a pinned partition, not a cosmetic sort trick**
-
-That means:
-
-- watched rows are grouped first
-- non-watched rows follow
-- manual board-column sorting applies inside each group
-- the groups should not be mixed together by a later column sort
-
-This keeps watchlist state usable even when the operator temporarily sorts by corp, alliance, kills, losses, or character.
+These are user judgment tools. They do not automate decisions.
 
 ---
 
-## Summary banner
+## Diagnostics
 
-Current main branch includes an unreleased bottom-board composition summary banner.
+Diagnostics bundle selected state and logs so PMG issues can be investigated.
 
-At the system level, it summarizes the currently visible board after filtering, not the raw unfiltered intake.
+Diagnostics can include:
 
-That means the banner is based on:
+- app/runtime information
+- settings summaries
+- freshness status
+- live feed status
+- checkpoint counts
+- source counts
+- recent app logs
 
-- current visible rows
-- current ignore suppression
-- current watchlist state
-- current board refresh state
-
-It is intentionally lightweight and meant to provide a fast composition read, not a second dashboard.
-
----
-
-## Compact mode and panel mode
-
-PMG supports a board-first compact mode and a lighter panel/custom-shell style.
-
-At a high level, compact/panel mode exists to keep PMG usable as a quick operational companion rather than a bulky desktop app.
-
-In the current main branch:
-
-- the board remains the main surface
-- compact mode is layout-driven rather than a separate feature fork
-- panel-mode transparency should still be preserved
-- normal row interactions should remain intact
-- compact/panel UI state can persist across restart
-
-That means left-click selection, right-click details, double-click zKill, and note access should continue to work even when PMG is running in a tighter board-first shape.
+Diagnostics should not include raw killmail JSON, secrets, unrelated local files, or private credentials.
 
 ---
 
-## Detail sidecar behavior
+## Error and Rate-Limit Behavior
 
-PMG opens pilot details in a sidecar inspector rather than taking over the whole board.
+PMG treats public providers as fallible.
 
-The sidecar behavior is:
+Expected conditions include:
 
-- open beside the board when there is room
-- honor the saved left/right preference when possible
-- flip or clamp placement near monitor edges when necessary
-- keep the board visible while the user reads evidence and freshness context
+- network timeouts
+- remote connection resets
+- rate limits
+- missing archive days
+- not-yet-published archive days
+- unavailable public endpoints
 
-This keeps PMG usable as a fast-scanning tool first, while still supporting closer inspection of a selected pilot.
-
-Current main branch also allows Watch/Unwatch from this sidecar.
-
----
-
-## Saved UI state
-
-Current main branch persists several pieces of local UI state:
-
-- main window position
-- main window size
-- compact-mode state
-- panel-mode startup state
-- saved board column layout
-
-Window persistence is intended to support real multi-monitor use. Saved bounds are treated as valid if they still intersect a visible monitor work area. If monitor layout changes and the saved bounds are no longer visible, PMG clamps them back onto a visible work area while preserving size as much as practical.
-
-Board layout persistence is separate from board visibility settings. Column order and width can be restored independently from which columns are shown.
+PMG should surface these states without crashing and retry or defer where appropriate.
 
 ---
 
-## Hover explanation
+## Data Boundaries
 
-Current main branch includes concise hover explanations for row/signal reasoning.
+PMG works from public and user-provided evidence.
 
-At the system level, these are derived display text built from the same row evidence/state PMG already uses for:
+PMG cannot prove:
 
-- board signal kind
-- notes and watchlist state
-- confirmed cyno evidence
-- derived bait evidence
-- tackle context
-- manual override state
+- current ship
+- current grid position
+- cloak status
+- fleet intent
+- private standings
+- hidden alts
+- complete public history
 
-The goal is to expose a short explanation layer without replacing the detail sidecar.
-
----
-
-## Evidence model
-
-PMG is careful about the distinction between confirmed evidence and inference.
-
-### Confirmed cyno module evidence
-
-Confirmed cyno-module evidence comes from public victim item data on killmails.
-
-If a public victim/loss item list shows a cyno module, PMG can treat that as strong evidence for that historical fit state.
-
-### Hull context as inference
-
-A cyno-capable hull observation is useful context, but it is still inference.
-
-A pilot being seen in a cyno-capable hull does **not** prove that they fit or used a cyno.
-
-### Industrial cyno plus tackle as derived bait evidence
-
-PMG separately tracks public losses where industrial cyno and tackle appear together on the same victim item list.
-
-That combination supports a derived bait signal because it is stronger than hull context alone.
-
-### Tackle markers on cyno-capable hulls
-
-PMG can also surface tackle context on cyno-capable hulls.
-
-That can matter operationally, but it does **not** mean every cyno-capable hull with tackle should automatically be treated as bait.
-
-This distinction is important because PMG is trying to be useful without overstating what public evidence actually proves.
+PMG can only summarize evidence it has.
 
 ---
 
-## Caching and freshness
+## Design Principle
 
-PMG is built for a situation where speed matters.
+PMG is an awareness tool.
 
-Repeatedly resolving the same information from scratch is slower and more dependent on external timing. Local caching helps by:
+It is intended to help players ask better questions faster:
 
-- reducing repeated lookups
-- improving responsiveness
-- supporting faster board population
-- making the tool more practical during real use
+```text
+Who is here?
+What public evidence matters?
+What is stale or unknown?
+Where should I manually verify?
+```
 
-PMG also surfaces freshness and retry context so the user can judge whether visible intel is current enough for the moment they are in.
-
----
-
-## Human-in-the-loop model
-
-A core design rule is that PMG supports the player's judgment instead of replacing it.
-
-PMG can:
-
-- summarize
-- highlight
-- sort
-- surface patterns
-- link out to zKill or deeper review
-
-PMG should not be treated as:
-
-- a live-visibility oracle
-- a claim of current location or current fit
-- a replacement for player interpretation
-
-The board helps a pilot think faster. It does not eliminate the need to think.
+PMG supports judgment. It does not replace it.
 
 ---
 
-## Current limitations
+## Related Docs
 
-Because PMG is still a technical preview, some practical limitations remain:
-
-- public killmail evidence can be delayed or incomplete
-- provider lookups can fail, throttle, or return partial data
-- cache rebuilds may be needed after derived-intel schema/backfill changes
-- some sidecar and compact-mode behavior is intentionally conservative to stay stable
-- hover explanations are intentionally concise and may still require opening details or zKill
-- Proton compatibility looks good through current tester feedback, but native Linux polish remains deferred
-
-This overview is meant to describe the current working shape of PMG without pretending that the technical design is already final or that unreleased main-branch behavior is already tagged.
-
----
-
-## Summary
-
-PMG works by taking a local pilot list, classifying it, enriching it with cached and public intel context, applying killmail-derived evidence where supported, layering in user-owned notes/watchlist/ignores/overrides, and presenting the result as a board plus sidecar built for quick operational reading.
-
-In plain language:
-
-**drop in names, let PMG cook, and get back a faster read on who is actually in your local.**
+- [`PMG-FEATURES.md`](./PMG-FEATURES.md)
+- [`FIRST-TIME-USE.md`](./FIRST-TIME-USE.md)
+- [`EVE-TOS-COMPLIANCE.md`](./EVE-TOS-COMPLIANCE.md)
+- [`DEVELOPER-NOTES.md`](./DEVELOPER-NOTES.md)
