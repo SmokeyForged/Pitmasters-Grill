@@ -1,0 +1,71 @@
+name: Diagnostic Review
+description: Ask for help reviewing a PMG diagnostic bundle or log-related issue.
+title: "[Diagnostic]: "
+labels: ["triage", "support", "needs-diagnostics"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when PMG generated a diagnostic bundle and you want help understanding a crash, hang, startup problem, stale data issue, or weird behavior.
+
+        Do not upload private EVE chat logs, credentials, API keys, unrelated personal files, or screenshots containing sensitive information.
+
+  - type: input
+    id: pmg_version
+    attributes:
+      label: PMG version
+      description: Example: 1.0.0
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows_version
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: diagnostic_reason
+    attributes:
+      label: Why are you opening this diagnostic review?
+      options:
+        - Crash
+        - Hard hang / freeze
+        - Slow startup
+        - Clipboard/local parsing issue
+        - Killmail DB / freshness issue
+        - R2Z2 / live feed issue
+        - Data looks stale or wrong
+        - UI issue
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what were you doing right before it happened?
+      placeholder: "I was..."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: attached
+    attributes:
+      label: Diagnostic bundle
+      options:
+        - label: I attached a PMG diagnostic bundle or sanitized relevant logs.
+        - label: I could not attach diagnostics yet.
+        - label: I removed or avoided private chat logs, credentials, API keys, and unrelated personal information.
+          required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra notes
+      description: Optional. Add anything else that may help.
+      placeholder: "Extra notes..."

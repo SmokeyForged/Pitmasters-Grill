@@ -1,0 +1,136 @@
+name: Bug Report
+description: Report something in PMG that is not working as expected.
+title: "[Bug]: "
+labels: ["triage", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Pitmasters Grill.
+
+        Please do not upload private EVE chat logs, credentials, API keys, unrelated personal files, or screenshots containing sensitive information.
+
+  - type: input
+    id: pmg_version
+    attributes:
+      label: PMG version
+      description: Example: 1.0.0
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows_version
+    attributes:
+      label: Windows version
+      description: Example: Windows 11 23H2, Windows 10 22H2
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: Install / run method
+      options:
+        - Release ZIP
+        - Built from source
+        - Technical preview ZIP
+        - Unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area of PMG affected
+      options:
+        - Startup / launch
+        - Clipboard / local parsing
+        - Grill board
+        - Analysis tab
+        - Intel tab
+        - Ignore list
+        - Settings
+        - R2Z2 / live feed
+        - Killmail database / freshness
+        - Diagnostics
+        - UI / theme / window behavior
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug in plain language.
+      placeholder: "PMG did X when I expected Y."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that trigger the issue.
+      placeholder: |
+        1. Open PMG
+        2. Copy local from EVE
+        3. Click ...
+        4. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "What did you expect PMG to do?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "What did PMG actually do?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Can you reproduce this?
+      options:
+        - "Yes, every time"
+        - "Yes, sometimes"
+        - "No, it happened once"
+        - "Not sure yet"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Attach a PMG diagnostic bundle if available. Do not include private chat logs, credentials, API keys, or unrelated personal files.
+      options:
+        - label: I checked whether a PMG diagnostic bundle is available.
+        - label: I attached a PMG diagnostic bundle or relevant sanitized logs.
+        - label: I could not attach diagnostics.
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or extra context
+      description: Optional. Add screenshots, error text, or anything else that helps explain the issue.
+      placeholder: "Drag screenshots here if useful."
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed or avoided private EVE chat logs, credentials, API keys, and unrelated personal information.
+          required: true

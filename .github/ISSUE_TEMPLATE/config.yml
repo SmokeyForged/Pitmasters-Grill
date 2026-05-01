@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: PMG Discussions
+    url: https://github.com/SmokeyForged/Pitmasters-Grill/discussions
+    about: Use Discussions for general feedback, pilot ideas, screenshots, and open-ended PMG talk.
+  - name: Latest PMG Release
+    url: https://github.com/SmokeyForged/Pitmasters-Grill/releases/latest
+    about: Download the latest public release before reporting an issue.

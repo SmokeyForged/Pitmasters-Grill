@@ -1,0 +1,60 @@
+name: Support Question
+description: Ask for help using PMG.
+title: "[Support]: "
+labels: ["triage", "support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for practical help using PMG.
+
+        For open-ended ideas, screenshots, or community discussion, GitHub Discussions may be a better fit.
+
+  - type: input
+    id: pmg_version
+    attributes:
+      label: PMG version
+      description: Example: 1.0.0
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: question_area
+    attributes:
+      label: What do you need help with?
+      options:
+        - Installing or launching PMG
+        - Copying local / clipboard behavior
+        - Understanding Grill board results
+        - Understanding Analysis or Intel results
+        - Ignore list behavior
+        - Settings
+        - R2Z2 / live feed
+        - Killmail database / freshness
+        - Diagnostic bundle
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Ask your question in plain language.
+      placeholder: "I am trying to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_tried
+    attributes:
+      label: What have you already tried?
+      placeholder: "I tried..."
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Optional. Add screenshots or details if useful. Do not include private chat logs, credentials, API keys, or unrelated personal information.
+      placeholder: "Extra context..."
