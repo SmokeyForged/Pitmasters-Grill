@@ -1,0 +1,373 @@
+# How to Navigate This Repo
+
+This guide explains where things live in the Pitmaster's Grill repository and which files are most useful depending on what you are trying to do.
+
+Pitmaster's Grill, or PMG, is a Windows desktop intel companion for EVE Online. The repository contains the WPF application source, release notes, user-facing documentation, and project notes.
+
+---
+
+## Start Here
+
+If you are new to the repo, start with these files:
+
+| File or Folder | Purpose |
+|---|---|
+| `README.md` | Public-facing intro, quick start, and navigation. |
+| `PitmastersGrill/` | Main application source code. |
+| `Patch Notes/` | Version-by-version release notes. |
+| `PMG-FEATURES.md` | Current feature overview and limitations. |
+| `HOW-IT-WORKS.md` | Technical overview of PMG’s data flow and evidence model. |
+| `FIRST-TIME-USE.md` | Setup and first-run guidance. |
+| `EVE-TOS-COMPLIANCE.md` | Safety and EVE client-boundary notes. |
+| `DEVELOPER-NOTES.md` | Maintainer notes and implementation guidance. |
+
+---
+
+## Repository Layout
+
+```text
+Pitmasters-Grill/
+├─ README.md
+├─ HOW-TO-NAVIGATE-THIS-REPO.md
+├─ PMG-FEATURES.md
+├─ HOW-IT-WORKS.md
+├─ FIRST-TIME-USE.md
+├─ EVE-TOS-COMPLIANCE.md
+├─ DEVELOPER-NOTES.md
+├─ Patch Notes/
+└─ PitmastersGrill/
+```
+
+---
+
+## Application Source
+
+The main app lives in:
+
+```text
+PitmastersGrill/
+```
+
+This is the WPF desktop application project.
+
+Important areas include:
+
+| Path | Purpose |
+|---|---|
+| `PitmastersGrill/PitmastersGrill.csproj` | Project configuration, version metadata, app icon, and build settings. |
+| `PitmastersGrill/App.xaml` / `App.xaml.cs` | Application startup, splash flow, service wiring, background startup scheduling, and shutdown handling. |
+| `PitmastersGrill/MainWindow.xaml` / `MainWindow.xaml.cs` | Main UI shell and interaction logic. |
+| `PitmastersGrill/Assets/` | App icons and branding assets. |
+| `PitmastersGrill/Models/` | Data models and UI snapshot models. |
+| `PitmastersGrill/Services/` | Core application services, public intel logic, formatting, freshness, diagnostics helpers, and app behavior. |
+| `PitmastersGrill/Persistence/` | Local SQLite persistence and repositories. |
+| `PitmastersGrill/Providers/` | External/public data provider integrations. |
+| `PitmastersGrill/Views/` | Additional WPF windows/views such as startup splash. |
+| `PitmastersGrill/Diagnostics/` | Diagnostic helpers and logging-related code. |
+
+---
+
+## Main User-Facing App Areas
+
+PMG’s main UI is organized around top-level tabs:
+
+| Tab | Purpose |
+|---|---|
+| `Analysis` | Aggregated summary of the currently visible board. |
+| `Grill` | Main pilot board. |
+| `Intel` | Killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls. |
+| `Ignore List` | Manage ignored pilots, corporations, and alliances. |
+| `Settings` | App behavior, PMG themes, layout, and related controls. |
+| `Help` | Shortcut and workflow reference. |
+
+---
+
+## Freshness and Public Intel System
+
+PMG’s public intel freshness model is layered.
+
+### Archive Backfill
+
+Historical baseline from completed public zKill archive days.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/Services/KillmailDayImportService.cs
+PitmastersGrill/Services/KillmailDatasetFreshnessService.cs
+PitmastersGrill/Persistence/DayImportStateRepository.cs
+```
+
+### R2Z2 Live Feed
+
+Optional live zKill-known killmail ingestion. Disabled by default.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/Services/R2Z2LiveKillmailService.cs
+PitmastersGrill/Models/R2Z2LiveFeedSnapshot.cs
+```
+
+### Today’s Freshness
+
+Manual visible-pilot same-day/recent repair.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/Services/TodaysFreshnessService.cs
+PitmastersGrill/Models/TodaysFreshnessSnapshot.cs
+PitmastersGrill/Services/ZkillFreshnessClient.cs
+```
+
+### Historical Freshness
+
+Manual visible-pilot repair for recent completed days.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/Services/HistoricalFreshnessService.cs
+PitmastersGrill/Models/HistoricalFreshnessSnapshot.cs
+PitmastersGrill/Persistence/HistoricalFreshnessCheckpointRepository.cs
+```
+
+### Background Historical Repair
+
+Bounded startup enrichment over known/recent pilots. Runs after the UI loads and respects cooldown/rate limits.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/Services/BackgroundIntelUpdateService.cs
+PitmastersGrill/Persistence/HistoricalFreshnessCheckpointRepository.cs
+```
+
+### Incremental Import and Write Coordination
+
+Freshness repairs and live updates flow through shared import/write paths so duplicate processing is avoided and SQLite writes are coordinated.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/Services/KillmailIncrementalImportService.cs
+PitmastersGrill/Services/KillmailDbWriteGate.cs
+```
+
+---
+
+## Board, Layout, and Display Behavior
+
+Board behavior, column layout, display formatting, and row enrichment are mostly handled by:
+
+```text
+PitmastersGrill/MainWindow.xaml
+PitmastersGrill/MainWindow.xaml.cs
+PitmastersGrill/Models/BoardColumnLayoutSetting.cs
+PitmastersGrill/Services/BoardRowFactory.cs
+PitmastersGrill/Services/PilotBoardRowEnrichmentApplier.cs
+PitmastersGrill/Services/LastSeenDisplayFormatter.cs
+```
+
+Useful related concepts:
+
+- saved board column layout
+- visible-column selection
+- right-edge column fill
+- relative `Last Seen` values
+- watchlist row treatment
+- ignore filtering
+- row context actions
+- zKill open links
+
+---
+
+## Diagnostics
+
+Diagnostics are intended to help troubleshoot app behavior without exposing unnecessary local data.
+
+Relevant code areas include:
+
+```text
+PitmastersGrill/Persistence/DiagnosticBundleService.cs
+PitmastersGrill/Diagnostics/
+```
+
+Diagnostics may include:
+
+- settings summary
+- app/runtime information
+- freshness status
+- R2Z2 status
+- checkpoint counts
+- `live_killmail_seen` counts by source
+- recent logs and troubleshooting context
+
+Diagnostics should not include raw killmail JSON, secrets, private EVE client data, or unrelated local files.
+
+---
+
+## Patch Notes and Release History
+
+Release notes live in:
+
+```text
+Patch Notes/
+```
+
+Use this folder for full version notes, not the README.
+
+The README should stay short and navigational. Detailed release history belongs in patch notes.
+
+Current General Release notes should use a filename similar to:
+
+```text
+Patch Notes/General-Release_1.0.0_patch_notes.md
+```
+
+---
+
+## Public Data Boundaries
+
+PMG is an evidence assistant for public EVE intel.
+
+PMG does not:
+
+- read EVE client memory
+- automate gameplay
+- inspect network traffic
+- use private ESI character scopes
+- claim hidden, cloaked, grid, or location certainty
+- guarantee that public data is complete
+
+PMG does:
+
+- parse copied local-style lists
+- use public zKill/ESI data where available
+- cache public intel locally
+- show what PMG knows and where the limits are
+- provide links for manual verification
+
+See:
+
+```text
+EVE-TOS-COMPLIANCE.md
+HOW-IT-WORKS.md
+```
+
+---
+
+## For Users
+
+Start with:
+
+```text
+README.md
+FIRST-TIME-USE.md
+Patch Notes/
+```
+
+Use the app’s `Help` tab for shortcuts and in-app workflow reminders.
+
+---
+
+## For Testers
+
+Useful areas:
+
+```text
+README.md
+Patch Notes/
+FIRST-TIME-USE.md
+PMG-FEATURES.md
+```
+
+When reporting an issue, include:
+
+- PMG version
+- what you were trying to do
+- what happened
+- what you expected
+- whether the issue involved Grill, Analysis, Intel, freshness, settings, startup, or diagnostics
+- diagnostics bundle if requested
+
+Do not post secrets, private credentials, raw logs with sensitive data, or unrelated local files.
+
+---
+
+## For Developers and Maintainers
+
+Start with:
+
+```text
+DEVELOPER-NOTES.md
+HOW-IT-WORKS.md
+PitmastersGrill/
+```
+
+Before changing behavior, understand these boundaries:
+
+- Archive Backfill is the historical baseline.
+- R2Z2 is optional live public data ingestion.
+- Today’s Freshness repairs visible same-day/recent pilot data.
+- Historical Freshness repairs visible recent completed-day data.
+- Background Historical Repair is bounded startup enrichment.
+- Freshness repair should not replace archive import semantics.
+- Freshness repair should not mark archive days complete.
+- SQLite write paths should remain coordinated.
+
+---
+
+## Safe Contribution Areas
+
+Good first contribution areas may include:
+
+- documentation improvements
+- clearer diagnostics
+- UI copy polish
+- bug reports with reproduction steps
+- release-note cleanup
+- small display/formatting improvements
+
+More advanced areas include:
+
+- freshness logic
+- killmail import behavior
+- SQLite persistence
+- R2Z2 behavior
+- board layout persistence
+- diagnostic bundle structure
+
+Changes in advanced areas should be tested carefully because they affect local cache state, public data freshness, and user trust.
+
+---
+
+## Release Checklist Reference
+
+Before a release, verify:
+
+- build succeeds
+- app launches without startup crash
+- Grill populates
+- board layout behaves
+- Intel tab renders
+- Today’s Freshness works
+- Historical Freshness works or skips cleanly
+- Background Historical Repair does not block startup
+- R2Z2 remains optional/disabled by default
+- diagnostics export works
+- README and patch notes match the release
+- version metadata is correct
+- no `.codex-temp`, `bin`, `obj`, `.vs`, local DBs, diagnostics bundles, or ZIP artifacts are committed
+
+---
+
+## Maintainer Note
+
+This repo should stay easy to navigate.
+
+The README is the front door.  
+This file is the map.  
+Patch notes are the history.  
+The source tree is the workshop.
