@@ -118,6 +118,7 @@ Intel includes:
 - R2Z2 live feed controls
 - Today’s Freshness
 - Historical Freshness
+- Diagnostics
 - background historical repair status
 - killmail cache controls
 
