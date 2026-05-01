@@ -1,4 +1,5 @@
 # Pitmaster's Grill
+<img width="250" height="250" alt="PMG Icon" src="https://github.com/user-attachments/assets/95b30b3f-1227-49f8-b153-d71aacf6c0a3" />
 
 > Fast, readable local intel for EVE Online.
 
