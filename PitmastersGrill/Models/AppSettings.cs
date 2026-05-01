@@ -20,6 +20,12 @@ namespace PitmastersGrill.Models
 
         public bool CompactModeEnabled { get; set; } = false;
 
+        public bool ShowBoardGridLines { get; set; } = true;
+
+        public int BoardTextSize { get; set; } = 12;
+
+        public string BoardFontFamily { get; set; } = string.Empty;
+
         public double? SavedWindowLeft { get; set; }
 
         public double? SavedWindowTop { get; set; }

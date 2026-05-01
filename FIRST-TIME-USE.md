@@ -95,11 +95,13 @@ It can show:
 
 Useful actions:
 
-- With Pitmaster selected, 'insert' will toggle between Board Mode and Normal Mode
+- Press `Insert` to toggle Board Mode on or off.
+- If you enter Board Mode and want the normal layout back, press `Insert` again.
 - right-click a row for details
 - double-click a row to open zKill
 - resize columns
 - hide optional columns from Settings
+- use Settings -> Board Columns to hide Grill grid lines, reduce board text size, or switch the board font
 - reset/recover the window with `Ctrl+Home`
 
 ---

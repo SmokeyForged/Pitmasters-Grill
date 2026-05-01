@@ -39,6 +39,7 @@ namespace PitmastersGrill
         private const int DefaultBoardPopulationRetryDelaySeconds = 12;
         private const int MaxBoardPopulationRetryAttempts = 5;
         private const int CompactDragHoldMilliseconds = 300;
+        private const int BoardModeHintMilliseconds = 5000;
         private const int TripleEscapeWindowMilliseconds = 1500;
         private const int GlobalResetWindowHotKeyId = 0x504D47;
         private const double DetailWindowGap = 8;
@@ -113,6 +114,7 @@ namespace PitmastersGrill
         private readonly DispatcherTimer _clipboardDebounceTimer;
         private readonly DispatcherTimer _compactDragHoldTimer;
         private readonly DispatcherTimer _boardColumnLayoutSaveTimer;
+        private readonly DispatcherTimer _boardModeHintTimer;
         private readonly CancellationTokenSource _windowShutdownCts = new();
         private readonly SystemTrayIconService _systemTrayIconService;
         private IgnoreAllianceListView? _ignoreAllianceListView;
@@ -185,6 +187,11 @@ namespace PitmastersGrill
                 Interval = TimeSpan.FromMilliseconds(500)
             };
             _boardColumnLayoutSaveTimer.Tick += BoardColumnLayoutSaveTimer_Tick;
+            _boardModeHintTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(BoardModeHintMilliseconds)
+            };
+            _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
@@ -263,6 +270,7 @@ namespace PitmastersGrill
 
             InitializeBoardColumnVisibilityUi();
             InitializeBoardColumnLayoutUi();
+            InitializeBoardDisplaySettingsUi();
             InitializePilotDetailPlacementUi();
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
@@ -353,6 +361,8 @@ namespace PitmastersGrill
             _compactDragHoldTimer.Tick -= CompactDragHoldTimer_Tick;
             _boardColumnLayoutSaveTimer.Stop();
             _boardColumnLayoutSaveTimer.Tick -= BoardColumnLayoutSaveTimer_Tick;
+            _boardModeHintTimer.Stop();
+            _boardModeHintTimer.Tick -= BoardModeHintTimer_Tick;
             _systemTrayIconService.Dispose();
             _diagnostics.Dispose();
 
@@ -412,6 +422,16 @@ namespace PitmastersGrill
                 AppLogger.UiInfo($"Display mode changed. boardMode={compact}");
             }
 
+            if (compact && !_isApplyingSettings &&
+                (!previousCompactMode.HasValue || previousCompactMode.Value != compact))
+            {
+                ShowBoardModeHint();
+            }
+            else if (!compact)
+            {
+                HideBoardModeHint();
+            }
+
             UpdateBoardFooterVisibility();
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
@@ -459,6 +479,34 @@ namespace PitmastersGrill
 
             CompactModeToggleButton.IsChecked = CompactModeToggleButton.IsChecked != true;
             ApplyCompactModeUi();
+        }
+
+        private void ShowBoardModeHint()
+        {
+            if (BoardModeHintOverlay == null)
+            {
+                return;
+            }
+
+            BoardModeHintOverlay.Visibility = Visibility.Visible;
+            _boardModeHintTimer.Stop();
+            _boardModeHintTimer.Start();
+        }
+
+        private void HideBoardModeHint()
+        {
+            if (BoardModeHintOverlay == null)
+            {
+                return;
+            }
+
+            _boardModeHintTimer.Stop();
+            BoardModeHintOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void BoardModeHintTimer_Tick(object? sender, EventArgs e)
+        {
+            HideBoardModeHint();
         }
 
         private void ToggleMaximizeRestore()
@@ -811,6 +859,124 @@ namespace PitmastersGrill
             ApplyBoardColumnMinimumWidths();
             BuildCanonicalBoardColumnLayout();
             ApplyCanonicalBoardColumnLayout("Apply canonical default board layout");
+        }
+
+        private void InitializeBoardDisplaySettingsUi()
+        {
+            ApplyBoardDisplaySettingsToControls();
+            ApplyBoardDisplaySettings();
+        }
+
+        private void ApplyBoardDisplaySettingsToControls()
+        {
+            var wasApplyingSettings = _isApplyingSettings;
+            _isApplyingSettings = true;
+
+            try
+            {
+                if (ShowBoardGridLinesCheckBox != null)
+                {
+                    ShowBoardGridLinesCheckBox.IsChecked = _appSettings.ShowBoardGridLines;
+                }
+
+                if (BoardTextSizeComboBox != null)
+                {
+                    BoardTextSizeComboBox.SelectedIndex = Math.Max(0, Math.Min(6, _appSettings.BoardTextSize - 10));
+                }
+
+                if (BoardFontFamilyComboBox != null)
+                {
+                    BoardFontFamilyComboBox.SelectedIndex = string.IsNullOrWhiteSpace(_appSettings.BoardFontFamily)
+                        ? 0
+                        : string.Equals(_appSettings.BoardFontFamily, "Consolas", StringComparison.Ordinal)
+                            ? 2
+                            : string.Equals(_appSettings.BoardFontFamily, "Bahnschrift", StringComparison.Ordinal)
+                                ? 3
+                                : 1;
+                }
+            }
+            finally
+            {
+                _isApplyingSettings = wasApplyingSettings;
+            }
+        }
+
+        private void ApplyBoardDisplaySettings()
+        {
+            if (PilotBoard == null)
+            {
+                return;
+            }
+
+            var showGridLines = _appSettings.ShowBoardGridLines;
+            PilotBoard.GridLinesVisibility = showGridLines ? DataGridGridLinesVisibility.All : DataGridGridLinesVisibility.None;
+            PilotBoard.HorizontalGridLinesBrush = showGridLines
+                ? (Brush)Resources["GridLineBrush"]
+                : Brushes.Transparent;
+            PilotBoard.VerticalGridLinesBrush = showGridLines
+                ? (Brush)Resources["GridLineBrush"]
+                : Brushes.Transparent;
+            PilotBoard.ColumnHeaderStyle = (Style)Resources[showGridLines
+                ? "PilotBoardColumnHeaderStyle"
+                : "PilotBoardColumnHeaderNoGridStyle"];
+            PilotBoard.CellStyle = (Style)Resources[showGridLines
+                ? "PilotBoardCellStyle"
+                : "PilotBoardCellNoGridStyle"];
+            PilotBoard.FontSize = _appSettings.BoardTextSize;
+            PilotBoard.FontFamily = string.IsNullOrWhiteSpace(_appSettings.BoardFontFamily)
+                ? SystemFonts.MessageFontFamily
+                : new FontFamily(_appSettings.BoardFontFamily);
+        }
+
+        private void ShowBoardGridLinesCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isApplyingSettings || ShowBoardGridLinesCheckBox == null)
+            {
+                return;
+            }
+
+            _appSettings.ShowBoardGridLines = ShowBoardGridLinesCheckBox.IsChecked == true;
+            ApplyBoardDisplaySettings();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo($"Board grid lines changed. enabled={_appSettings.ShowBoardGridLines}");
+        }
+
+        private void BoardTextSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isApplyingSettings || BoardTextSizeComboBox == null)
+            {
+                return;
+            }
+
+            _appSettings.BoardTextSize = BoardTextSizeComboBox.SelectedIndex + 10;
+
+            ApplyBoardDisplaySettings();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo($"Board text size changed. size={_appSettings.BoardTextSize}");
+        }
+
+        private void BoardFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isApplyingSettings || BoardFontFamilyComboBox == null)
+            {
+                return;
+            }
+
+            _appSettings.BoardFontFamily = BoardFontFamilyComboBox.SelectedIndex switch
+            {
+                1 => "Segoe UI",
+                2 => "Consolas",
+                3 => "Bahnschrift",
+                _ => string.Empty
+            };
+
+            ApplyBoardDisplaySettings();
+            _mainWindowAppearanceController.SaveSettings(_appSettings);
+
+            AppLogger.UiInfo(
+                $"Board font family changed. family='{(_appSettings.BoardFontFamily.Length == 0 ? "Default" : _appSettings.BoardFontFamily)}'");
         }
 
         private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)

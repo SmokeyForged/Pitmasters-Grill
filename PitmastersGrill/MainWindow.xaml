@@ -1,4 +1,5 @@
 ﻿<Window x:Class="PitmastersGrill.MainWindow"
+        x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -129,6 +130,66 @@
                     <Setter Property="ToolTip" Value="{x:Null}"/>
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PilotBoardColumnHeaderStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource GridHeaderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource HeaderTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource GridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="PilotBoardColumnHeaderNoGridStyle"
+               TargetType="DataGridColumnHeader"
+               BasedOn="{StaticResource PilotBoardColumnHeaderStyle}">
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <Style x:Key="PilotBoardCellStyle" TargetType="DataGridCell">
+            <Setter Property="Background" Value="{DynamicResource GridBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BodyTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource GridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentEmberBrush}"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                </Trigger>
+
+                <DataTrigger Binding="{Binding BoardSignalKind}" Value="Bait">
+                    <Setter Property="Background" Value="{DynamicResource BoardSignalBaitBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding BoardSignalKind}" Value="ConfirmedCovert">
+                    <Setter Property="Background" Value="{DynamicResource BoardSignalConfirmedCovertBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding BoardSignalKind}" Value="ConfirmedNormal">
+                    <Setter Property="Background" Value="{DynamicResource BoardSignalConfirmedNormalBrush}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding BoardSignalKind}" Value="InferredCyno">
+                    <Setter Property="Background" Value="{DynamicResource BoardSignalInferredCynoBrush}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding BoardSignalKind}" Value="Possible">
+                    <Setter Property="Background" Value="{DynamicResource BoardSignalPossibleBrush}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PilotBoardCellNoGridStyle"
+               TargetType="DataGridCell"
+               BasedOn="{StaticResource PilotBoardCellStyle}">
+            <Setter Property="BorderThickness" Value="0"/>
         </Style>
 
         <Style x:Key="SettingsLabelStyle" TargetType="TextBlock">
@@ -819,11 +880,14 @@
                                       AutoGenerateColumns="False"
                                       CanUserAddRows="False"
                                       IsReadOnly="True"
+                                      ColumnHeaderStyle="{StaticResource PilotBoardColumnHeaderStyle}"
+                                      CellStyle="{StaticResource PilotBoardCellStyle}"
                                       CanUserResizeColumns="True"
                                       SelectionMode="Single"
                                       SelectionUnit="FullRow"
                                       EnableRowVirtualization="True"
                                       EnableColumnVirtualization="True"
+                                      FontSize="12"
                                       VirtualizingPanel.IsVirtualizing="True"
                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
@@ -903,6 +967,24 @@
                                     <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="110" MinWidth="70"/>
                                 </DataGrid.Columns>
                             </DataGrid>
+
+                            <Border x:Name="BoardModeHintOverlay"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Top"
+                                    Margin="0,16,0,0"
+                                    Padding="12,8"
+                                    Background="#DD101010"
+                                    BorderBrush="{DynamicResource AccentEmberBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Panel.ZIndex="20"
+                                    Grid.ColumnSpan="4">
+                                <TextBlock Text="Board Mode enabled. Press Insert to return to normal mode."
+                                           Foreground="{DynamicResource HeaderTextBrush}"
+                                           FontWeight="SemiBold"/>
+                            </Border>
 
                             <Border x:Name="DetailPane"
                                     Visibility="Collapsed"
@@ -1953,6 +2035,59 @@
                                             BorderThickness="1"
                                             Padding="16">
                                         <StackPanel>
+                                            <TextBlock Text="Board Display"
+                                                       FontSize="18"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                                       Margin="0,0,0,12"/>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Text="Compact display options apply only to the Grill board and Board Mode. Other PMG tabs keep their existing layout and readability."/>
+
+                                            <CheckBox x:Name="ShowBoardGridLinesCheckBox"
+                                                      Content="Show Grill board grid lines"
+                                                      Foreground="{DynamicResource BodyTextBrush}"
+                                                      Margin="0,8,0,8"
+                                                      Checked="ShowBoardGridLinesCheckBox_Changed"
+                                                      Unchecked="ShowBoardGridLinesCheckBox_Changed"/>
+
+                                            <TextBlock Text="Grill board text size"
+                                                       Foreground="{DynamicResource BodyTextBrush}"
+                                                       Margin="0,0,0,6"/>
+
+                                            <ComboBox x:Name="BoardTextSizeComboBox"
+                                                      Width="120"
+                                                      HorizontalAlignment="Left"
+                                                      Margin="0,0,0,10"
+                                                      SelectionChanged="BoardTextSizeComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="10"/>
+                                                <ComboBoxItem Content="11"/>
+                                                <ComboBoxItem Content="12"/>
+                                                <ComboBoxItem Content="13"/>
+                                                <ComboBoxItem Content="14"/>
+                                                <ComboBoxItem Content="15"/>
+                                                <ComboBoxItem Content="16"/>
+                                            </ComboBox>
+
+                                            <TextBlock Text="Grill board font family"
+                                                       Foreground="{DynamicResource BodyTextBrush}"
+                                                       Margin="0,0,0,6"/>
+
+                                            <ComboBox x:Name="BoardFontFamilyComboBox"
+                                                      Width="180"
+                                                      HorizontalAlignment="Left"
+                                                      Margin="0,0,0,12"
+                                                      SelectionChanged="BoardFontFamilyComboBox_SelectionChanged">
+                                                <ComboBoxItem Content="App Default"/>
+                                                <ComboBoxItem Content="Segoe UI"/>
+                                                <ComboBoxItem Content="Consolas"/>
+                                                <ComboBoxItem Content="Bahnschrift"/>
+                                            </ComboBox>
+
+                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                                       Margin="0,0,0,18"
+                                                       Text="Defaults preserve the current PMG look. Use a smaller text size or hide grid lines only if you want a denser live board."/>
+
                                             <TextBlock Text="Board Column Visibility"
                                                        FontSize="18"
                                                        FontWeight="SemiBold"
@@ -2282,6 +2417,10 @@
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource HeaderTextBrush}"
                                                Margin="0,0,0,8"/>
+                                    <TextBlock Text="Insert — Toggle Board Mode on or off. If PMG switches into the dense live board layout, press Insert again to return to normal mode."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
                                     <TextBlock Text="Ctrl+Home — Reset and recover the PMG window position/size if it is moved off-screen or the layout gets awkward."
                                                Style="{StaticResource SettingsLabelStyle}"
                                                TextWrapping="Wrap"
@@ -2308,6 +2447,10 @@
                                                TextWrapping="Wrap"
                                                Margin="0,0,0,6"/>
                                     <TextBlock Text="Right-click any Grill row — Open pilot details."
+                                               Style="{StaticResource SettingsLabelStyle}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,6"/>
+                                    <TextBlock Text="Board display options — Use Settings -> Board Columns to hide grid lines, shrink text safely, or switch the Grill board font for a denser view."
                                                Style="{StaticResource SettingsLabelStyle}"
                                                TextWrapping="Wrap"
                                                Margin="0,0,0,6"/>
