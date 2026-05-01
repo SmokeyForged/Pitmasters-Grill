@@ -3,12 +3,24 @@ using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace PitmastersGrill.Services
 {
     public class AppSettingsService
     {
+        private const int DefaultBoardTextSize = 12;
+        private const int MinimumBoardTextSize = 10;
+        private const int MaximumBoardTextSize = 16;
+        private static readonly string[] SupportedBoardFontFamilies =
+        {
+            string.Empty,
+            "Segoe UI",
+            "Consolas",
+            "Bahnschrift"
+        };
+
         private readonly string _settingsPath;
 
         public AppSettingsService()
@@ -105,6 +117,13 @@ namespace PitmastersGrill.Services
             settings.ShowLastSeenColumn ??= true;
             settings.ShowCynoHullSeenColumn ??= true;
             settings.BoardColumnLayout ??= new List<BoardColumnLayoutSetting>();
+            settings.ShowBoardGridLines = settings.ShowBoardGridLines;
+            settings.BoardTextSize = Clamp(settings.BoardTextSize, MinimumBoardTextSize, MaximumBoardTextSize, DefaultBoardTextSize);
+
+            if (!SupportedBoardFontFamilies.Contains(settings.BoardFontFamily ?? string.Empty, StringComparer.Ordinal))
+            {
+                settings.BoardFontFamily = string.Empty;
+            }
 
             return settings;
         }

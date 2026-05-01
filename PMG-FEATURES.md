@@ -75,12 +75,14 @@ The Grill can show:
 Common Grill actions:
 
 - copy EVE local to populate the board
+- press `Insert` to toggle Board Mode on or off, then press `Insert` again to return to the normal layout
 - right-click a row for pilot details
 - double-click a row to open zKill
 - hover over a row for quick sig details
 - resize and reorder columns
 - reset board layout from settings/help workflows
 - hide optional columns from Settings
+- hide board grid lines, reduce board text size, or switch the Grill board font from Settings -> Board Columns
 
 The board is designed to stay readable in a compact panel-style workflow.
 
@@ -232,6 +234,7 @@ The Help tab provides quick in-app reminders for relevant PMG shortcuts and inte
 Examples include:
 
 - copying EVE local to populate the Grill
+- using `Insert` to toggle Board Mode and return to normal mode
 - using `Ctrl+Home` to recover/reset the PMG window position
 - right-clicking Grill rows for details
 - double-clicking supported entities to open zKill
