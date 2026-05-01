@@ -77,7 +77,7 @@ Common Grill actions:
 - copy EVE local to populate the board
 - right-click a row for pilot details
 - double-click a row to open zKill
-- howver over a row for quick sig details
+- hover over a row for quick sig details
 - resize and reorder columns
 - reset board layout from settings/help workflows
 - hide optional columns from Settings
