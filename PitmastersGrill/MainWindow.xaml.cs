@@ -68,6 +68,7 @@ namespace PitmastersGrill
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly SettingsTabController _settingsTabController;
+        private readonly AnalysisTabController _analysisTabController;
         private readonly WindowLayoutController _windowLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
@@ -133,6 +134,7 @@ namespace PitmastersGrill
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
             _settingsTabController = new SettingsTabController();
+            _analysisTabController = new AnalysisTabController();
             _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
 
@@ -4090,83 +4092,6 @@ namespace PitmastersGrill
             });
         }
 
-        private static int CountDistinctVisibleAffiliations(
-            IEnumerable<PilotBoardRow> rows,
-            Func<PilotBoardRow, string> selector)
-        {
-            return rows
-                .Select(row => selector(row)?.Trim())
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count();
-        }
-
-        private static List<string> BuildTopVisibleAffiliationSummaries(
-            IEnumerable<PilotBoardRow> rows,
-            Func<PilotBoardRow, string> selector,
-            int maxCount)
-        {
-            return rows
-                .Select(row => selector(row)?.Trim())
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .GroupBy(value => value!, StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Take(maxCount)
-                .Select(group => $"{group.Key} [{group.Count()}]")
-                .ToList();
-        }
-
-        private static List<AnalysisAffiliationSummary> BuildTopVisibleAffiliationDetails(
-            IEnumerable<PilotBoardRow> rows,
-            Func<PilotBoardRow, string> nameSelector,
-            Func<PilotBoardRow, string> idSelector,
-            int maxCount)
-        {
-            return rows
-                .Select(row => new
-                {
-                    Name = nameSelector(row)?.Trim(),
-                    Id = idSelector(row)?.Trim()
-                })
-                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
-                .GroupBy(
-                    item => item.Name!,
-                    StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Take(maxCount)
-                .Select(group => new AnalysisAffiliationSummary(
-                    group.Key,
-                    group.Count(),
-                    group.Select(item => item.Id).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) ?? string.Empty))
-                .ToList();
-        }
-
-        private static List<AnalysisAffiliationSummary> BuildVisibleAffiliationDetails(
-            IEnumerable<PilotBoardRow> rows,
-            Func<PilotBoardRow, string> nameSelector,
-            Func<PilotBoardRow, string> idSelector)
-        {
-            return rows
-                .Select(row => new
-                {
-                    Name = nameSelector(row)?.Trim(),
-                    Id = idSelector(row)?.Trim()
-                })
-                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
-                .GroupBy(
-                    item => item.Name!,
-                    StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new AnalysisAffiliationSummary(
-                    group.Key,
-                    group.Count(),
-                    group.Select(item => item.Id).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) ?? string.Empty))
-                .ToList();
-        }
-
         private void CurrentRows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             UpdateBoardSummaryBanner();
@@ -4220,67 +4145,39 @@ namespace PitmastersGrill
                 return;
             }
 
-            var visibleRows = _currentRows.ToList();
-            if (visibleRows.Count == 0)
+            var summary = _analysisTabController.BuildSummary(_currentRows);
+            if (!summary.HasVisibleRows)
             {
                 AnalysisEmptyStateText.Visibility = Visibility.Visible;
                 AnalysisDetailsPanel.Visibility = Visibility.Collapsed;
-                AnalysisEmptyStateText.Text = "No visible pilots yet. Load or refresh the Grill to see aggregate analysis.";
+                AnalysisEmptyStateText.Text = summary.EmptyStateText;
                 return;
             }
 
-            var watchedCount = visibleRows.Count(row => row.IsWatched);
-            var uniqueCorpCount = CountDistinctVisibleAffiliations(visibleRows, row => row.CorpName);
-            var uniqueAllianceCount = CountDistinctVisibleAffiliations(visibleRows, row => row.AllianceName);
-            var topAllianceDetails = BuildTopVisibleAffiliationDetails(
-                visibleRows,
-                row => row.AllianceName,
-                row => row.AllianceId,
-                maxCount: 3);
-            var topCorpDetails = BuildTopVisibleAffiliationDetails(
-                visibleRows,
-                row => row.CorpName,
-                row => row.CorpId,
-                maxCount: 3);
-            var allAllianceDetails = BuildVisibleAffiliationDetails(
-                visibleRows,
-                row => row.AllianceName,
-                row => row.AllianceId);
-            var allCorpDetails = BuildVisibleAffiliationDetails(
-                visibleRows,
-                row => row.CorpName,
-                row => row.CorpId);
-            var baitCount = visibleRows.Count(row => row.BaitOverride || row.HasDerivedBaitEvidence);
-            var hardCynoCount = visibleRows.Count(row =>
-                string.Equals(row.BoardSignalKind, "ConfirmedNormal", StringComparison.OrdinalIgnoreCase));
-            var covertCynoCount = visibleRows.Count(row =>
-                string.Equals(row.BoardSignalKind, "ConfirmedCovert", StringComparison.OrdinalIgnoreCase));
-
             AnalysisEmptyStateText.Visibility = Visibility.Collapsed;
             AnalysisDetailsPanel.Visibility = Visibility.Visible;
-            AnalysisVisibleCountsText.Text = $"Visible pilots: {visibleRows.Count} | Watched pilots: {watchedCount} | Confirmed cynos: Hard {hardCynoCount} | Covert {covertCynoCount} | Bait {baitCount}";
-            AnalysisUniqueCountsText.Text = $"Unique corps: {uniqueCorpCount} | Unique alliances: {uniqueAllianceCount}";
-            PopulateAnalysisAllianceTopText(topAllianceDetails);
-            PopulateAnalysisCorpTopText(topCorpDetails);
-            PopulateAnalysisAffiliationList(_analysisAllianceItems, allAllianceDetails, "alliance");
-            PopulateAnalysisAffiliationList(_analysisCorpItems, allCorpDetails, "corporation");
+            AnalysisVisibleCountsText.Text = summary.VisibleCountsText;
+            AnalysisUniqueCountsText.Text = summary.UniqueCountsText;
+            PopulateAnalysisAllianceTopText(summary.TopAlliances);
+            PopulateAnalysisCorpTopText(summary.TopCorps);
+            PopulateAnalysisAffiliationList(
+                _analysisAllianceItems,
+                _analysisTabController.BuildAffiliationListItems(summary.AllAlliances, "alliance"));
+            PopulateAnalysisAffiliationList(
+                _analysisCorpItems,
+                _analysisTabController.BuildAffiliationListItems(summary.AllCorps, "corporation"));
             AnalysisSignalsText.Text = string.Empty;
-            PopulateAnalysisHighlightsText(visibleRows);
+            PopulateAnalysisHighlightsText(summary.Highlights);
         }
 
         private static void PopulateAnalysisAffiliationList(
             ObservableCollection<AnalysisAffiliationListItem> target,
-            IReadOnlyList<AnalysisAffiliationSummary> summaries,
-            string entityType)
+            IReadOnlyList<AnalysisAffiliationListItem> items)
         {
             target.Clear();
-            foreach (var summary in summaries)
+            foreach (var item in items)
             {
-                target.Add(new AnalysisAffiliationListItem(
-                    summary.Name,
-                    summary.Id,
-                    entityType,
-                    $"{summary.Name} [{summary.Count}]"));
+                target.Add(item);
             }
         }
 
@@ -4468,35 +4365,21 @@ namespace PitmastersGrill
             }
         }
 
-        private void PopulateAnalysisHighlightsText(IReadOnlyList<PilotBoardRow> visibleRows)
+        private void PopulateAnalysisHighlightsText(IReadOnlyList<AnalysisHighlightSummary> highlights)
         {
             AnalysisHighlightsText.Inlines.Clear();
             AnalysisHighlightsText.Inlines.Add(new Run("Highlights: "));
 
-            var topDangerousPilots = visibleRows
-                .Where(row => (row.KillCount ?? 0) > 0 || (row.LossCount ?? 0) > 0)
-                .OrderByDescending(row => ComputeDangerPercent(row))
-                .ThenByDescending(row => row.KillCount ?? 0)
-                .ThenBy(row => row.CharacterName, StringComparer.OrdinalIgnoreCase)
-                .GroupBy(
-                    row => !string.IsNullOrWhiteSpace(row.CharacterId)
-                        ? $"id:{row.CharacterId.Trim()}"
-                        : $"name:{row.CharacterName.Trim().ToUpperInvariant()}",
-                    StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .Take(3)
-                .ToList();
-
             var addedAny = false;
-            for (var index = 0; index < topDangerousPilots.Count; index++)
+            for (var index = 0; index < highlights.Count; index++)
             {
-                var pilot = topDangerousPilots[index];
+                var highlight = highlights[index];
                 AddHighlightCharacterLink(
                     AnalysisHighlightsText,
-                    index == 0 ? "Top Dangerous" : string.Empty,
-                    pilot.CharacterName,
-                    pilot.CharacterId,
-                    $"{ComputeDangerPercent(pilot):0.#}%",
+                    highlight.Label,
+                    highlight.CharacterName,
+                    highlight.CharacterId,
+                    highlight.ValueText,
                     ref addedAny);
             }
 
@@ -4540,17 +4423,6 @@ namespace PitmastersGrill
 
             target.Inlines.Add(new Run($" [{valueText}]"));
             addedAny = true;
-        }
-
-        private static double ComputeDangerPercent(PilotBoardRow row)
-        {
-            var kills = Math.Max(0, row.KillCount ?? 0);
-            var losses = Math.Max(0, row.LossCount ?? 0);
-            var total = kills + losses;
-
-            return total <= 0
-                ? 0
-                : (double)kills / total * 100d;
         }
 
         private void AddHyperlinkInline(TextBlock target, string text, string url, string toolTip)
@@ -4633,9 +4505,6 @@ namespace PitmastersGrill
                 AppLogger.UiError($"Failed to open analysis affiliation item. type='{item.EntityType}' id='{item.Id}'", ex);
             }
         }
-
-        private sealed record AnalysisAffiliationSummary(string Name, int Count, string Id);
-        private sealed record AnalysisAffiliationListItem(string Name, string Id, string EntityType, string DisplayText);
 
         private void RestoreWindowLayoutFromSettings()
         {
