@@ -34,5 +34,15 @@ namespace PitmastersGrill.Tests.Services
 
             Assert.Empty(result);
         }
+
+        [Fact]
+        public void Parse_RejectsNamesThatContainInvalidSeparators()
+        {
+            var parser = new LocalListParser();
+
+            var result = parser.Parse("Valid Name\nBad//Name\nAlso..Bad\nAnother Valid");
+
+            Assert.Equal(new[] { "Valid Name", "Another Valid" }, result);
+        }
     }
 }

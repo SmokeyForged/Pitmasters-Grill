@@ -27,5 +27,27 @@ namespace PitmastersGrill.Tests.Services
 
             Assert.Contains("before start day", ex.Message, StringComparison.Ordinal);
         }
+
+        [Fact]
+        public void GetExplicitWindowUtc_SupportsSingleDayWindow()
+        {
+            var service = new SeedWindowPolicyService();
+
+            var result = service.GetExplicitWindowUtc("2026-04-03", "2026-04-03");
+
+            Assert.Equal("2026-04-03", result.StartDayUtc);
+            Assert.Equal("2026-04-03", result.EndDayUtc);
+            Assert.Equal(1, result.DayCount);
+        }
+
+        [Fact]
+        public void GetExplicitWindowUtc_RejectsInvalidStartDay()
+        {
+            var service = new SeedWindowPolicyService();
+
+            var ex = Assert.Throws<InvalidOperationException>(() => service.GetExplicitWindowUtc("2026-02-30", "2026-03-01"));
+
+            Assert.Contains("Invalid start day", ex.Message, StringComparison.Ordinal);
+        }
     }
 }

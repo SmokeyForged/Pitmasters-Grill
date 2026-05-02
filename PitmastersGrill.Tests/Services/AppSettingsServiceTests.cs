@@ -113,6 +113,31 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains(Environment.NewLine, json, StringComparison.Ordinal);
         }
 
+        [Fact]
+        public void Load_PreservesSupportedBoardFontAndValidPlacement()
+        {
+            using var tempDirectory = new TempDirectory();
+            var settingsPath = tempDirectory.FilePath("settings.json");
+            File.WriteAllText(
+                settingsPath,
+                """
+                {
+                  "BoardTextSize": 13,
+                  "BoardFontFamily": "Bahnschrift",
+                  "PilotDetailPlacementPreference": "AutoPreferLeft",
+                  "ShowSigColumn": false
+                }
+                """);
+            var service = CreateService(settingsPath);
+
+            var result = service.Load();
+
+            Assert.Equal(13, result.BoardTextSize);
+            Assert.Equal("Bahnschrift", result.BoardFontFamily);
+            Assert.Equal(PilotDetailPlacementPreference.AutoPreferLeft.ToString(), result.PilotDetailPlacementPreference);
+            Assert.False(result.ShowSigColumn);
+        }
+
         private static AppSettingsService CreateService(string settingsPath)
         {
             var service = new AppSettingsService();

@@ -64,5 +64,30 @@ namespace PitmastersGrill.Tests.Services
             Assert.False(result.IsPlausibleLocalList);
             Assert.Equal("Clipboard looked like command content.", result.IgnoreReason);
         }
+
+        [Fact]
+        public void Inspect_RejectsPayloadWithTooManyNonEmptyLines()
+        {
+            var clipboardText = string.Join("\n", Enumerable.Repeat("Aura", ClipboardPayloadInspector.MaximumNonEmptyLines + 1));
+
+            var result = _inspector.Inspect(clipboardText);
+
+            Assert.False(result.IsPlausibleLocalList);
+            Assert.Equal("Clipboard contained too many lines to treat as a local list.", result.IgnoreReason);
+        }
+
+        [Fact]
+        public void Inspect_AcceptsStrongLocalListSignalEvenWithOneMarkupLine()
+        {
+            var names = Enumerable.Range(1, 20).Select(index => $"Pilot {index}").ToList();
+            names[19] = "<Grid";
+            var clipboardText = string.Join("\n", names);
+
+            var result = _inspector.Inspect(clipboardText);
+
+            Assert.True(result.IsPlausibleLocalList);
+            Assert.Equal(20, result.NonEmptyLineCount);
+            Assert.Equal(19, result.PlausibleNameCount);
+        }
     }
 }

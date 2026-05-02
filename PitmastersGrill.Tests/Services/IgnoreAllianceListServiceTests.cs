@@ -113,6 +113,23 @@ namespace PitmastersGrill.Tests.Services
             Assert.All(state.Entries, entry => Assert.Equal(IgnoreEntryType.Alliance, entry.Type));
         }
 
+        [Fact]
+        public void LoadAllianceIds_ReturnsOnlyAllianceTypedEntries()
+        {
+            using var tempDirectory = new TempDirectory();
+            var service = CreateService(tempDirectory.FilePath("ignore-alliances.json"));
+            service.SaveTypedEntries(new[]
+            {
+                new TypedIgnoreEntry { Id = 300, Type = IgnoreEntryType.Alliance, ResolvedName = "Alliance A" },
+                new TypedIgnoreEntry { Id = 400, Type = IgnoreEntryType.Corporation, ResolvedName = "Corp B" },
+                new TypedIgnoreEntry { Id = 500, Type = IgnoreEntryType.Alliance, ResolvedName = "Alliance C" }
+            });
+
+            var result = service.LoadAllianceIds();
+
+            Assert.Equal(new long[] { 300, 500 }, result.OrderBy(x => x).ToArray());
+        }
+
         private static IgnoreAllianceListService CreateService(string path)
         {
             var service = new IgnoreAllianceListService();
