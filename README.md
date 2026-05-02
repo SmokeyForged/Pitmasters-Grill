@@ -12,16 +12,15 @@ Pitmaster's Grill, or PMG, is a free Windows desktop intel companion for EVE Onl
 
 PMG turns copied EVE local lists into a readable board of public pilot context. It is built for quick, practical use during live play: copy local, scan the Grill, review Analysis when time allows, refresh public intel when needed, and open zKill for deeper manual review.
 
-
 <img width="1345" height="754" alt="image" src="https://github.com/user-attachments/assets/7c40fe63-ce16-4831-bf6c-247e444502c5" />
-
-
 
 PMG is now in **General Release**.
 
-Current release: **Pitmasters Grill v1.1.0**  
-Latest release: **[v1.1.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.1.0)**  
+Current release: **Pitmasters Grill v1.2.0**  
+Latest release: **[v1.2.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.2.0)**  
 Full release history: **[GitHub Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**
+
+Repository status on `main`: **1.2.0 general release foundation and support improvements are present**. This release focuses on maintainability, automated validation, and safer future iteration. It does **not** add new EVE intel sources or change PMG's public-data boundaries.
 
 ---
 
@@ -52,7 +51,7 @@ PMG can:
 - show recent public ship observations
 - surface cyno, tackle, bait, and watchlist context
 - summarize visible-pilot composition in Analysis
-- repair recent public intel with Today’s Freshness and Historical Freshness
+- repair recent public intel with Today's Freshness and Historical Freshness
 - optionally use R2Z2 for live zKill-known killmail ingestion
 - cache public intel locally to reduce repeated lookup cost
 - export diagnostics for troubleshooting
@@ -70,8 +69,7 @@ PMG is organized around a few top-level tabs:
   <img width="761" height="660" alt="image" src="https://github.com/user-attachments/assets/a92772d7-3460-4ee5-8fef-2a6adeb68459" />
 
 - **Grill** — the main pilot board.
-<img width="1134" height="409" alt="image" src="https://github.com/user-attachments/assets/009de61b-7824-4bd3-94ee-69e03878b22e" />
-
+  <img width="1134" height="409" alt="image" src="https://github.com/user-attachments/assets/009de61b-7824-4bd3-94ee-69e03878b22e" />
 
 - **Intel** — killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls.
 - **Ignore List** — manage ignored pilots, corporations, and alliances.
@@ -94,7 +92,7 @@ PMG uses layered public-data freshness:
 2. **R2Z2 Live Feed**  
    Optional live zKill-known killmail ingestion. Disabled by default.
 
-3. **Today’s Freshness**  
+3. **Today's Freshness**  
    Manual visible-pilot same-day/recent repair.
 
 4. **Historical Freshness**  
@@ -103,7 +101,7 @@ PMG uses layered public-data freshness:
 5. **Background Historical Repair**  
    Bounded startup enrichment over known/recent pilots with cooldown protection.
 
-These features improve PMG’s local view of public evidence. They do not make public data complete, and they do not expose private data.
+These features improve PMG's local view of public evidence. They do not make public data complete, and they do not expose private data.
 
 ---
 
@@ -120,23 +118,29 @@ New here? Start with:
 - **[Patch Notes](./Patch%20Notes/)**  
   Full release history and version notes.
 
+- **[1.2.0 General Release Notes](./Patch%20Notes/General-Release_1-2-0.md)**  
+  Summary of the 1.2.0 support, maintainability, CI, and validation work.
+
 - **[Current Feature Snapshot](./PMG-FEATURES.md)**  
-  A deeper overview of PMG’s current feature set and limitations.
+  A deeper overview of PMG's current feature set and limitations.
 
 - **[How It Works](./HOW-IT-WORKS.md)**  
-  Technical overview of PMG’s data flow and evidence model.
+  Technical overview of PMG's data flow and evidence model.
 
 - **[First-Time Use](./FIRST-TIME-USE.md)**  
   Setup and first-run guidance.
 
 - **[EVE ToS Compliance](./EVE-TOS-COMPLIANCE.md)**  
-  PMG’s safety framing around EVE client boundaries.
+  PMG's safety framing around EVE client boundaries.
 
 - **[Developer Notes](./DEVELOPER-NOTES.md)**  
   Implementation notes for maintainers and contributors.
 
 - **[Application Source](./PitmastersGrill/)**  
   Main WPF application source.
+
+- **[Automated Tests](./PitmastersGrill.Tests/)**  
+  Deterministic test coverage for non-UI services and extracted controllers.
 
 - **[Issues](https://github.com/SmokeyForged/Pitmasters-Grill/issues)**  
   Bug reports, enhancement requests, and community feedback.

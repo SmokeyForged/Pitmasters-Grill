@@ -41,6 +41,8 @@ Important files/folders:
 
 ```text
 PitmastersGrill/PitmastersGrill.csproj
+PitmastersGrill.Tests/PitmastersGrill.Tests.csproj
+.github/workflows/dotnet-build-test.yml
 PitmastersGrill/App.xaml
 PitmastersGrill/App.xaml.cs
 PitmastersGrill/MainWindow.xaml
@@ -214,7 +216,15 @@ Main UI areas:
 - Settings
 - Help
 
-`MainWindow.xaml.cs` is large. Avoid expanding it unnecessarily after 1.0. Prefer extracting behavior into services/helpers when safe.
+`MainWindow.xaml.cs` is still one of the main pressure points. Avoid expanding it unnecessarily after 1.0. Prefer extracting behavior into services/helpers when safe.
+
+Recent low-risk extraction areas now include:
+
+- board display settings coordination
+- board column layout persistence/validation helpers
+- window layout and snapshot logic
+- settings-tab mapping helpers
+- Analysis-tab deterministic summary helpers
 
 Keep UI behavior predictable:
 
@@ -306,7 +316,19 @@ Avoid letting optional UI assets crash startup.
 Common build command:
 
 ```powershell
-dotnet build .\PitmastersGrill\PitmastersGrill.csproj --no-restore -m:1
+dotnet build .\PitmastersGrill\PitmastersGrill.slnx --configuration Release -m:1
+```
+
+Common test command:
+
+```powershell
+dotnet test .\PitmastersGrill.Tests\PitmastersGrill.Tests.csproj --configuration Release -v minimal
+```
+
+Windows CI currently restores, builds, and tests through:
+
+```text
+.github/workflows/dotnet-build-test.yml
 ```
 
 Known warning classes may include:
@@ -324,6 +346,7 @@ Warnings should be reviewed, but not every analyzer suggestion is release-blocki
 Before release:
 
 - build succeeds
+- automated tests pass
 - app launches
 - tray icon and app branding do not crash startup
 - Grill populates
@@ -382,6 +405,8 @@ Useful edge tests:
 - visible pilot with late-posted killmail
 - narrow window size
 - multiple monitor/window restore
+
+Deterministic automated coverage now exists for a growing set of non-UI services and extracted controllers. Prefer extending `PitmastersGrill.Tests/` before adding brittle UI automation or live-network tests.
 
 ---
 

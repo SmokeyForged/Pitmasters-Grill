@@ -2,7 +2,7 @@
 
 This guide explains where things live in the Pitmaster's Grill repository and which files are most useful depending on what you are trying to do.
 
-Pitmaster's Grill, or PMG, is a Windows desktop intel companion for EVE Online. The repository contains the WPF application source, release notes, user-facing documentation, and project notes.
+Pitmaster's Grill, or PMG, is a Windows desktop intel companion for EVE Online. The repository contains the WPF application source, automated tests, CI workflow definitions, release notes, user-facing documentation, and project notes.
 
 ---
 
@@ -14,9 +14,11 @@ If you are new to the repo, start with these files:
 |---|---|
 | `README.md` | Public-facing intro, quick start, and navigation. |
 | `PitmastersGrill/` | Main application source code. |
+| `PitmastersGrill.Tests/` | Deterministic non-UI automated test project. |
+| `.github/workflows/` | Windows build/test CI workflow definitions. |
 | `Patch Notes/` | Version-by-version release notes. |
 | `PMG-FEATURES.md` | Current feature overview and limitations. |
-| `HOW-IT-WORKS.md` | Technical overview of PMG’s data flow and evidence model. |
+| `HOW-IT-WORKS.md` | Technical overview of PMG's data flow and evidence model. |
 | `FIRST-TIME-USE.md` | Setup and first-run guidance. |
 | `EVE-TOS-COMPLIANCE.md` | Safety and EVE client-boundary notes. |
 | `DEVELOPER-NOTES.md` | Maintainer notes and implementation guidance. |
@@ -27,15 +29,17 @@ If you are new to the repo, start with these files:
 
 ```text
 Pitmasters-Grill/
-├─ README.md
-├─ HOW-TO-NAVIGATE-THIS-REPO.md
-├─ PMG-FEATURES.md
-├─ HOW-IT-WORKS.md
-├─ FIRST-TIME-USE.md
-├─ EVE-TOS-COMPLIANCE.md
-├─ DEVELOPER-NOTES.md
-├─ Patch Notes/
-└─ PitmastersGrill/
++-- README.md
++-- HOW-TO-NAVIGATE-THIS-REPO.md
++-- PMG-FEATURES.md
++-- HOW-IT-WORKS.md
++-- FIRST-TIME-USE.md
++-- EVE-TOS-COMPLIANCE.md
++-- DEVELOPER-NOTES.md
++-- .github/workflows/
++-- Patch Notes/
++-- PitmastersGrill/
++-- PitmastersGrill.Tests/
 ```
 
 ---
@@ -65,11 +69,23 @@ Important areas include:
 | `PitmastersGrill/Views/` | Additional WPF windows/views such as startup splash. |
 | `PitmastersGrill/Diagnostics/` | Diagnostic helpers and logging-related code. |
 
+Automated tests live in:
+
+```text
+PitmastersGrill.Tests/
+```
+
+CI workflow definitions live in:
+
+```text
+.github/workflows/
+```
+
 ---
 
 ## Main User-Facing App Areas
 
-PMG’s main UI is organized around top-level tabs:
+PMG's main UI is organized around top-level tabs:
 
 | Tab | Purpose |
 |---|---|
@@ -84,7 +100,7 @@ PMG’s main UI is organized around top-level tabs:
 
 ## Freshness and Public Intel System
 
-PMG’s public intel freshness model is layered.
+PMG's public intel freshness model is layered.
 
 ### Archive Backfill
 
@@ -109,7 +125,7 @@ PitmastersGrill/Services/R2Z2LiveKillmailService.cs
 PitmastersGrill/Models/R2Z2LiveFeedSnapshot.cs
 ```
 
-### Today’s Freshness
+### Today's Freshness
 
 Manual visible-pilot same-day/recent repair.
 
@@ -159,12 +175,17 @@ PitmastersGrill/Services/KillmailDbWriteGate.cs
 
 ## Board, Layout, and Display Behavior
 
-Board behavior, column layout, display formatting, and row enrichment are mostly handled by:
+Board behavior, layout, display formatting, and row enrichment are handled by a mix of `MainWindow` shell ownership and focused helpers such as:
 
 ```text
 PitmastersGrill/MainWindow.xaml
 PitmastersGrill/MainWindow.xaml.cs
 PitmastersGrill/Models/BoardColumnLayoutSetting.cs
+PitmastersGrill/Services/BoardDisplaySettingsController.cs
+PitmastersGrill/Services/BoardColumnLayoutController.cs
+PitmastersGrill/Services/WindowLayoutController.cs
+PitmastersGrill/Services/SettingsTabController.cs
+PitmastersGrill/Services/AnalysisTabController.cs
 PitmastersGrill/Services/BoardRowFactory.cs
 PitmastersGrill/Services/PilotBoardRowEnrichmentApplier.cs
 PitmastersGrill/Services/LastSeenDisplayFormatter.cs
@@ -223,8 +244,10 @@ The README should stay short and navigational. Detailed release history belongs 
 Current General Release notes should use a filename similar to:
 
 ```text
-Patch Notes/General-Release_1.0.0_patch_notes.md
+Patch Notes/General-Release_1-2-0.md
 ```
+
+Release-preparation or foundation notes should be promoted into the matching General Release note before public release.
 
 ---
 
@@ -268,7 +291,7 @@ FIRST-TIME-USE.md
 Patch Notes/
 ```
 
-Use the app’s `Help` tab for shortcuts and in-app workflow reminders.
+Use the app's `Help` tab for shortcuts and in-app workflow reminders.
 
 ---
 
@@ -304,13 +327,15 @@ Start with:
 DEVELOPER-NOTES.md
 HOW-IT-WORKS.md
 PitmastersGrill/
+PitmastersGrill.Tests/
+.github/workflows/
 ```
 
 Before changing behavior, understand these boundaries:
 
 - Archive Backfill is the historical baseline.
 - R2Z2 is optional live public data ingestion.
-- Today’s Freshness repairs visible same-day/recent pilot data.
+- Today's Freshness repairs visible same-day/recent pilot data.
 - Historical Freshness repairs visible recent completed-day data.
 - Background Historical Repair is bounded startup enrichment.
 - Freshness repair should not replace archive import semantics.
@@ -326,7 +351,7 @@ Good first contribution areas may include:
 - documentation improvements
 - clearer diagnostics
 - UI copy polish
-- bug reports with reproduction steps
+- bug reports
 - release-note cleanup
 - small display/formatting improvements
 
@@ -348,11 +373,12 @@ Changes in advanced areas should be tested carefully because they affect local c
 Before a release, verify:
 
 - build succeeds
+- automated tests pass
 - app launches without startup crash
 - Grill populates
 - board layout behaves
 - Intel tab renders
-- Today’s Freshness works
+- Today's Freshness works
 - Historical Freshness works or skips cleanly
 - Background Historical Repair does not block startup
 - R2Z2 remains optional/disabled by default

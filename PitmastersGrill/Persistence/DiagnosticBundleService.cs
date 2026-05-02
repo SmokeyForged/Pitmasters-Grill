@@ -10,7 +10,7 @@ namespace PitmastersGrill.Persistence
 {
     public static class DiagnosticBundleService
     {
-        private const string VersionLabel = "General Release-v1.2.0-dev";
+        private const string VersionLabel = "General Release-v1.2.0";
         private const int MaximumBundlesToRetain = 20;
 
         public static string GetDiagnosticsDirectory()
