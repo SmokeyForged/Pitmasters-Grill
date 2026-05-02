@@ -14,12 +14,20 @@ PMG turns copied EVE local lists into a readable board of public pilot context. 
 
 
 
-https://github.com/user-attachments/assets/179a57b2-ae23-46d0-b53c-fb7f76ce99a7
-
 
 
 
 PMG is now in **General Release**.
+
+---
+
+<img width="800" height="450" alt="ezgif-100e114878aa3517" src="https://github.com/user-attachments/assets/487854b5-0398-4cab-8a34-3bde1c16628b" />
+
+---
+
+<img width="800" height="450" alt="ezgif-13793b3c0cf615df" src="https://github.com/user-attachments/assets/800f5222-3544-4a3c-b087-08c73663d78d" />
+
+---
 
 Current release: **Pitmasters Grill v1.2.0**  
 Latest release: **[v1.2.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.2.0)**  
@@ -71,18 +79,10 @@ PMG does **not** read EVE client memory, inspect network traffic, automate gamep
 PMG is organized around a few top-level tabs:
 
 - **Analysis** — summary view for the current visible board.
-  <img width="761" height="660" alt="image" src="https://github.com/user-attachments/assets/a92772d7-3460-4ee5-8fef-2a6adeb68459" />
-
 - **Grill** — the main pilot board.
-  <img width="1134" height="409" alt="image" src="https://github.com/user-attachments/assets/009de61b-7824-4bd3-94ee-69e03878b22e" />
-
 - **Intel** — killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls.
 - **Ignore List** — manage ignored pilots, corporations, and alliances.
-  <img width="730" height="800" alt="image" src="https://github.com/user-attachments/assets/5ff3b8aa-35e1-4e8f-a52e-900735f6b3d9" />
-
 - **Settings** — app behavior, PMG themes, visibility, and layout options.
-  <img width="732" height="802" alt="image" src="https://github.com/user-attachments/assets/4c6ded45-6ba5-4cc5-b902-4ad4b5e26c46" />
-
 - **Help** — shortcut and workflow reference.
 
 ---
