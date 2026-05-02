@@ -30,5 +30,39 @@ namespace PitmastersGrill.Tests.Services
             Assert.False(result.IsPlausibleLocalList);
             Assert.Equal("Clipboard looked like shell prompt content.", result.IgnoreReason);
         }
+
+        [Fact]
+        public void Inspect_RejectsLongLinesWhenNotStrongLocalList()
+        {
+            var longLine = new string('A', ClipboardPayloadInspector.MaximumSingleLineCharacters + 1);
+            var clipboardText = $"Aura\n{longLine}";
+
+            var result = _inspector.Inspect(clipboardText);
+
+            Assert.False(result.IsPlausibleLocalList);
+            Assert.Equal("Clipboard contained lines too long to treat as pilot names.", result.IgnoreReason);
+        }
+
+        [Fact]
+        public void Inspect_RejectsCodeLikeContent()
+        {
+            var clipboardText = "Aura\n<div>markup</div>\nChribba";
+
+            var result = _inspector.Inspect(clipboardText);
+
+            Assert.False(result.IsPlausibleLocalList);
+            Assert.Equal("Clipboard looked like code, markup, or stack-trace content.", result.IgnoreReason);
+        }
+
+        [Fact]
+        public void Inspect_RejectsSmallPayloadWithMixedPilotAndCommandLines()
+        {
+            var clipboardText = "Aura\ndotnet build";
+
+            var result = _inspector.Inspect(clipboardText);
+
+            Assert.False(result.IsPlausibleLocalList);
+            Assert.Equal("Clipboard looked like command content.", result.IgnoreReason);
+        }
     }
 }

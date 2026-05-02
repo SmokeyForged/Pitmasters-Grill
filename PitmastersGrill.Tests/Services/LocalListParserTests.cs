@@ -14,5 +14,25 @@ namespace PitmastersGrill.Tests.Services
 
             Assert.Equal(new[] { "Aura", "Chribba" }, result);
         }
+
+        [Fact]
+        public void Parse_PreservesFirstOccurrenceOrderAcrossCaseInsensitiveDuplicates()
+        {
+            var parser = new LocalListParser();
+
+            var result = parser.Parse("  Chribba  \nAURA\nAura\nThe Mittani\nchribba");
+
+            Assert.Equal(new[] { "Chribba", "AURA", "The Mittani" }, result);
+        }
+
+        [Fact]
+        public void Parse_ReturnsEmptyListForWhitespaceOnlyInput()
+        {
+            var parser = new LocalListParser();
+
+            var result = parser.Parse(" \r\n\t \n");
+
+            Assert.Empty(result);
+        }
     }
 }
