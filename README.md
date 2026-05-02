@@ -12,7 +12,12 @@ Pitmaster's Grill, or PMG, is a free Windows desktop intel companion for EVE Onl
 
 PMG turns copied EVE local lists into a readable board of public pilot context. It is built for quick, practical use during live play: copy local, scan the Grill, review Analysis when time allows, refresh public intel when needed, and open zKill for deeper manual review.
 
-<img width="1345" height="754" alt="image" src="https://github.com/user-attachments/assets/7c40fe63-ce16-4831-bf6c-247e444502c5" />
+
+
+https://github.com/user-attachments/assets/179a57b2-ae23-46d0-b53c-fb7f76ce99a7
+
+
+
 
 PMG is now in **General Release**.
 
