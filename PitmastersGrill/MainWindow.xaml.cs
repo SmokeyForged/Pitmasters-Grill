@@ -67,6 +67,7 @@ namespace PitmastersGrill
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
+        private readonly WindowLayoutController _windowLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
         private readonly BoardPopulationPassController _boardPopulationPassController;
@@ -130,6 +131,7 @@ namespace PitmastersGrill
             _mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
+            _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
 
             _isApplyingSettings = true;
@@ -569,7 +571,7 @@ namespace PitmastersGrill
             }
 
             var currentBounds = new Rect(Left, Top, Width, Height);
-            if (!IsUsableWindowBounds(currentBounds))
+            if (!_windowLayoutController.IsUsableWindowBounds(currentBounds))
             {
                 return;
             }
@@ -676,7 +678,7 @@ namespace PitmastersGrill
                 _lastNonMinimizedWindowState = WindowState;
             }
 
-            if (WindowState == WindowState.Maximized && IsUsableWindowBounds(RestoreBounds))
+            if (WindowState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds))
             {
                 _lastKnownNormalBounds = RestoreBounds;
             }
@@ -4658,54 +4660,38 @@ namespace PitmastersGrill
 
         private void RestoreWindowLayoutFromSettings()
         {
-            var virtualDesktopSummary = BuildVirtualDesktopSummary();
-            var fallbackBounds = GetDefaultWindowBoundsForCurrentDisplay();
-            var hasSavedBounds = TryGetSavedWindowBounds(out var savedBounds);
-
-            Rect targetBounds;
-            string restoreDecision;
-            string restoreReason;
-
-            if (!hasSavedBounds)
-            {
-                targetBounds = fallbackBounds;
-                restoreDecision = "Fallback";
-                restoreReason = "No saved bounds were available.";
-            }
-            else if (!TryValidateWindowBounds(savedBounds, out var failureReason))
-            {
-                targetBounds = fallbackBounds;
-                restoreDecision = "Fallback";
-                restoreReason = failureReason;
-            }
-            else
-            {
-                targetBounds = savedBounds;
-                restoreDecision = "Applied";
-                restoreReason = "Saved bounds are visible on the current monitor layout.";
-            }
+            var workAreas = GetMonitorWorkAreasDip();
+            var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas);
+            var restoreResult = _windowLayoutController.BuildRestoreResult(
+                _appSettings,
+                MinWidth,
+                MinHeight,
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                MinimumVisibleWindowEdge,
+                DefaultWindowWidth,
+                DefaultWindowHeight,
+                workAreas);
 
             AppLogger.UiInfo(
-                $"Window layout restore decision={restoreDecision} savedBounds={DescribeRect(hasSavedBounds ? savedBounds : Rect.Empty)} fallbackReason='{restoreReason}' wasMaximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={virtualDesktopSummary}");
+                $"Window layout restore decision={restoreResult.RestoreDecision} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={virtualDesktopSummary}");
 
             WindowState = WindowState.Normal;
-            Left = targetBounds.Left;
-            Top = targetBounds.Top;
-            Width = targetBounds.Width;
-            Height = targetBounds.Height;
-            _lastKnownNormalBounds = targetBounds;
+            Left = restoreResult.TargetBounds.Left;
+            Top = restoreResult.TargetBounds.Top;
+            Width = restoreResult.TargetBounds.Width;
+            Height = restoreResult.TargetBounds.Height;
+            _lastKnownNormalBounds = restoreResult.TargetBounds;
 
-            if (_appSettings.SavedWindowIsMaximized)
+            if (restoreResult.ShouldRestoreMaximized)
             {
                 WindowState = WindowState.Maximized;
             }
 
-            _lastNonMinimizedWindowState = _appSettings.SavedWindowIsMaximized
-                ? WindowState.Maximized
-                : WindowState.Normal;
+            _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState;
 
             AppLogger.UiInfo(
-                $"Window layout restore applied finalBounds={DescribeRect(targetBounds)} finalWindowState={WindowState}");
+                $"Window layout restore applied finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}");
         }
 
         private void SaveWindowLayoutToSettings(string reason)
@@ -4714,7 +4700,7 @@ namespace PitmastersGrill
                 ? _lastNonMinimizedWindowState
                 : WindowState;
 
-            if (effectiveState == WindowState.Maximized && IsUsableWindowBounds(RestoreBounds))
+            if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds))
             {
                 _lastKnownNormalBounds = RestoreBounds;
             }
@@ -4723,138 +4709,58 @@ namespace PitmastersGrill
                 TrackCurrentNormalWindowBounds("Save");
             }
 
-            var bounds = IsUsableWindowBounds(_lastKnownNormalBounds)
+            var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds)
                 ? _lastKnownNormalBounds
                 : effectiveState == WindowState.Maximized
                     ? RestoreBounds
                     : new Rect(Left, Top, Width, Height);
 
-            if (!TryValidateWindowBounds(bounds, out var failureReason))
+            var workAreas = GetMonitorWorkAreasDip();
+            if (!_windowLayoutController.TryBuildLayoutSnapshot(
+                    bounds,
+                    effectiveState,
+                    MinWidth,
+                    MinHeight,
+                    MinimumSavedWindowWidth,
+                    MinimumSavedWindowHeight,
+                    MinimumVisibleWindowEdge,
+                    workAreas,
+                    out var snapshot,
+                    out var failureReason))
             {
                 AppLogger.UiWarn(
-                    $"Window layout save skipped. reason='{reason}' bounds={DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={BuildVirtualDesktopSummary()}");
+                    $"Window layout save skipped. reason='{reason}' bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}");
                 return;
             }
 
-            _appSettings.SavedWindowLeft = bounds.Left;
-            _appSettings.SavedWindowTop = bounds.Top;
-            _appSettings.SavedWindowWidth = bounds.Width;
-            _appSettings.SavedWindowHeight = bounds.Height;
-            _appSettings.SavedWindowIsMaximized = effectiveState == WindowState.Maximized;
+            _windowLayoutController.ApplySnapshot(_appSettings, snapshot);
             _mainWindowAppearanceController.SaveSettings(_appSettings);
 
             AppLogger.UiInfo(
-                $"Window layout saved. reason='{reason}' bounds={DescribeRect(bounds)} maximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={BuildVirtualDesktopSummary()}");
+                $"Window layout saved. reason='{reason}' bounds={_windowLayoutController.DescribeRect(bounds)} maximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}");
         }
 
         private void ClearSavedWindowLayoutSettings()
         {
-            _appSettings.SavedWindowLeft = null;
-            _appSettings.SavedWindowTop = null;
-            _appSettings.SavedWindowWidth = null;
-            _appSettings.SavedWindowHeight = null;
-            _appSettings.SavedWindowIsMaximized = false;
+            _windowLayoutController.ClearSavedLayout(_appSettings);
             _mainWindowAppearanceController.SaveSettings(_appSettings);
-        }
-
-        private bool TryGetSavedWindowBounds(out Rect bounds)
-        {
-            bounds = Rect.Empty;
-
-            if (!_appSettings.SavedWindowLeft.HasValue ||
-                !_appSettings.SavedWindowTop.HasValue ||
-                !_appSettings.SavedWindowWidth.HasValue ||
-                !_appSettings.SavedWindowHeight.HasValue)
-            {
-                return false;
-            }
-
-            bounds = new Rect(
-                _appSettings.SavedWindowLeft.Value,
-                _appSettings.SavedWindowTop.Value,
-                _appSettings.SavedWindowWidth.Value,
-                _appSettings.SavedWindowHeight.Value);
-
-            return true;
-        }
-
-        private bool TryValidateWindowBounds(Rect bounds, out string failureReason)
-        {
-            if (double.IsNaN(bounds.Left) || double.IsInfinity(bounds.Left) ||
-                double.IsNaN(bounds.Top) || double.IsInfinity(bounds.Top) ||
-                double.IsNaN(bounds.Width) || double.IsInfinity(bounds.Width) ||
-                double.IsNaN(bounds.Height) || double.IsInfinity(bounds.Height))
-            {
-                failureReason = "Bounds contained NaN or Infinity.";
-                return false;
-            }
-
-            if (bounds.Width < Math.Max(MinWidth, MinimumSavedWindowWidth) ||
-                bounds.Height < Math.Max(MinHeight, MinimumSavedWindowHeight))
-            {
-                failureReason = "Bounds were smaller than the minimum safe size.";
-                return false;
-            }
-
-            foreach (var workArea in GetMonitorWorkAreasDip())
-            {
-                var intersection = Rect.Intersect(
-                    bounds,
-                    workArea);
-
-                if (!intersection.IsEmpty &&
-                    intersection.Width >= MinimumVisibleWindowEdge &&
-                    intersection.Height >= MinimumVisibleWindowEdge)
-                {
-                    failureReason = string.Empty;
-                    return true;
-                }
-            }
-
-            failureReason = "Bounds were outside the current monitor work areas.";
-            return false;
         }
 
         private Rect GetDefaultWindowBoundsForCurrentDisplay()
         {
-            var fallbackScreen = FormsScreen.PrimaryScreen
-                ?? FormsScreen.AllScreens.FirstOrDefault();
-            var workArea = fallbackScreen != null
-                ? GetScreenWorkAreaDip(fallbackScreen)
-                : new Rect(0, 0, 1280, 800);
-
-            var width = Math.Max(MinimumSavedWindowWidth, DefaultWindowWidth);
-            var height = Math.Max(MinimumSavedWindowHeight, DefaultWindowHeight);
-
-            width = Math.Min(width, workArea.Width);
-            height = Math.Min(height, workArea.Height);
-
-            var left = workArea.Left + Math.Max(0, (workArea.Width - width) / 2);
-            var top = workArea.Top + Math.Max(0, (workArea.Height - height) / 2);
-
-            return new Rect(left, top, width, height);
-        }
-
-        private bool IsUsableWindowBounds(Rect bounds)
-        {
-            return !bounds.IsEmpty &&
-                   !double.IsNaN(bounds.Left) &&
-                   !double.IsNaN(bounds.Top) &&
-                   !double.IsNaN(bounds.Width) &&
-                   !double.IsNaN(bounds.Height) &&
-                   !double.IsInfinity(bounds.Left) &&
-                   !double.IsInfinity(bounds.Top) &&
-                   !double.IsInfinity(bounds.Width) &&
-                   !double.IsInfinity(bounds.Height) &&
-                   bounds.Width > 0 &&
-                   bounds.Height > 0;
+            return _windowLayoutController.GetDefaultWindowBounds(
+                GetMonitorWorkAreasDip(),
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                DefaultWindowWidth,
+                DefaultWindowHeight);
         }
 
         private IReadOnlyList<Rect> GetMonitorWorkAreasDip()
         {
             return FormsScreen.AllScreens
                 .Select(GetScreenWorkAreaDip)
-                .Where(IsUsableWindowBounds)
+                .Where(_windowLayoutController.IsUsableWindowBounds)
                 .ToList();
         }
 
@@ -4879,26 +4785,7 @@ namespace PitmastersGrill
 
         private string BuildVirtualDesktopSummary()
         {
-            var workAreas = GetMonitorWorkAreasDip();
-            if (workAreas.Count == 0)
-            {
-                return "none";
-            }
-
-            var virtualBounds = workAreas[0];
-            foreach (var workArea in workAreas.Skip(1))
-            {
-                virtualBounds = Rect.Union(virtualBounds, workArea);
-            }
-
-            return $"virtual={DescribeRect(virtualBounds)} workAreas={string.Join(";", workAreas.Select(DescribeRect))}";
-        }
-
-        private static string DescribeRect(Rect bounds)
-        {
-            return bounds.IsEmpty
-                ? "<empty>"
-                : $"[{bounds.Left:0.##},{bounds.Top:0.##},{bounds.Width:0.##},{bounds.Height:0.##}]";
+            return _windowLayoutController.BuildVirtualDesktopSummary(GetMonitorWorkAreasDip());
         }
 
         private async Task RunEnableKillmailDbPullAsync()
