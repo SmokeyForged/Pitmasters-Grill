@@ -111,6 +111,60 @@ Supported Analysis lists can open zKill links where PMG has enough entity inform
 
 ---
 
+## Signal Reference
+
+PMG signal labels summarize public historical evidence. They are not live-certainty claims.
+
+Signal labels are intended to help users quickly understand what PMG found in public killmail-derived intel and related cached evidence.
+
+### Confirmed covert
+
+PMG found recent public killmail-derived module evidence showing a `Covert Cynosural Field Generator I`.
+
+This means PMG has recent public evidence that the pilot was associated with a covert cyno module. It does not prove the pilot is currently flying a covert cyno ship.
+
+### Confirmed normal
+
+PMG found recent public killmail-derived module evidence showing a regular `Cynosural Field Generator I`.
+
+In PMG's signal model, this is treated as the normal cyno type. In some UI or implementation contexts, this may also be described as a hard cyno.
+
+This does not prove the pilot is currently flying a normal cyno ship.
+
+### Possible
+
+PMG found meaningful evidence, but not enough recent confirmed module evidence to mark the signal as confirmed.
+
+Possible signals may come from stale module evidence, unknown-age evidence, or combined weaker public evidence.
+
+### Inferred
+
+PMG found weaker supporting evidence, usually from cyno-capable hull observations, public activity, or related context, but did not find confirmed cyno module evidence.
+
+Inferred means PMG sees a reason to surface the context, but the evidence is weaker than possible or confirmed.
+
+### Bait
+
+PMG found public loss evidence where an industrial cyno and a tackle module, such as a warp scrambler or warp disruptor, appeared together.
+
+This suggests possible industrial cyno bait behavior, but it is still evidence-based. It does not prove current intent, current fit, current grid position, or current ship.
+
+### Important signal limits
+
+PMG signals do not prove:
+
+- current ship
+- current fit
+- current grid position
+- cloak status
+- fleet intent
+- whether a pilot is actively baiting
+- whether a pilot is currently dangerous
+
+PMG summarizes public evidence so users can make better decisions. It does not replace judgment or manual verification.
+
+---
+
 ## Intel
 
 The Intel tab is where PMG reports local public-intel freshness and gives access to repair tools.
