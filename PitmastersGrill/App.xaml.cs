@@ -19,7 +19,7 @@ namespace PitmastersGrill
             base.OnStartup(e);
 
             RegisterGlobalExceptionLogging();
-            AppLogger.Initialize("General Release-v1.1.0", e.Args);
+            AppLogger.Initialize("General Release-v1.2.0-dev", e.Args);
             AppLogger.AppInfo("Application startup invoked.");
 
             try
@@ -76,7 +76,7 @@ namespace PitmastersGrill
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
         }
 
-        private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        private void OnDispatcherUnhandledException(object? sender, DispatcherUnhandledExceptionEventArgs e)
         {
             try
             {
@@ -92,7 +92,7 @@ namespace PitmastersGrill
             // This step is for observability, not behavior masking.
         }
 
-        private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        private void OnAppDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
         {
             try
             {
@@ -117,7 +117,7 @@ namespace PitmastersGrill
             }
         }
 
-        private void OnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
             try
             {

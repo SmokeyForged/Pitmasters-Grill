@@ -1945,7 +1945,7 @@
                                                        FontSize="12"
                                                        Margin="24,0,0,14"
                                                        Visibility="Collapsed"
-                                                       Text="Panel Mode is always enabled for PMG 1.1.0."/>
+                                                       Text="Panel Mode is always enabled for PMG 1.2.0-dev."/>
 
                                             <TextBlock Text="Window Surface Opacity"
                                                        Foreground="{DynamicResource BodyTextBrush}"
@@ -2219,7 +2219,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="General Release-v1.1.0"/>
+                                                       Text="General Release-v1.2.0-dev"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"

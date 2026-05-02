@@ -57,45 +57,6 @@ namespace PitmastersGrill
         private const double MinimumSavedWindowHeight = NormalModeMinimumWindowHeight;
         private const double MinimumVisibleWindowEdge = 80;
         private const double MinimumBoardLayoutHostWidth = 400;
-        private static readonly string[] CanonicalBoardColumnOrder =
-        {
-            "SigColumn",
-            "CharacterColumn",
-            "AllianceColumn",
-            "CorpColumn",
-            "KillsColumn",
-            "LossesColumn",
-            "AvgFleetSizeColumn",
-            "LastShipSeenColumn",
-            "LastSeenColumn",
-            "CynoHullSeenColumn"
-        };
-        private static readonly Dictionary<string, double> CanonicalBoardColumnMinimumWidths = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["SigColumn"] = 34,
-            ["CharacterColumn"] = 72,
-            ["AllianceColumn"] = 72,
-            ["CorpColumn"] = 82,
-            ["KillsColumn"] = 42,
-            ["LossesColumn"] = 42,
-            ["AvgFleetSizeColumn"] = 48,
-            ["LastShipSeenColumn"] = 64,
-            ["LastSeenColumn"] = 54,
-            ["CynoHullSeenColumn"] = 70
-        };
-        private static readonly Dictionary<string, double> CanonicalBoardColumnDefaultWidths = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["SigColumn"] = 42,
-            ["CharacterColumn"] = 120,
-            ["AllianceColumn"] = 120,
-            ["CorpColumn"] = 140,
-            ["KillsColumn"] = 55,
-            ["LossesColumn"] = 55,
-            ["AvgFleetSizeColumn"] = 70,
-            ["LastShipSeenColumn"] = 100,
-            ["LastSeenColumn"] = 90,
-            ["CynoHullSeenColumn"] = 110
-        };
 
         private readonly BackgroundIntelUpdateService _backgroundIntelUpdateService;
         private AppSettings _appSettings = new();
@@ -104,6 +65,8 @@ namespace PitmastersGrill
         private readonly PilotBoardRowDetailFormatter _pilotBoardRowDetailFormatter;
         private readonly DetailPaneController _detailPaneController;
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
+        private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
+        private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
         private readonly BoardPopulationPassController _boardPopulationPassController;
@@ -147,8 +110,6 @@ namespace PitmastersGrill
         private string? _activeBoardSortMemberPath;
         private ListSortDirection? _activeBoardSortDirection;
         private string _pendingBoardColumnLayoutSaveReason = string.Empty;
-        private readonly Dictionary<string, DataGridColumn> _boardColumnsByKey = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, BoardColumnLayoutSetting> _defaultBoardColumnLayout = new(StringComparer.OrdinalIgnoreCase);
         private DependencyPropertyDescriptor? _boardColumnWidthDescriptor;
         private bool? _lastAppliedCompactMode;
         private bool _isApplyingBoardColumnLayout;
@@ -167,6 +128,8 @@ namespace PitmastersGrill
 
             var appSettingsService = new AppSettingsService();
             _mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
+            _boardDisplaySettingsController = new BoardDisplaySettingsController();
+            _boardColumnLayoutController = new BoardColumnLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
 
             _isApplyingSettings = true;
@@ -276,8 +239,8 @@ namespace PitmastersGrill
             EnableLiveZkillFeedCheckBox.IsChecked = _appSettings.LiveZkillFeedEnabled;
             BackgroundHistoricalRepairEnabledCheckBox.IsChecked = _appSettings.BackgroundHistoricalRepairEnabled;
 
-            InitializeBoardColumnVisibilityUi();
             InitializeBoardColumnLayoutUi();
+            InitializeBoardColumnVisibilityUi();
             InitializeBoardDisplaySettingsUi();
             InitializePilotDetailPlacementUi();
 
@@ -926,9 +889,19 @@ namespace PitmastersGrill
 
         private void InitializeBoardColumnLayoutUi()
         {
-            CacheBoardColumnsByKey();
-            ApplyBoardColumnMinimumWidths();
-            BuildCanonicalBoardColumnLayout();
+            _boardColumnLayoutController.InitializeColumns(
+                ("SigColumn", SigColumn),
+                ("CharacterColumn", CharacterColumn),
+                ("AllianceColumn", AllianceColumn),
+                ("CorpColumn", CorpColumn),
+                ("KillsColumn", KillsColumn),
+                ("LossesColumn", LossesColumn),
+                ("AvgFleetSizeColumn", AvgFleetSizeColumn),
+                ("LastShipSeenColumn", LastShipSeenColumn),
+                ("LastSeenColumn", LastSeenColumn),
+                ("CynoHullSeenColumn", CynoHullSeenColumn));
+            _boardColumnLayoutController.ApplyColumnMinimumWidths();
+            _boardColumnLayoutController.BuildCanonicalBoardColumnLayout();
             ApplyCanonicalBoardColumnLayout("Apply canonical default board layout");
         }
 
@@ -945,26 +918,11 @@ namespace PitmastersGrill
 
             try
             {
-                if (ShowBoardGridLinesCheckBox != null)
-                {
-                    ShowBoardGridLinesCheckBox.IsChecked = _appSettings.ShowBoardGridLines;
-                }
-
-                if (BoardTextSizeComboBox != null)
-                {
-                    BoardTextSizeComboBox.SelectedIndex = Math.Max(0, Math.Min(6, _appSettings.BoardTextSize - 10));
-                }
-
-                if (BoardFontFamilyComboBox != null)
-                {
-                    BoardFontFamilyComboBox.SelectedIndex = string.IsNullOrWhiteSpace(_appSettings.BoardFontFamily)
-                        ? 0
-                        : string.Equals(_appSettings.BoardFontFamily, "Consolas", StringComparison.Ordinal)
-                            ? 2
-                            : string.Equals(_appSettings.BoardFontFamily, "Bahnschrift", StringComparison.Ordinal)
-                                ? 3
-                                : 1;
-                }
+                _boardDisplaySettingsController.ApplySettingsToControls(
+                    _appSettings,
+                    ShowBoardGridLinesCheckBox,
+                    BoardTextSizeComboBox,
+                    BoardFontFamilyComboBox);
             }
             finally
             {
@@ -974,29 +932,7 @@ namespace PitmastersGrill
 
         private void ApplyBoardDisplaySettings()
         {
-            if (PilotBoard == null)
-            {
-                return;
-            }
-
-            var showGridLines = _appSettings.ShowBoardGridLines;
-            PilotBoard.GridLinesVisibility = showGridLines ? DataGridGridLinesVisibility.All : DataGridGridLinesVisibility.None;
-            PilotBoard.HorizontalGridLinesBrush = showGridLines
-                ? (Brush)Resources["GridLineBrush"]
-                : Brushes.Transparent;
-            PilotBoard.VerticalGridLinesBrush = showGridLines
-                ? (Brush)Resources["GridLineBrush"]
-                : Brushes.Transparent;
-            PilotBoard.ColumnHeaderStyle = (Style)Resources[showGridLines
-                ? "PilotBoardColumnHeaderStyle"
-                : "PilotBoardColumnHeaderNoGridStyle"];
-            PilotBoard.CellStyle = (Style)Resources[showGridLines
-                ? "PilotBoardCellStyle"
-                : "PilotBoardCellNoGridStyle"];
-            PilotBoard.FontSize = _appSettings.BoardTextSize;
-            PilotBoard.FontFamily = string.IsNullOrWhiteSpace(_appSettings.BoardFontFamily)
-                ? SystemFonts.MessageFontFamily
-                : new FontFamily(_appSettings.BoardFontFamily);
+            _boardDisplaySettingsController.ApplySettingsToBoard(_appSettings, PilotBoard, Resources);
         }
 
         private void ShowBoardGridLinesCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1006,7 +942,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.ShowBoardGridLines = ShowBoardGridLinesCheckBox.IsChecked == true;
+            _boardDisplaySettingsController.SetShowBoardGridLines(_appSettings, ShowBoardGridLinesCheckBox.IsChecked == true);
             ApplyBoardDisplaySettings();
             _mainWindowAppearanceController.SaveSettings(_appSettings);
 
@@ -1020,8 +956,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.BoardTextSize = BoardTextSizeComboBox.SelectedIndex + 10;
-
+            _boardDisplaySettingsController.SetBoardTextSize(_appSettings, BoardTextSizeComboBox.SelectedIndex);
             ApplyBoardDisplaySettings();
             UpdateWindowMinimumSize();
             _mainWindowAppearanceController.SaveSettings(_appSettings);
@@ -1036,14 +971,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.BoardFontFamily = BoardFontFamilyComboBox.SelectedIndex switch
-            {
-                1 => "Segoe UI",
-                2 => "Consolas",
-                3 => "Bahnschrift",
-                _ => string.Empty
-            };
-
+            _boardDisplaySettingsController.SetBoardFontFamily(_appSettings, BoardFontFamilyComboBox.SelectedIndex);
             ApplyBoardDisplaySettings();
             UpdateWindowMinimumSize();
             _mainWindowAppearanceController.SaveSettings(_appSettings);
@@ -1064,7 +992,7 @@ namespace PitmastersGrill
             _mainWindowAppearanceController.SaveSettings(_appSettings);
 
             AppLogger.UiInfo(
-                $"Board column visibility changed. sig={IsEnabled(ShowSigColumnCheckBox)} alliance={IsEnabled(ShowAllianceColumnCheckBox)} corp={IsEnabled(ShowCorpColumnCheckBox)} kills={IsEnabled(ShowKillsColumnCheckBox)} losses={IsEnabled(ShowLossesColumnCheckBox)} avgFleet={IsEnabled(ShowAvgFleetSizeColumnCheckBox)} lastShip={IsEnabled(ShowLastShipSeenColumnCheckBox)} lastSeen={IsEnabled(ShowLastSeenColumnCheckBox)} cynoHull={IsEnabled(ShowCynoHullSeenColumnCheckBox)}");
+                $"Board column visibility changed. sig={IsChecked(ShowSigColumnCheckBox)} alliance={IsChecked(ShowAllianceColumnCheckBox)} corp={IsChecked(ShowCorpColumnCheckBox)} kills={IsChecked(ShowKillsColumnCheckBox)} losses={IsChecked(ShowLossesColumnCheckBox)} avgFleet={IsChecked(ShowAvgFleetSizeColumnCheckBox)} lastShip={IsChecked(ShowLastShipSeenColumnCheckBox)} lastSeen={IsChecked(ShowLastSeenColumnCheckBox)} cynoHull={IsChecked(ShowCynoHullSeenColumnCheckBox)}");
         }
 
         private void ShowCorpAllianceCountsCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1122,16 +1050,18 @@ namespace PitmastersGrill
 
             try
             {
-                ShowSigColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowSigColumn);
-                ShowAllianceColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowAllianceColumn);
-                ShowCorpColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowCorpColumn);
-                ShowKillsColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowKillsColumn);
-                ShowLossesColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLossesColumn);
-                ShowAvgFleetSizeColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowAvgFleetSizeColumn);
-                ShowLastShipSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLastShipSeenColumn);
-                ShowLastSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowLastSeenColumn);
-                ShowCynoHullSeenColumnCheckBox.IsChecked = IsEnabled(_appSettings.ShowCynoHullSeenColumn);
-                ShowCorpAllianceCountsCheckBox.IsChecked = _appSettings.ShowCorpAllianceCounts;
+                _boardColumnLayoutController.ApplyBoardColumnSettingsToCheckBoxes(
+                    _appSettings,
+                    ShowSigColumnCheckBox,
+                    ShowAllianceColumnCheckBox,
+                    ShowCorpColumnCheckBox,
+                    ShowKillsColumnCheckBox,
+                    ShowLossesColumnCheckBox,
+                    ShowAvgFleetSizeColumnCheckBox,
+                    ShowLastShipSeenColumnCheckBox,
+                    ShowLastSeenColumnCheckBox,
+                    ShowCynoHullSeenColumnCheckBox,
+                    ShowCorpAllianceCountsCheckBox);
             }
             finally
             {
@@ -1141,15 +1071,17 @@ namespace PitmastersGrill
 
         private void SaveBoardColumnSettingsFromCheckBoxes()
         {
-            _appSettings.ShowSigColumn = IsEnabled(ShowSigColumnCheckBox);
-            _appSettings.ShowAllianceColumn = IsEnabled(ShowAllianceColumnCheckBox);
-            _appSettings.ShowCorpColumn = IsEnabled(ShowCorpColumnCheckBox);
-            _appSettings.ShowKillsColumn = IsEnabled(ShowKillsColumnCheckBox);
-            _appSettings.ShowLossesColumn = IsEnabled(ShowLossesColumnCheckBox);
-            _appSettings.ShowAvgFleetSizeColumn = IsEnabled(ShowAvgFleetSizeColumnCheckBox);
-            _appSettings.ShowLastShipSeenColumn = IsEnabled(ShowLastShipSeenColumnCheckBox);
-            _appSettings.ShowLastSeenColumn = IsEnabled(ShowLastSeenColumnCheckBox);
-            _appSettings.ShowCynoHullSeenColumn = IsEnabled(ShowCynoHullSeenColumnCheckBox);
+            _boardColumnLayoutController.SaveBoardColumnSettingsFromCheckBoxes(
+                _appSettings,
+                ShowSigColumnCheckBox,
+                ShowAllianceColumnCheckBox,
+                ShowCorpColumnCheckBox,
+                ShowKillsColumnCheckBox,
+                ShowLossesColumnCheckBox,
+                ShowAvgFleetSizeColumnCheckBox,
+                ShowLastShipSeenColumnCheckBox,
+                ShowLastSeenColumnCheckBox,
+                ShowCynoHullSeenColumnCheckBox);
         }
 
         private void ApplyBoardColumnVisibility()
@@ -1158,16 +1090,7 @@ namespace PitmastersGrill
 
             try
             {
-                SetColumnVisibility(SigColumn, _appSettings.ShowSigColumn);
-                CharacterColumn.Visibility = Visibility.Visible;
-                SetColumnVisibility(AllianceColumn, _appSettings.ShowAllianceColumn);
-                SetColumnVisibility(CorpColumn, _appSettings.ShowCorpColumn);
-                SetColumnVisibility(KillsColumn, _appSettings.ShowKillsColumn);
-                SetColumnVisibility(LossesColumn, _appSettings.ShowLossesColumn);
-                SetColumnVisibility(AvgFleetSizeColumn, _appSettings.ShowAvgFleetSizeColumn);
-                SetColumnVisibility(LastShipSeenColumn, _appSettings.ShowLastShipSeenColumn);
-                SetColumnVisibility(LastSeenColumn, _appSettings.ShowLastSeenColumn);
-                SetColumnVisibility(CynoHullSeenColumn, _appSettings.ShowCynoHullSeenColumn);
+                _boardColumnLayoutController.ApplyBoardColumnVisibility(_appSettings);
             }
             finally
             {
@@ -1175,55 +1098,6 @@ namespace PitmastersGrill
             }
 
             ScheduleFitVisibleBoardColumnsToViewport(force: true);
-        }
-
-        private void ApplyBoardColumnMinimumWidths()
-        {
-            foreach (var pair in _boardColumnsByKey)
-            {
-                pair.Value.MinWidth = GetBoardColumnMinimumWidth(pair.Key);
-            }
-        }
-
-        private void CacheBoardColumnsByKey()
-        {
-            _boardColumnsByKey.Clear();
-            RegisterBoardColumn("SigColumn", SigColumn);
-            RegisterBoardColumn("CharacterColumn", CharacterColumn);
-            RegisterBoardColumn("AllianceColumn", AllianceColumn);
-            RegisterBoardColumn("CorpColumn", CorpColumn);
-            RegisterBoardColumn("KillsColumn", KillsColumn);
-            RegisterBoardColumn("LossesColumn", LossesColumn);
-            RegisterBoardColumn("AvgFleetSizeColumn", AvgFleetSizeColumn);
-            RegisterBoardColumn("LastShipSeenColumn", LastShipSeenColumn);
-            RegisterBoardColumn("LastSeenColumn", LastSeenColumn);
-            RegisterBoardColumn("CynoHullSeenColumn", CynoHullSeenColumn);
-        }
-
-        private void RegisterBoardColumn(string key, DataGridColumn column)
-        {
-            if (column == null)
-            {
-                return;
-            }
-
-            _boardColumnsByKey[key] = column;
-        }
-
-        private void BuildCanonicalBoardColumnLayout()
-        {
-            _defaultBoardColumnLayout.Clear();
-
-            for (var index = 0; index < CanonicalBoardColumnOrder.Length; index++)
-            {
-                var key = CanonicalBoardColumnOrder[index];
-                if (!_boardColumnsByKey.TryGetValue(key, out var column))
-                {
-                    continue;
-                }
-
-                _defaultBoardColumnLayout[key] = CreateCanonicalBoardColumnLayoutSetting(key, index);
-            }
         }
 
         private void HookBoardColumnWidthTracking()
@@ -1243,7 +1117,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            foreach (var column in _boardColumnsByKey.Values)
+            foreach (var column in _boardColumnLayoutController.BoardColumnsByKey.Values)
             {
                 _boardColumnWidthDescriptor.AddValueChanged(column, BoardColumnWidth_ValueChanged);
             }
@@ -1256,7 +1130,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            if (!TryValidateSavedBoardColumnLayout(_appSettings.BoardColumnLayout, out var validSavedSettings, out var validationFailureReason))
+            if (!_boardColumnLayoutController.TryValidateSavedBoardColumnLayout(_appSettings.BoardColumnLayout, out var validSavedSettings, out var validationFailureReason))
             {
                 AppLogger.UiWarn($"Saved board column layout discarded. reason='{validationFailureReason}'");
                 _appSettings.BoardColumnLayout.Clear();
@@ -1270,12 +1144,7 @@ namespace PitmastersGrill
 
         private void ApplyCanonicalBoardColumnLayout(string reason)
         {
-            ApplyBoardColumnLayout(
-                CanonicalBoardColumnOrder
-                    .Where(key => _defaultBoardColumnLayout.ContainsKey(key))
-                    .Select(key => _defaultBoardColumnLayout[key])
-                    .ToList(),
-                reason);
+            ApplyBoardColumnLayout(_boardColumnLayoutController.GetCanonicalBoardColumnLayout(), reason);
         }
 
         private void ApplyBoardColumnLayout(IEnumerable<BoardColumnLayoutSetting> layoutSettings, string reason)
@@ -1289,43 +1158,7 @@ namespace PitmastersGrill
 
             try
             {
-                var widthSettings = layoutSettings
-                    .Where(setting => setting != null && !string.IsNullOrWhiteSpace(setting.ColumnKey))
-                    .Where(setting => _boardColumnsByKey.ContainsKey(setting.ColumnKey))
-                    .ToList();
-
-                foreach (var setting in widthSettings)
-                {
-                    if (TryBuildDataGridLength(setting, out var width))
-                    {
-                        _boardColumnsByKey[setting.ColumnKey].Width = width;
-                    }
-                }
-
-                var orderedKeys = widthSettings
-                    .OrderBy(setting => setting.DisplayIndex)
-                    .ThenBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
-                    .Select(setting => setting.ColumnKey)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                foreach (var defaultKey in CanonicalBoardColumnOrder)
-                {
-                    if (!orderedKeys.Contains(defaultKey, StringComparer.OrdinalIgnoreCase))
-                    {
-                        orderedKeys.Add(defaultKey);
-                    }
-                }
-
-                for (var index = 0; index < orderedKeys.Count; index++)
-                {
-                    if (_boardColumnsByKey.TryGetValue(orderedKeys[index], out var column) &&
-                        column.DisplayIndex != index)
-                    {
-                        column.DisplayIndex = index;
-                    }
-                }
-
+                _boardColumnLayoutController.ApplyBoardColumnLayout(layoutSettings);
                 ScheduleFitVisibleBoardColumnsToViewport();
 
                 AppLogger.UiInfo($"Board column layout applied. reason='{reason}'");
@@ -1334,24 +1167,6 @@ namespace PitmastersGrill
             {
                 _isApplyingBoardColumnLayout = false;
             }
-        }
-
-        private static bool TryBuildDataGridLength(BoardColumnLayoutSetting setting, out DataGridLength width)
-        {
-            width = DataGridLength.Auto;
-
-            if (setting == null || string.IsNullOrWhiteSpace(setting.WidthUnitType))
-            {
-                return false;
-            }
-
-            if (double.IsNaN(setting.WidthValue) || double.IsInfinity(setting.WidthValue) || setting.WidthValue <= 0)
-            {
-                return false;
-            }
-
-            width = new DataGridLength(setting.WidthValue, DataGridLengthUnitType.Pixel);
-            return true;
         }
 
         private void PilotBoard_ColumnReordered(object sender, DataGridColumnEventArgs e)
@@ -1400,19 +1215,15 @@ namespace PitmastersGrill
                 return;
             }
 
-            var currentLayout = _boardColumnsByKey
-                .Select(pair => CreateBoardColumnLayoutSetting(pair.Key, pair.Value))
-                .OrderBy(setting => setting.DisplayIndex)
-                .ThenBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var currentLayout = _boardColumnLayoutController.CaptureCurrentBoardColumnLayout();
 
-            if (!TryValidateSavedBoardColumnLayout(currentLayout, out var sanitizedLayout, out var validationFailureReason))
+            if (!_boardColumnLayoutController.TryValidateSavedBoardColumnLayout(currentLayout, out var sanitizedLayout, out var validationFailureReason))
             {
                 AppLogger.UiWarn($"Board column layout save skipped. reason='{reason}' validationFailure='{validationFailureReason}'");
                 return;
             }
 
-            if (BoardColumnLayoutsMatch(_appSettings.BoardColumnLayout, sanitizedLayout))
+            if (_boardColumnLayoutController.BoardColumnLayoutsMatch(_appSettings.BoardColumnLayout, sanitizedLayout))
             {
                 return;
             }
@@ -1420,70 +1231,6 @@ namespace PitmastersGrill
             _appSettings.BoardColumnLayout = sanitizedLayout;
             _mainWindowAppearanceController.SaveSettings(_appSettings);
             AppLogger.UiInfo($"Board column layout saved. reason='{reason}'");
-        }
-
-        private static bool BoardColumnLayoutsMatch(
-            IReadOnlyList<BoardColumnLayoutSetting>? left,
-            IReadOnlyList<BoardColumnLayoutSetting>? right)
-        {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (left == null || right == null || left.Count != right.Count)
-            {
-                return false;
-            }
-
-            for (var index = 0; index < left.Count; index++)
-            {
-                var leftItem = left[index];
-                var rightItem = right[index];
-
-                if (!string.Equals(leftItem?.ColumnKey, rightItem?.ColumnKey, StringComparison.OrdinalIgnoreCase) ||
-                    leftItem?.DisplayIndex != rightItem?.DisplayIndex ||
-                    leftItem?.WidthUnitType != rightItem?.WidthUnitType ||
-                    Math.Abs((leftItem?.WidthValue ?? 0d) - (rightItem?.WidthValue ?? 0d)) > 0.01d)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static BoardColumnLayoutSetting CreateBoardColumnLayoutSetting(string key, DataGridColumn column, int? displayIndexOverride = null)
-        {
-            var width = column.ActualWidth;
-            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
-            {
-                width = column.Width.DisplayValue;
-            }
-
-            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
-            {
-                width = GetBoardColumnMinimumWidth(key);
-            }
-
-            return new BoardColumnLayoutSetting
-            {
-                ColumnKey = key,
-                DisplayIndex = displayIndexOverride ?? column.DisplayIndex,
-                WidthValue = Math.Max(GetBoardColumnMinimumWidth(key), width),
-                WidthUnitType = DataGridLengthUnitType.Pixel.ToString()
-            };
-        }
-
-        private static BoardColumnLayoutSetting CreateCanonicalBoardColumnLayoutSetting(string key, int displayIndex)
-        {
-            return new BoardColumnLayoutSetting
-            {
-                ColumnKey = key,
-                DisplayIndex = displayIndex,
-                WidthValue = GetBoardColumnDefaultWidth(key),
-                WidthUnitType = DataGridLengthUnitType.Pixel.ToString()
-            };
         }
 
         private void FinalizeBoardColumnLayoutInitialization()
@@ -1506,120 +1253,6 @@ namespace PitmastersGrill
                    IsLoaded &&
                    PilotBoard.IsLoaded &&
                    PilotBoard.ActualWidth >= MinimumBoardLayoutHostWidth;
-        }
-
-        private bool TryValidateSavedBoardColumnLayout(
-            IReadOnlyList<BoardColumnLayoutSetting>? layoutSettings,
-            out List<BoardColumnLayoutSetting> validLayout,
-            out string failureReason)
-        {
-            validLayout = new List<BoardColumnLayoutSetting>();
-            failureReason = string.Empty;
-
-            if (layoutSettings == null || layoutSettings.Count == 0)
-            {
-                failureReason = "No layout settings were present.";
-                return false;
-            }
-
-            var knownSettings = layoutSettings
-                .Where(setting => setting != null && !string.IsNullOrWhiteSpace(setting.ColumnKey))
-                .Where(setting => _boardColumnsByKey.ContainsKey(setting.ColumnKey))
-                .GroupBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .ToList();
-
-            if (knownSettings.Count == 0)
-            {
-                failureReason = "No known board column keys were present.";
-                return false;
-            }
-
-            var usedDisplayIndexes = new HashSet<int>();
-            foreach (var setting in knownSettings)
-            {
-                if (!string.Equals(setting.WidthUnitType, DataGridLengthUnitType.Pixel.ToString(), StringComparison.OrdinalIgnoreCase))
-                {
-                    failureReason = $"Unsupported width unit '{setting.WidthUnitType}' for column '{setting.ColumnKey}'.";
-                    return false;
-                }
-
-                if (setting.DisplayIndex < 0 || setting.DisplayIndex >= CanonicalBoardColumnOrder.Length)
-                {
-                    failureReason = $"DisplayIndex out of range for column '{setting.ColumnKey}'.";
-                    return false;
-                }
-
-                if (!usedDisplayIndexes.Add(setting.DisplayIndex))
-                {
-                    failureReason = $"Duplicate DisplayIndex '{setting.DisplayIndex}' detected.";
-                    return false;
-                }
-
-                if (double.IsNaN(setting.WidthValue) || double.IsInfinity(setting.WidthValue))
-                {
-                    failureReason = $"Non-finite width detected for column '{setting.ColumnKey}'.";
-                    return false;
-                }
-
-                if (setting.WidthValue < GetBoardColumnMinimumWidth(setting.ColumnKey))
-                {
-                    failureReason = $"Width below minimum for column '{setting.ColumnKey}'.";
-                    return false;
-                }
-            }
-
-            var orderedKeys = knownSettings
-                .OrderBy(setting => setting.DisplayIndex)
-                .ThenBy(setting => setting.ColumnKey, StringComparer.OrdinalIgnoreCase)
-                .Select(setting => setting.ColumnKey)
-                .ToList();
-
-            foreach (var key in CanonicalBoardColumnOrder)
-            {
-                if (!orderedKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
-                {
-                    orderedKeys.Add(key);
-                }
-            }
-
-            for (var index = 0; index < orderedKeys.Count; index++)
-            {
-                var key = orderedKeys[index];
-                var existing = knownSettings.FirstOrDefault(setting => string.Equals(setting.ColumnKey, key, StringComparison.OrdinalIgnoreCase));
-                validLayout.Add(existing != null
-                    ? new BoardColumnLayoutSetting
-                    {
-                        ColumnKey = existing.ColumnKey,
-                        DisplayIndex = index,
-                        WidthValue = existing.WidthValue,
-                        WidthUnitType = existing.WidthUnitType
-                    }
-                    : CreateCanonicalBoardColumnLayoutSetting(key, index));
-            }
-
-            var totalWidth = validLayout.Sum(setting => Math.Max(GetBoardColumnMinimumWidth(setting.ColumnKey), setting.WidthValue));
-            if (totalWidth < CanonicalBoardColumnMinimumWidths.Values.Sum() * 0.8d)
-            {
-                failureReason = $"Total saved width was too small. totalWidth={totalWidth:0.##}";
-                return false;
-            }
-
-            return true;
-        }
-
-        private static double GetBoardColumnMinimumWidth(string key)
-        {
-            return CanonicalBoardColumnMinimumWidths.TryGetValue(key, out var width)
-                ? width
-                : 50;
-        }
-
-        private static double GetBoardColumnDefaultWidth(string key)
-        {
-            return CanonicalBoardColumnDefaultWidths.TryGetValue(key, out var width)
-                ? width
-                : Math.Max(GetBoardColumnMinimumWidth(key), 80);
         }
 
         private void ScheduleFitVisibleBoardColumnsToViewport(bool force = false)
@@ -1671,14 +1304,14 @@ namespace PitmastersGrill
 
         private void FitVisibleBoardColumnsToViewport()
         {
-            if (PilotBoard == null || _boardColumnsByKey.Count == 0 || PilotBoard.ActualWidth <= 0)
+            if (PilotBoard == null || _boardColumnLayoutController.BoardColumnsByKey.Count == 0 || PilotBoard.ActualWidth <= 0)
             {
                 return;
             }
 
             PilotBoard.UpdateLayout();
 
-            var visibleColumns = _boardColumnsByKey.Values
+            var visibleColumns = _boardColumnLayoutController.BoardColumnsByKey.Values
                 .Where(column => column.Visibility == Visibility.Visible)
                 .OrderBy(column => column.DisplayIndex)
                 .ToList();
@@ -1697,8 +1330,8 @@ namespace PitmastersGrill
             var columnPlans = visibleColumns
                 .Select(column =>
                 {
-                    var key = GetBoardColumnKey(column);
-                    var minimum = Math.Max(12d, GetBoardColumnMinimumWidth(key));
+                    var key = _boardColumnLayoutController.GetBoardColumnKey(column);
+                    var minimum = Math.Max(12d, _boardColumnLayoutController.GetBoardColumnMinimumWidth(key));
                     var current = Math.Max(minimum, GetEffectiveBoardColumnWidth(column));
                     return new BoardColumnFitPlan(column, minimum, current);
                 })
@@ -1806,45 +1439,14 @@ namespace PitmastersGrill
 
         private sealed record BoardColumnFitPlan(DataGridColumn Column, double MinimumWidth, double CurrentWidth);
 
-        private string GetBoardColumnKey(DataGridColumn column)
-        {
-            foreach (var pair in _boardColumnsByKey)
-            {
-                if (ReferenceEquals(pair.Value, column))
-                {
-                    return pair.Key;
-                }
-            }
-
-            return string.Empty;
-        }
-
         private void SetAllOptionalBoardColumnSettings(bool isVisible)
         {
-            _appSettings.ShowSigColumn = isVisible;
-            _appSettings.ShowAllianceColumn = isVisible;
-            _appSettings.ShowCorpColumn = isVisible;
-            _appSettings.ShowKillsColumn = isVisible;
-            _appSettings.ShowLossesColumn = isVisible;
-            _appSettings.ShowAvgFleetSizeColumn = isVisible;
-            _appSettings.ShowLastShipSeenColumn = isVisible;
-            _appSettings.ShowLastSeenColumn = isVisible;
-            _appSettings.ShowCynoHullSeenColumn = isVisible;
+            _boardColumnLayoutController.SetAllOptionalBoardColumnSettings(_appSettings, isVisible);
         }
 
-        private static void SetColumnVisibility(DataGridColumn column, bool? isVisible)
-        {
-            column.Visibility = IsEnabled(isVisible) ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private static bool IsEnabled(CheckBox checkBox)
+        private static bool IsChecked(CheckBox checkBox)
         {
             return checkBox.IsChecked == true;
-        }
-
-        private static bool IsEnabled(bool? value)
-        {
-            return value != false;
         }
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)

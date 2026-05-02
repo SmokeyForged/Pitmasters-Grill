@@ -1,0 +1,30 @@
+name: dotnet-build-test
+
+on:
+  push:
+    branches:
+      - main
+      - v*
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore PitmastersGrill\PitmastersGrill.slnx
+
+      - name: Build
+        run: dotnet build PitmastersGrill\PitmastersGrill.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test PitmastersGrill.Tests\PitmastersGrill.Tests.csproj --configuration Release --no-build
