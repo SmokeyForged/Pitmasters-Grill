@@ -67,6 +67,7 @@ namespace PitmastersGrill
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
+        private readonly SettingsTabController _settingsTabController;
         private readonly WindowLayoutController _windowLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
@@ -131,6 +132,7 @@ namespace PitmastersGrill
             _mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
+            _settingsTabController = new SettingsTabController();
             _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
 
@@ -238,13 +240,15 @@ namespace PitmastersGrill
                 VisualThemeComboBox,
                 ColorBlindModeComboBox,
                 LogLevelComboBox);
-            EnableLiveZkillFeedCheckBox.IsChecked = _appSettings.LiveZkillFeedEnabled;
-            BackgroundHistoricalRepairEnabledCheckBox.IsChecked = _appSettings.BackgroundHistoricalRepairEnabled;
+            _settingsTabController.ApplySettingsToControls(
+                _appSettings,
+                EnableLiveZkillFeedCheckBox,
+                BackgroundHistoricalRepairEnabledCheckBox,
+                PilotDetailPlacementComboBox);
 
             InitializeBoardColumnLayoutUi();
             InitializeBoardColumnVisibilityUi();
             InitializeBoardDisplaySettingsUi();
-            InitializePilotDetailPlacementUi();
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
 
@@ -855,18 +859,6 @@ namespace PitmastersGrill
             PilotBoard?.Items.Refresh();
         }
 
-
-        private void InitializePilotDetailPlacementUi()
-        {
-            if (PilotDetailPlacementComboBox == null)
-            {
-                return;
-            }
-
-            var preference = GetPilotDetailPlacementPreference();
-            PilotDetailPlacementComboBox.SelectedIndex = preference == PilotDetailPlacementPreference.AutoPreferLeft ? 1 : 0;
-        }
-
         private void PilotDetailPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isApplyingSettings || PilotDetailPlacementComboBox == null)
@@ -874,10 +866,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            _appSettings.PilotDetailPlacementPreference =
-                PilotDetailPlacementComboBox.SelectedIndex == 1
-                    ? PilotDetailPlacementPreference.AutoPreferLeft.ToString()
-                    : PilotDetailPlacementPreference.AutoPreferRight.ToString();
+            _settingsTabController.SetPilotDetailPlacementPreference(_appSettings, PilotDetailPlacementComboBox.SelectedIndex);
 
             _mainWindowAppearanceController.SaveSettings(_appSettings);
             AppLogger.UiInfo($"Pilot detail placement preference changed. preference={_appSettings.PilotDetailPlacementPreference}");
@@ -3003,7 +2992,7 @@ namespace PitmastersGrill
             }
 
             var enabled = EnableLiveZkillFeedCheckBox.IsChecked == true;
-            _appSettings.LiveZkillFeedEnabled = enabled;
+            _settingsTabController.SetLiveZkillFeedEnabled(_appSettings, enabled);
             _mainWindowAppearanceController.SaveSettings(_appSettings);
             AppLogger.UiInfo($"Live zKill feed setting changed. enabled={enabled}");
 
@@ -3035,7 +3024,7 @@ namespace PitmastersGrill
             }
 
             var enabled = BackgroundHistoricalRepairEnabledCheckBox.IsChecked == true;
-            _appSettings.BackgroundHistoricalRepairEnabled = enabled;
+            _settingsTabController.SetBackgroundHistoricalRepairEnabled(_appSettings, enabled);
             _mainWindowAppearanceController.SaveSettings(_appSettings);
             AppLogger.UiInfo($"Background historical repair setting changed. enabled={enabled}");
         }
@@ -3340,7 +3329,7 @@ namespace PitmastersGrill
             var canRight = rightX + detailWidth <= workRight;
             var canLeft = leftX >= workLeft;
 
-            var preferLeft = GetPilotDetailPlacementPreference() == PilotDetailPlacementPreference.AutoPreferLeft;
+            var preferLeft = _settingsTabController.GetPilotDetailPlacementPreference(_appSettings) == PilotDetailPlacementPreference.AutoPreferLeft;
             var preferredSide = preferLeft ? "left" : "right";
             var finalSide = preferredSide;
 
@@ -3370,16 +3359,6 @@ namespace PitmastersGrill
                 AppLogger.UiInfo(
                     $"Detail window placement adjusted. ownerBounds=({ownerLeft:0.##},{ownerTop:0.##},{ownerWidth:0.##},{ownerHeight:0.##}) workArea=({workLeft:0.##},{workTop:0.##},{workRight - workLeft:0.##},{workBottom - workTop:0.##}) preferredSide={preferredSide} finalSide={finalSide} finalBounds=({clampedLeft:0.##},{clampedTop:0.##},{detailWidth:0.##},{detailHeight:0.##})");
             }
-        }
-
-        private PilotDetailPlacementPreference GetPilotDetailPlacementPreference()
-        {
-            return Enum.TryParse<PilotDetailPlacementPreference>(
-                _appSettings.PilotDetailPlacementPreference,
-                ignoreCase: true,
-                out var parsed)
-                ? parsed
-                : PilotDetailPlacementPreference.AutoPreferRight;
         }
 
         private void ActivePilotDetailWindow_Closed(object? sender, EventArgs e)
