@@ -17,6 +17,7 @@ If you are new to the repo, start with these files:
 | `PitmastersGrill.Tests/` | Deterministic non-UI automated test project. |
 | `.github/workflows/` | Windows build/test CI workflow definitions. |
 | `docs/` | Release checklist, dependency maintenance, and supporting maintainer docs. |
+| `docs/RELEASE-AUTOMATION-DESIGN.md` | Design and guardrails for repeatable PMG release automation. |
 | `Patch Notes/` | Version-by-version release notes. |
 | `PMG-FEATURES.md` | Current feature overview and limitations. |
 | `HOW-IT-WORKS.md` | Technical overview of PMG's data flow and evidence model. |
