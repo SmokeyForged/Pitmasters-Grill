@@ -82,6 +82,7 @@ namespace PitmastersGrill
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
         private ManualUpdateCheckController? _manualUpdateCheckController;
+        private DiagnosticsActionController? _diagnosticsActionController;
         private readonly EveSessionContextService _eveSessionContextService;
         private readonly MainWindowDiagnostics _diagnostics;
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
@@ -236,6 +237,10 @@ namespace PitmastersGrill
                 _appSettings,
                 _windowShutdownCts.Token,
                 () => _isShuttingDown);
+            _diagnosticsActionController = new DiagnosticsActionController(
+                this,
+                DiagnosticsStatusText,
+                _browserLauncher);
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -2697,100 +2702,22 @@ namespace PitmastersGrill
 
         private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var logsRootPath = AppPaths.GetLogsRootDirectory();
-
-                AppLogger.UiInfo($"Open logs requested. path={logsRootPath}");
-                SetDiagnosticsStatus("Opening logs folder.");
-                _browserLauncher.OpenPath(logsRootPath);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Open logs failed.", ex);
-                SetDiagnosticsStatus("Failed to open logs folder.");
-
-                MessageBox.Show(
-                    $"Failed to open logs folder.\n\n{ex.Message}",
-                    "PMG Logs Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            _diagnosticsActionController?.OpenLogs();
         }
 
         private void PackageDiagnosticsButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var bundlePath = DiagnosticBundleService.TryCreateBundle("manual-diagnostics-package");
-
-                if (string.IsNullOrWhiteSpace(bundlePath))
-                {
-                    SetDiagnosticsStatus("Diagnostic package failed.");
-                    MessageBox.Show(
-                        "PMG could not create a diagnostic package. Check the active logs for details.",
-                        "PMG Diagnostics",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                var bundleFileName = Path.GetFileName(bundlePath);
-                SetDiagnosticsStatus($"Created diagnostic package: {bundleFileName}");
-                AppLogger.UiInfo($"Manual diagnostic package created. path={bundlePath}");
-
-                var diagnosticsDirectory = Path.GetDirectoryName(bundlePath);
-                if (!string.IsNullOrWhiteSpace(diagnosticsDirectory))
-                {
-                    _browserLauncher.OpenPath(diagnosticsDirectory);
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Manual diagnostic package failed.", ex);
-                SetDiagnosticsStatus("Diagnostic package failed.");
-
-                MessageBox.Show(
-                    $"Failed to create diagnostic package.\n\n{ex.Message}",
-                    "PMG Diagnostics Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            _diagnosticsActionController?.PackageDiagnostics();
         }
 
         private void OpenDiagnosticsFolderButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var diagnosticsDirectory = DiagnosticBundleService.GetDiagnosticsDirectory();
-
-                AppLogger.UiInfo($"Open diagnostics folder requested. path={diagnosticsDirectory}");
-                SetDiagnosticsStatus("Opening diagnostics folder.");
-                _browserLauncher.OpenPath(diagnosticsDirectory);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Open diagnostics folder failed.", ex);
-                SetDiagnosticsStatus("Failed to open diagnostics folder.");
-
-                MessageBox.Show(
-                    $"Failed to open diagnostics folder.\n\n{ex.Message}",
-                    "PMG Diagnostics Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            _diagnosticsActionController?.OpenDiagnosticsFolder();
         }
 
         private void SetDiagnosticsStatus(string message)
         {
-            if (DiagnosticsStatusText == null)
-            {
-                return;
-            }
-
-            DiagnosticsStatusText.Text = string.IsNullOrWhiteSpace(message)
-                ? "Diagnostics ready."
-                : message.Trim();
+            _diagnosticsActionController?.SetStatus(message);
         }
 
         private void RefreshProviderHealthButton_Click(object sender, RoutedEventArgs e)
