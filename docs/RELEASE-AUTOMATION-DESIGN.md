@@ -163,6 +163,19 @@ Required behavior:
 - preserve PMG release naming conventions,
 - leave final publish under operator control unless explicitly requested.
 
+
+### Implemented Draft Creation Helper
+
+The first GitHub release draft helper is:
+
+```powershell
+.\tools\New-ReleaseDraft.ps1
+```
+
+The helper validates existing local package output under `.release/<version>/`, verifies the ZIP/checksum/package summary/release notes, and defaults to a dry run. A draft release is created only when `-CreateDraft` is explicitly supplied.
+
+The helper refuses to overwrite existing GitHub releases and does not publish releases. It creates a GitHub draft release only, attaches the ZIP and checksum, and leaves final publish under operator control.
+
 ### Phase 4: Optional Publish
 
 Publishing a GitHub release should remain a deliberate operator action.

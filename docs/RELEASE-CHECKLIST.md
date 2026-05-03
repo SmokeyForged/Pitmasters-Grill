@@ -138,3 +138,4 @@ When release automation is used or modified:
 - [ ] Confirm final publish remains operator-controlled unless explicitly requested.
 - [ ] Run `./tools/Check-ReleaseReadiness.ps1` from the repository root and preserve the output with release validation notes.
 - [ ] Run `./tools/Prepare-ReleasePackage.ps1 -PublishPath <publish-output-folder>` and preserve the generated summary/checksum.
+- [ ] Run `./tools/New-ReleaseDraft.ps1` first as a dry run, then rerun with `-CreateDraft` only when ready to create the GitHub draft release.
