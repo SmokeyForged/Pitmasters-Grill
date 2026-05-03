@@ -1,4 +1,4 @@
-﻿<Window x:Class="PitmastersGrill.MainWindow"
+<Window x:Class="PitmastersGrill.MainWindow"
         x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -2395,7 +2395,61 @@
                 </TabItem>
 
                 <TabItem Header="Help">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TabItem.Resources>
+                    <Style x:Key="HelpSubTabControlStyle" TargetType="{x:Type TabControl}">
+                        <Setter Property="Background" Value="#101418" />
+                        <Setter Property="BorderBrush" Value="#3A4652" />
+                        <Setter Property="Foreground" Value="#F2EFE6" />
+                    </Style>
+
+                    <Style x:Key="HelpSubTabItemStyle" TargetType="{x:Type TabItem}">
+                        <Setter Property="Foreground" Value="#F2EFE6" />
+                        <Setter Property="Background" Value="#1E252C" />
+                        <Setter Property="BorderBrush" Value="#3A4652" />
+                        <Setter Property="Padding" Value="10,4" />
+                        <Setter Property="Margin" Value="0,0,2,0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="{x:Type TabItem}">
+                                    <Border
+                                        x:Name="TabBorder"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="1"
+                                        Padding="{TemplateBinding Padding}"
+                                        Margin="{TemplateBinding Margin}">
+                                        <ContentPresenter
+                                            x:Name="ContentSite"
+                                            ContentSource="Header"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            RecognizesAccessKey="True" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="TabBorder" Property="Background" Value="#2A333C" />
+                                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="#52C7EA" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                            <Setter Property="Panel.ZIndex" Value="10" />
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="TabBorder" Property="Background" Value="#24303A" />
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Foreground" Value="#7E8A95" />
+                                            <Setter TargetName="TabBorder" Property="Opacity" Value="0.7" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </TabItem.Resources>
+                    <TabControl Style="{StaticResource HelpSubTabControlStyle}" Background="#101418" BorderBrush="#3A4652" Foreground="#F2EFE6">
+                        <TabItem Header="General / Getting Started" Style="{StaticResource HelpSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418">
+                                <StackPanel Margin="8" Background="#101418">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418">
                         <StackPanel Margin="16">
                             <TextBlock Text="PMG Help"
                                        FontSize="22"
@@ -2551,6 +2605,34 @@
                             </Border>
                         </StackPanel>
                     </ScrollViewer>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="Signal Reference" Style="{StaticResource HelpSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418">
+                                <StackPanel Margin="8" Background="#101418">
+                                    <TextBlock Text="PMG Signal Reference" FontSize="18" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,0,0,8" />
+                                    <TextBlock Text="PMG signals are public historical evidence summaries. They do not prove that a pilot is currently in that ship, currently fit that way, uncloaked, on-grid, or actively baiting. PMG summarizes public evidence so users can make better decisions; it does not make live-certainty claims." TextWrapping="Wrap" Foreground="#F2EFE6" Margin="0,0,0,12" />
+
+                                    <TextBlock Text="Confirmed covert" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,8,0,2" />
+                                    <TextBlock Text="PMG found recent public killmail-derived module evidence showing a Covert Cynosural Field Generator I." TextWrapping="Wrap" Foreground="#F2EFE6" />
+
+                                    <TextBlock Text="Confirmed normal" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,8,0,2" />
+                                    <TextBlock Text="PMG found recent public killmail-derived module evidence showing a regular Cynosural Field Generator I. In code this is the normal cyno type; in one UI/context it may also display as hard." TextWrapping="Wrap" Foreground="#F2EFE6" />
+
+                                    <TextBlock Text="Possible" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,8,0,2" />
+                                    <TextBlock Text="PMG has meaningful evidence, but not enough for recent confirmed module evidence. This can come from stale or unknown-age module evidence, or from combined weaker signals." TextWrapping="Wrap" Foreground="#F2EFE6" />
+
+                                    <TextBlock Text="Inferred" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,8,0,2" />
+                                    <TextBlock Text="Weak evidence exists, usually from cyno-capable hull observations, public activity, or related context, but no confirmed cyno module was found." TextWrapping="Wrap" Foreground="#F2EFE6" />
+
+                                    <TextBlock Text="Bait" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,8,0,2" />
+                                    <TextBlock Text="PMG found public loss evidence where an industrial cyno and a tackle module, such as a warp scrambler or warp disruptor, appeared together. This suggests possible industrial cyno bait, but it is still evidence-based and not proof of intent." TextWrapping="Wrap" Foreground="#F2EFE6" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
                 </TabItem>
             </TabControl>
 

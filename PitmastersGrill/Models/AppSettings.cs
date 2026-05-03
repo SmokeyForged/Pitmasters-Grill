@@ -26,6 +26,7 @@ namespace PitmastersGrill.Models
 
         public string BoardFontFamily { get; set; } = string.Empty;
 
+        // Legacy normal-window layout fields retained for backward compatibility with existing settings.json files.
         public double? SavedWindowLeft { get; set; }
 
         public double? SavedWindowTop { get; set; }
@@ -35,6 +36,28 @@ namespace PitmastersGrill.Models
         public double? SavedWindowHeight { get; set; }
 
         public bool SavedWindowIsMaximized { get; set; } = false;
+
+        // Normal mode layout.
+        public double? SavedNormalWindowLeft { get; set; }
+
+        public double? SavedNormalWindowTop { get; set; }
+
+        public double? SavedNormalWindowWidth { get; set; }
+
+        public double? SavedNormalWindowHeight { get; set; }
+
+        public bool SavedNormalWindowIsMaximized { get; set; } = false;
+
+        // Board mode layout.
+        public double? SavedBoardWindowLeft { get; set; }
+
+        public double? SavedBoardWindowTop { get; set; }
+
+        public double? SavedBoardWindowWidth { get; set; }
+
+        public double? SavedBoardWindowHeight { get; set; }
+
+        public bool SavedBoardWindowIsMaximized { get; set; } = false;
 
         public bool ShowCorpAllianceCounts { get; set; } = false;
 

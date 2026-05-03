@@ -386,3 +386,15 @@ PMG supports judgment. It does not replace it.
 - [`FIRST-TIME-USE.md`](./FIRST-TIME-USE.md)
 - [`EVE-TOS-COMPLIANCE.md`](./EVE-TOS-COMPLIANCE.md)
 - [`DEVELOPER-NOTES.md`](./DEVELOPER-NOTES.md)
+
+## Signal Interpretation Reference
+
+PMG signal labels are evidence summaries, not live-certainty claims.
+
+- Confirmed covert means PMG found recent public killmail-derived evidence involving a Covert Cynosural Field Generator I.
+- Confirmed normal means PMG found recent public killmail-derived evidence involving a regular Cynosural Field Generator I.
+- Possible means PMG has meaningful evidence, but not enough for recent confirmed module evidence.
+- Inferred means weak public evidence exists, often from cyno-capable hull observations or related context.
+- Bait means PMG found public loss evidence where an industrial cyno and tackle module appeared together.
+
+See `SIGNAL-REFERENCE.md` for the full explanation.
