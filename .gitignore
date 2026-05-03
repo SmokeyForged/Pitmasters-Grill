@@ -63,3 +63,4 @@ coverage/
 *.coveragexml
 # Local publish profiles
 PitmastersGrill/Properties/PublishProfiles/
+.release/

@@ -137,3 +137,4 @@ When release automation is used or modified:
 - [ ] Confirm automation stops on dirty working tree, failed validation, missing notes, or version mismatch.
 - [ ] Confirm final publish remains operator-controlled unless explicitly requested.
 - [ ] Run `./tools/Check-ReleaseReadiness.ps1` from the repository root and preserve the output with release validation notes.
+- [ ] Run `./tools/Prepare-ReleasePackage.ps1 -PublishPath <publish-output-folder>` and preserve the generated summary/checksum.

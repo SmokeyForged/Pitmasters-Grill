@@ -138,6 +138,19 @@ Expected outputs:
 
 The script should refuse to overwrite existing artifacts unless explicitly allowed.
 
+
+### Implemented Package Preparation
+
+The first local package preparation helper is:
+
+```powershell
+.\tools\Prepare-ReleasePackage.ps1 -PublishPath <publish-output-folder>
+```
+
+The script is intentionally local-only. It reads `PmgReleaseVersion`, derives the canonical release title/tag/ZIP name, packages an existing publish output folder, writes a SHA256 checksum, and writes a local summary under `.release/<version>/` by default.
+
+It does not create tags, GitHub releases, uploads, commits, pushes, or merges. It refuses to overwrite existing artifacts unless `-Force` is supplied.
+
 ### Phase 3: GitHub Release Draft
 
 Automation may create or update a GitHub release draft after validation.
