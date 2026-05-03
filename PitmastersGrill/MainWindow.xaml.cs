@@ -81,6 +81,7 @@ namespace PitmastersGrill
         private readonly WatchedPilotRepository _watchedPilotRepository;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
+        private ManualUpdateCheckController? _manualUpdateCheckController;
         private readonly EveSessionContextService _eveSessionContextService;
         private readonly MainWindowDiagnostics _diagnostics;
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
@@ -227,6 +228,14 @@ namespace PitmastersGrill
             _isApplyingSettings = true;
 
             _appSettings = appSettingsService.Load();
+            _manualUpdateCheckController = new ManualUpdateCheckController(
+                this,
+                ManualUpdateCheckButton,
+                ManualUpdateStatusText,
+                _browserLauncher,
+                _appSettings,
+                _windowShutdownCts.Token,
+                () => _isShuttingDown);
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -2678,85 +2687,12 @@ namespace PitmastersGrill
 
         private async void ManualUpdateCheckButton_Click(object sender, RoutedEventArgs e)
         {
-            await RunManualUpdateCheckAsync();
-        }
-
-        private async Task RunManualUpdateCheckAsync()
-        {
-            try
+            if (_manualUpdateCheckController == null)
             {
-                ManualUpdateCheckButton.IsEnabled = false;
-                ManualUpdateStatusText.Text = "Checking GitHub for the latest stable PMG release...";
-
-                var appSettingsService = new AppSettingsService();
-                var settings = appSettingsService.Load();
-                var currentVersion = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
-                var updateService = new PmgUpdateAwarenessService(new GitHubLatestReleaseChecker(), currentVersion);
-                var result = await updateService.CheckAsync(
-                    settings.SkippedUpdateVersion,
-                    respectSkippedVersion: false,
-                    _windowShutdownCts.Token);
-
-                if (!result.IsUpdateAvailable)
-                {
-                    ManualUpdateStatusText.Text = $"PMG is current. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.";
-                    MessageBox.Show(
-                        this,
-                        $"PMG is current.\n\nCurrent version: {result.CurrentVersion}",
-                        "PMG Update Check",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                ManualUpdateStatusText.Text = $"PMG {result.LatestVersion} is available. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.";
-
-                var message =
-                    $"PMG {result.LatestVersion} is available.\n\n" +
-                    $"Current version: {result.CurrentVersion}\n" +
-                    $"Latest version: {result.LatestVersion}\n\n" +
-                    "Yes: open the GitHub release page for manual update.\n" +
-                    "No: leave this reminder available.\n" +
-                    "Cancel: skip this version.";
-
-                var response = MessageBox.Show(
-                    this,
-                    message,
-                    "PMG Update Available",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Information);
-
-                if (response == MessageBoxResult.Yes)
-                {
-                    _browserLauncher.OpenUrl(result.ReleasePageUrl);
-                }
-                else if (response == MessageBoxResult.Cancel)
-                {
-                    settings.SkippedUpdateVersion = result.LatestVersion;
-                    _appSettings.SkippedUpdateVersion = result.LatestVersion;
-                    appSettingsService.Save(settings);
-                    ManualUpdateStatusText.Text = $"Skipped PMG {result.LatestVersion}. Manual checks will still show available releases.";
-                }
+                return;
             }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                ManualUpdateStatusText.Text = "Update check cancelled.";
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Manual update check failed.", ex);
-                ManualUpdateStatusText.Text = $"Update check failed: {ex.Message}";
-                MessageBox.Show(
-                    this,
-                    $"PMG could not check for updates.\n\n{ex.Message}",
-                    "PMG Update Check",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-            finally
-            {
-                ManualUpdateCheckButton.IsEnabled = true;
-            }
+
+            await _manualUpdateCheckController.RunAsync();
         }
 
         private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
