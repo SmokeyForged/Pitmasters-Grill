@@ -431,7 +431,95 @@
         </Style>
 
 
-    </Window.Resources>
+    
+
+        <!-- PMG nested sub-tab shared styles. Keep aligned with the Help sub-tabs. -->
+        <Style x:Key="PmgNestedSubTabControlStyle" TargetType="{x:Type TabControl}">
+            <Setter Property="Background" Value="#101418" />
+            <Setter Property="BorderBrush" Value="#3A4652" />
+            <Setter Property="Foreground" Value="#F2EFE6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabControl}">
+                        <Grid KeyboardNavigation.TabNavigation="Local" Background="#101418">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TabPanel
+                                x:Name="HeaderPanel"
+                                Grid.Row="0"
+                                Panel.ZIndex="1"
+                                Background="#101418"
+                                IsItemsHost="True"
+                                KeyboardNavigation.TabIndex="1" />
+
+                            <Border
+                                x:Name="ContentPanel"
+                                Grid.Row="1"
+                                Background="#101418"
+                                BorderBrush="#3A4652"
+                                BorderThickness="1"
+                                KeyboardNavigation.DirectionalNavigation="Contained"
+                                KeyboardNavigation.TabIndex="2"
+                                KeyboardNavigation.TabNavigation="Local">
+                                <ContentPresenter
+                                    x:Name="PART_SelectedContentHost"
+                                    Margin="0"
+                                    ContentSource="SelectedContent"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PmgNestedSubTabItemStyle" TargetType="{x:Type TabItem}">
+            <Setter Property="Foreground" Value="#F2EFE6" />
+            <Setter Property="Background" Value="#1E252C" />
+            <Setter Property="BorderBrush" Value="#3A4652" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TabItem}">
+                        <Border
+                            x:Name="TabBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1"
+                            Padding="{TemplateBinding Padding}"
+                            Margin="{TemplateBinding Margin}">
+                            <ContentPresenter
+                                x:Name="ContentSite"
+                                ContentSource="Header"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#2A333C" />
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#52C7EA" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="Panel.ZIndex" Value="10" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#24303A" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#7E8A95" />
+                                <Setter TargetName="TabBorder" Property="Opacity" Value="0.7" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+</Window.Resources>
 
     <Grid Background="{DynamicResource WindowBackgroundBrush}">
         <Grid.RowDefinitions>
@@ -1187,9 +1275,9 @@
                 </TabItem>
 
                 <TabItem Header="Intel">
-                    <TabControl Background="{DynamicResource WindowBackgroundBrush}"
-                                BorderBrush="{DynamicResource PanelBorderBrush}">
-                        <TabItem Header="Status">
+                    <TabControl Background="#101418"
+                                BorderBrush="#3A4652" Style="{StaticResource PmgNestedSubTabControlStyle}" Foreground="#F2EFE6">
+                        <TabItem Header="Status" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           Padding="12"
                                           Background="{DynamicResource WindowBackgroundBrush}">
@@ -1711,7 +1799,7 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <TabItem Header="Config">
+                        <TabItem Header="Config" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           Padding="12">
                                 <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -1883,9 +1971,9 @@
                 <TabItem Header="Settings">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
                         <TabControl Margin="0,0,0,0"
-                                    Background="{DynamicResource WindowBackgroundBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}">
-                            <TabItem Header="General">
+                                    Background="#101418"
+                                    BorderBrush="#3A4652" Style="{StaticResource PmgNestedSubTabControlStyle}" Foreground="#F2EFE6">
+                            <TabItem Header="General" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Padding="12">
                                     <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -1990,7 +2078,7 @@
                                 </ScrollViewer>
                             </TabItem>
 
-                            <TabItem Header="Accessibility">
+                            <TabItem Header="Accessibility" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Padding="12">
                                     <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -2027,7 +2115,7 @@
                                 </ScrollViewer>
                             </TabItem>
 
-                            <TabItem Header="Board Columns">
+                            <TabItem Header="Board Columns" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Padding="12">
                                     <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -2204,7 +2292,7 @@
                                 </ScrollViewer>
                             </TabItem>
 
-                            <TabItem Header="Version">
+                            <TabItem Header="Version" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Padding="12">
                                     <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -2238,7 +2326,7 @@
                                 </ScrollViewer>
                             </TabItem>
 
-                            <TabItem Header="Diagnostics">
+                            <TabItem Header="Diagnostics" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                                               Padding="12">
                                     <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -2445,11 +2533,11 @@
                         </Setter>
                     </Style>
                 </TabItem.Resources>
-                    <TabControl Style="{StaticResource HelpSubTabControlStyle}" Background="#101418" BorderBrush="#3A4652" Foreground="#F2EFE6">
-                        <TabItem Header="General / Getting Started" Style="{StaticResource HelpSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418">
+                    <TabControl Style="{StaticResource PmgNestedSubTabControlStyle}" Background="#101418" BorderBrush="#3A4652" Foreground="#F2EFE6">
+                        <TabItem Header="General / Getting Started" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418" PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                                 <StackPanel Margin="8" Background="#101418">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418" PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                         <StackPanel Margin="16">
                             <TextBlock Text="PMG Help"
                                        FontSize="22"
@@ -2609,8 +2697,8 @@
                             </ScrollViewer>
                         </TabItem>
 
-                        <TabItem Header="Signal Reference" Style="{StaticResource HelpSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418">
+                        <TabItem Header="Signal Reference" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#101418" PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                                 <StackPanel Margin="8" Background="#101418">
                                     <TextBlock Text="PMG Signal Reference" FontSize="18" FontWeight="SemiBold" Foreground="#F2EFE6" Margin="0,0,0,8" />
                                     <TextBlock Text="PMG signals are public historical evidence summaries. They do not prove that a pilot is currently in that ship, currently fit that way, uncloaked, on-grid, or actively baiting. PMG summarizes public evidence so users can make better decisions; it does not make live-certainty claims." TextWrapping="Wrap" Foreground="#F2EFE6" Margin="0,0,0,12" />
