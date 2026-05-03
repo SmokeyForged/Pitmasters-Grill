@@ -101,6 +101,17 @@ Background Historical Repair and live feed behavior should not run inside constr
 
 ---
 
+## Release Version Metadata
+App-visible release/version metadata should flow through one path:
+
+```text
+PitmastersGrill/PitmastersGrill.csproj -> PmgReleaseVersion -> AppReleaseMetadata
+```
+
+`PmgReleaseVersion` is the release value to bump. `AppReleaseMetadata` builds the release label, user agent, and user-visible version text from compiled assembly metadata. Avoid adding new hard-coded release strings in UI, logging, diagnostics, or HTTP defaults.
+
+---
+
 ## Update Awareness
 Update awareness is intentionally not a full self-updater.
 
