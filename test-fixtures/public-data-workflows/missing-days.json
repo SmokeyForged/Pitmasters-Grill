@@ -1,0 +1,9 @@
+{
+  "isRunning": false,
+  "isCurrentThroughYesterday": false,
+  "hasError": false,
+  "hasRequestedCoverageWindow": false,
+  "latestCompleteDayUtc": "2026-04-29",
+  "requiredThroughDayUtc": "2026-05-02",
+  "missingDayCount": 3
+}

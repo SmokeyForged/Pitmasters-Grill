@@ -1,0 +1,10 @@
+{
+  "isRunning": false,
+  "isCurrentThroughYesterday": true,
+  "hasError": false,
+  "requiredThroughDayUtc": "2026-05-02",
+  "latestCompleteDayUtc": "2026-05-02",
+  "hasRequestedCoverageWindow": false,
+  "isRequestedCoverageComplete": true,
+  "missingDayCount": 0
+}

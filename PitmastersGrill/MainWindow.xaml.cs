@@ -1789,49 +1789,7 @@ namespace PitmastersGrill
 
         private static string BuildIntelCurrentUpdateStatusText(IntelUpdateStatusSnapshot snapshot)
         {
-            if (snapshot == null)
-            {
-                return "No update currently running.";
-            }
-
-            if (snapshot.HasError)
-            {
-                return string.IsNullOrWhiteSpace(snapshot.ErrorText)
-                    ? "Killmail intel update failed."
-                    : $"Killmail intel update failed: {snapshot.ErrorText}";
-            }
-
-            if (snapshot.IsRunning)
-            {
-                if (snapshot.IsForegroundPriorityActive)
-                {
-                    return "Updating killmail intel is paused for foreground activity.";
-                }
-
-                return string.IsNullOrWhiteSpace(snapshot.CurrentImportDayUtc)
-                    ? "Updating killmail intel…"
-                    : $"Updating killmail intel… Current day {snapshot.CurrentImportDayUtc}.";
-            }
-
-            if (snapshot.HasRequestedCoverageWindow && snapshot.RequestedCoverageDays > 0)
-            {
-                if (!snapshot.IsRequestedCoverageComplete)
-                {
-                    return $"Killmail intel partially populated. Local coverage is {snapshot.LocalCoverageDays} of {snapshot.RequestedCoverageDays} requested days.";
-                }
-            }
-
-            if (snapshot.IsCurrentThroughYesterday)
-            {
-                return "Killmail intel is current.";
-            }
-
-            if (snapshot.MissingDayCount > 0)
-            {
-                return $"Killmail intel is waiting to catch up {snapshot.MissingDayCount} day(s).";
-            }
-
-            return "No update currently running.";
+            return PublicDataStatusTextBuilder.BuildIntelCurrentUpdateStatusText(snapshot);
         }
 
         private static string FormatIntelTimestamp(string value, string emptyText)

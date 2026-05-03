@@ -1,0 +1,7 @@
+{
+  "isRunning": false,
+  "isCurrentThroughYesterday": false,
+  "hasError": true,
+  "errorText": "zKill archive request returned HTTP 503 Service Unavailable",
+  "missingDayCount": 0
+}
