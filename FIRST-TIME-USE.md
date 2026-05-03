@@ -58,6 +58,8 @@ PitmastersGrill.exe
 
 On first launch, PMG may create local app data and prepare its local public-intel cache.
 
+PMG may also check GitHub for the latest stable PMG release during startup. This check is informational and fail-open: if GitHub or the network is unavailable, PMG continues launching. PMG does not automatically download, install, replace files, or restart itself.
+
 If Windows SmartScreen appears, review the prompt and choose the option appropriate for your own trust decision.
 
 ---
@@ -264,8 +266,9 @@ After installing PMG:
 5. Open Intel.
 6. Run Today’s Freshness.
 7. Export diagnostics.
-8. Close and reopen PMG.
-9. Confirm layout and settings persist.
+8. Open Settings -> Version and run Check for Updates.
+9. Close and reopen PMG.
+10. Confirm layout and settings persist.
 
 ---
 

@@ -13,6 +13,7 @@ This checklist does not replace judgment. It gives the release owner a consisten
 - [ ] Confirm README current-release references are correct.
 - [ ] Confirm patch notes exist for the release.
 - [ ] Confirm release notes accurately describe PMG's public-data boundaries.
+- [ ] Confirm update-awareness wording is accurate and does not imply auto-install behavior.
 - [ ] Confirm the release does not imply live grid, cloak, private ESI, client-memory, or network-traffic certainty.
 
 ## Local validation
@@ -54,6 +55,8 @@ Use a clean local folder when practical.
 - [ ] Confirm Analysis still renders.
 - [ ] Confirm Settings opens.
 - [ ] Confirm Help opens.
+- [ ] Confirm Settings -> Version manual update check reports current/latest status or fails clearly.
+- [ ] Confirm startup update awareness does not block launch if GitHub/network access is unavailable.
 - [ ] Confirm diagnostics export still works.
 - [ ] Confirm diagnostics do not expose unwanted local/private data.
 - [ ] Confirm double-click / zKill-open behavior still works where available.

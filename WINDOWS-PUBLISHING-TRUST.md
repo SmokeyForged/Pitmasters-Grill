@@ -95,6 +95,11 @@ Main operational risks:
 
 PMG should keep all signing credentials out of source control and out of developer worktrees.
 
+## Update Awareness Does Not Change Windows Trust
+PMG's update-awareness checks do not change Windows publishing trust. Checking GitHub for a newer stable release is not the same as signing, installing, or verifying a downloaded executable.
+
+PMG does not automatically download, install, replace files, restart itself, or bypass SmartScreen. Users still manually download release artifacts from GitHub and make their own Windows trust decision unless a future signed/packaged distribution path is explicitly implemented.
+
 ## Recommended short-term path
 
 Short term, the best PMG path is:

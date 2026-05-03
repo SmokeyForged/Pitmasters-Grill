@@ -28,6 +28,7 @@ PMG provides:
 - optional R2Z2 live zKill feed
 - zKill open-link workflows
 - diagnostics bundle export
+- release/update awareness and manual version checking
 - saved window and board layout behavior
 - PMG themes
 - tray icon support
@@ -330,6 +331,11 @@ Users should still review diagnostics before posting them publicly.
 
 ---
 
+## Update Awareness
+PMG includes safe release-awareness checks. During startup, PMG may check GitHub for the latest stable release and continue normally if the check is unavailable.
+
+Users can also run a manual check from Settings -> Version. The update checker is informational only: it does not download, install, replace files, restart PMG, or force users onto a newer version. When a newer stable release is available, PMG can open the GitHub release page for manual review and update.
+
 ## Branding and App Integration
 
 PMG includes:
@@ -437,7 +443,7 @@ PMG is in General Release.
 
 Current release:
 
-- **Pitmasters Grill v1.1.0**
+- **Pitmasters Grill v1.3.0**
 - General Release
 - Windows desktop application
 

@@ -206,6 +206,13 @@ This avoids double-counting and keeps freshness repair separate from archive-day
 
 ---
 
+## Update Awareness
+PMG includes an awareness-only release check. During startup, PMG can query GitHub for the latest stable release and then continue startup whether the check succeeds or fails.
+
+The same release-check pipeline is available manually from Settings -> Version. Manual checks ignore skipped-version suppression so maintainers and users can verify the pipeline without restarting.
+
+The update-awareness path does not use EVE data, private ESI scopes, client integration, or gameplay automation. It does not download, install, replace files, restart PMG, or perform rollback logic.
+
 ## Write Coordination
 
 PMG has multiple possible writers to the local killmail database:
