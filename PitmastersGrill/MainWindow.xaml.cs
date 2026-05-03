@@ -42,6 +42,8 @@ namespace PitmastersGrill
         private const int BoardModeHintMilliseconds = 5000;
         private const int TripleEscapeWindowMilliseconds = 1500;
         private const int GlobalResetWindowHotKeyId = 0x504D47;
+        private const int GlobalClearBoardHotKeyId = 0x504D48;
+        private const int GlobalToggleBoardModeHotKeyId = 0x504D49;
         private const double DetailWindowGap = 8;
         private const double NormalModeMinimumWindowWidth = 420;
         private const double NormalModeMinimumWindowHeight = 300;
@@ -119,6 +121,8 @@ namespace PitmastersGrill
         private bool _isBoardColumnAutoFitPending;
         private bool _isBoardColumnLayoutReadyForPersistence;
         private bool _globalResetWindowHotKeyRegistered;
+        private bool _globalClearBoardHotKeyRegistered;
+        private bool _globalToggleBoardModeHotKeyRegistered;
         private EveSessionContext? _currentEveSessionContext;
         private DateTime _lastSessionContextRefreshUtc = DateTime.MinValue;
         private bool _isSessionContextRefreshInFlight;
@@ -276,7 +280,7 @@ namespace PitmastersGrill
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
-            ApplyEveSessionContext(new EveSessionContext());
+            ApplyEveSessionContext(CreatePendingEveSessionContext());
 
             AppLogger.DatabaseInfo(
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
@@ -299,6 +303,7 @@ namespace PitmastersGrill
             _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
             RestoreWindowLayoutFromSettings();
             TryRegisterGlobalResetWindowHotKey(hwnd);
+            TryRegisterGlobalBoardActionHotKeys(hwnd);
             UpdateWindowStateUi();
             TriggerSessionContextRefresh("startup", force: false);
 
@@ -348,6 +353,7 @@ namespace PitmastersGrill
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
+            TryUnregisterGlobalBoardActionHotKeys(hwnd);
             TryUnregisterGlobalResetWindowHotKey(hwnd);
             RemoveClipboardFormatListener(hwnd);
 
@@ -367,7 +373,7 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
         }
 
-        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged) { SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", previousCompactMode.Value ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); } private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged && previousCompactMode.HasValue) { var wasBoardMode = previousCompactMode.GetValueOrDefault(); var outgoingLayoutMode = wasBoardMode ? WindowLayoutMode.Board : WindowLayoutMode.Normal; SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", outgoingLayoutMode); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); } private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!ReferenceEquals(sender, MainTabControl))
             {
@@ -1850,18 +1856,80 @@ namespace PitmastersGrill
             if (msg == WmClipboardUpdate)
             {
                 ScheduleClipboardProcessing();
+                return IntPtr.Zero;
             }
-            else if (msg == WmHotKey && wParam.ToInt32() == GlobalResetWindowHotKeyId)
-            {
-                handled = true;
 
-                if (!IsActive)
+            if (msg == WmHotKey)
+            {
+                var hotKeyId = wParam.ToInt32();
+
+                switch (hotKeyId)
                 {
-                    RequestWindowLayoutResetFromHotkey("global Ctrl+Home hotkey");
+                    case GlobalResetWindowHotKeyId:
+                        handled = true;
+
+                        if (!IsActive)
+                        {
+                            RequestWindowLayoutResetFromHotkey("global Ctrl+Home hotkey");
+                        }
+
+                        break;
+
+                    case GlobalClearBoardHotKeyId:
+                        handled = true;
+                        ClearBoard("global Delete hotkey");
+                        break;
+
+                    case GlobalToggleBoardModeHotKeyId:
+                        handled = true;
+                        ToggleCompactModeFromHotkey();
+                        break;
+
+                    default:
+                        handled = false;
+                        break;
                 }
             }
 
             return IntPtr.Zero;
+        }
+
+        private void TryRegisterGlobalBoardActionHotKeys(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            _globalClearBoardHotKeyRegistered = RegisterHotKey(
+                hwnd,
+                GlobalClearBoardHotKeyId,
+                0,
+                (uint)KeyInterop.VirtualKeyFromKey(Key.Delete));
+
+            if (_globalClearBoardHotKeyRegistered)
+            {
+                AppLogger.UiInfo("Global Delete clear-board hotkey registered.");
+            }
+            else
+            {
+                AppLogger.UiWarn($"Global Delete clear-board hotkey registration failed. error={Marshal.GetLastWin32Error()}");
+            }
+
+            _globalToggleBoardModeHotKeyRegistered = RegisterHotKey(
+                hwnd,
+                GlobalToggleBoardModeHotKeyId,
+                0,
+                (uint)KeyInterop.VirtualKeyFromKey(Key.Insert));
+
+            if (_globalToggleBoardModeHotKeyRegistered)
+            {
+                AppLogger.UiInfo("Global Insert board-mode hotkey registered.");
+            }
+            else
+            {
+                AppLogger.UiWarn($"Global Insert board-mode hotkey registration failed. error={Marshal.GetLastWin32Error()}");
+            }
         }
 
         private void TryRegisterGlobalResetWindowHotKey(IntPtr hwnd)
@@ -1884,6 +1952,42 @@ namespace PitmastersGrill
             }
 
             AppLogger.UiWarn($"Global Ctrl+Home hotkey registration failed. win32Error={Marshal.GetLastWin32Error()}");
+        }
+
+        private void TryUnregisterGlobalBoardActionHotKeys(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (_globalClearBoardHotKeyRegistered)
+            {
+                if (UnregisterHotKey(hwnd, GlobalClearBoardHotKeyId))
+                {
+                    AppLogger.UiInfo("Global Delete clear-board hotkey unregistered.");
+                }
+                else
+                {
+                    AppLogger.UiWarn($"Global Delete clear-board hotkey unregister failed. error={Marshal.GetLastWin32Error()}");
+                }
+
+                _globalClearBoardHotKeyRegistered = false;
+            }
+
+            if (_globalToggleBoardModeHotKeyRegistered)
+            {
+                if (UnregisterHotKey(hwnd, GlobalToggleBoardModeHotKeyId))
+                {
+                    AppLogger.UiInfo("Global Insert board-mode hotkey unregistered.");
+                }
+                else
+                {
+                    AppLogger.UiWarn($"Global Insert board-mode hotkey unregister failed. error={Marshal.GetLastWin32Error()}");
+                }
+
+                _globalToggleBoardModeHotKeyRegistered = false;
+            }
         }
 
         private void TryUnregisterGlobalResetWindowHotKey(IntPtr hwnd)
@@ -4197,6 +4301,19 @@ namespace PitmastersGrill
             {
                 _isSessionContextRefreshInFlight = false;
             }
+        }
+
+        private static EveSessionContext CreatePendingEveSessionContext()
+        {
+            return new EveSessionContext
+            {
+                CharacterName = "Waiting for local context",
+                SolarSystemName = "Waiting for local context",
+                EvidenceSource = "Soft local read pending",
+                EvidenceTimestampUtc = null,
+                Confidence = "Pending",
+                StatusMessage = "Waiting for local session evidence"
+            };
         }
 
         private void ApplyEveSessionContext(EveSessionContext context)

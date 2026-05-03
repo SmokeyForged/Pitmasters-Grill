@@ -771,95 +771,7 @@
                                   Padding="12"
                                   Background="{DynamicResource WindowBackgroundBrush}">
                         <StackPanel>
-                            <Border Background="{DynamicResource SurfaceAltBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    Padding="16"
-                                    Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="EVE Session Context"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource HeaderTextBrush}"
-                                               Margin="0,0,0,8"/>
-                                    <Grid Margin="0,0,0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="150"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBlock Grid.Row="0"
-                                                   Grid.Column="0"
-                                                   Foreground="{DynamicResource MutedTextBrush}"
-                                                   Text="Current character"/>
-                                        <TextBlock x:Name="AnalysisCurrentCharacterText"
-                                                   Grid.Row="0"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,0,0,0"
-                                                   Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not detected"/>
-
-                                        <TextBlock Grid.Row="1"
-                                                   Grid.Column="0"
-                                                   Foreground="{DynamicResource MutedTextBrush}"
-                                                   Text="Current system"/>
-                                        <TextBlock x:Name="AnalysisCurrentSystemText"
-                                                   Grid.Row="1"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,0,0,0"
-                                                   Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not detected"/>
-
-                                        <TextBlock Grid.Row="2"
-                                                   Grid.Column="0"
-                                                   Foreground="{DynamicResource MutedTextBrush}"
-                                                   Text="Evidence source"/>
-                                        <TextBlock x:Name="AnalysisEvidenceSourceText"
-                                                   Grid.Row="2"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,0,0,0"
-                                                   Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not configured"/>
-
-                                        <TextBlock Grid.Row="3"
-                                                   Grid.Column="0"
-                                                   Foreground="{DynamicResource MutedTextBrush}"
-                                                   Text="Last observed"/>
-                                        <TextBlock x:Name="AnalysisObservedAtText"
-                                                   Grid.Row="3"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,0,0,0"
-                                                   Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not detected"/>
-
-                                        <TextBlock Grid.Row="4"
-                                                   Grid.Column="0"
-                                                   Foreground="{DynamicResource MutedTextBrush}"
-                                                   Text="Confidence / status"/>
-                                        <TextBlock x:Name="AnalysisContextStatusText"
-                                                   Grid.Row="4"
-                                                   Grid.Column="1"
-                                                   Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,0,0,0"
-                                                   Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Unable to infer EVE context"/>
-                                    </Grid>
-                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                               Margin="0,8,0,0"
-                                               Text="Right-click a Grill row to open pilot details. Board Mode keeps the Grill dense for live use; Analysis collects the aggregate readout here."/>
-                                </StackPanel>
-                            </Border>
+                            
 
                             <Border Background="{DynamicResource SurfaceAltBrush}"
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
@@ -950,6 +862,96 @@
                                             </StackPanel>
                                         </Grid>
                                     </StackPanel>
+
+<Border Background="{DynamicResource SurfaceAltBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="16"
+                                    Margin="0,12,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="EVE Session Context"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource HeaderTextBrush}"
+                                               Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Current character"/>
+                                        <TextBlock x:Name="AnalysisCurrentCharacterText"
+                                                   Grid.Row="0"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not detected"/>
+
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Current system"/>
+                                        <TextBlock x:Name="AnalysisCurrentSystemText"
+                                                   Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not detected"/>
+
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Evidence source"/>
+                                        <TextBlock x:Name="AnalysisEvidenceSourceText"
+                                                   Grid.Row="2"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not configured"/>
+
+                                        <TextBlock Grid.Row="3"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Last observed"/>
+                                        <TextBlock x:Name="AnalysisObservedAtText"
+                                                   Grid.Row="3"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Not detected"/>
+
+                                        <TextBlock Grid.Row="4"
+                                                   Grid.Column="0"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   Text="Confidence / status"/>
+                                        <TextBlock x:Name="AnalysisContextStatusText"
+                                                   Grid.Row="4"
+                                                   Grid.Column="1"
+                                                   Style="{StaticResource SettingsLabelStyle}"
+                                                   Margin="0,0,0,0"
+                                                   Foreground="{DynamicResource BodyTextBrush}"
+                                                   Text="Unable to infer EVE context"/>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                                               Margin="0,8,0,0"
+                                               Text="Right-click a Grill row to open pilot details. Board Mode keeps the Grill dense for live use; Analysis collects the aggregate readout here."/>
+                                </StackPanel>
+                            </Border>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
