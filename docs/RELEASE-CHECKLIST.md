@@ -125,3 +125,14 @@ PMG may still trigger Windows SmartScreen or trust prompts while unsigned.
 - [ ] Extract and launch from a clean folder.
 - [ ] Confirm the release page displays the intended artifact and notes.
 - [ ] Close release-process issues only after the published artifact is verified.
+
+## Release automation readiness
+
+When release automation is used or modified:
+
+- [ ] Confirm automation reads the intended version from `PmgReleaseVersion`.
+- [ ] Confirm artifact naming matches the documented canonical pattern.
+- [ ] Confirm generated checksums match release artifacts.
+- [ ] Confirm GitHub release draft metadata matches the intended version.
+- [ ] Confirm automation stops on dirty working tree, failed validation, missing notes, or version mismatch.
+- [ ] Confirm final publish remains operator-controlled unless explicitly requested.
