@@ -5,6 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PitmastersGrill"
+        xmlns:services="clr-namespace:PitmastersGrill.Services"
         xmlns:views="clr-namespace:PitmastersGrill.Views"
         mc:Ignorable="d"
         Title="Pitmasters Grill"
@@ -2035,7 +2036,7 @@
                                                        FontSize="12"
                                                        Margin="24,0,0,14"
                                                        Visibility="Collapsed"
-                                                       Text="Panel Mode is always enabled for PMG 1.3.0."/>
+                                                       Text="{x:Static services:AppReleaseMetadata.PanelModeAlwaysEnabledText}"/>
 
                                             <TextBlock Text="Window Surface Opacity"
                                                        Foreground="{DynamicResource BodyTextBrush}"
@@ -2309,7 +2310,7 @@
                                                        Margin="0,0,0,12"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="General Release-v1.3.0"/>
+                                                       Text="{x:Static services:AppReleaseMetadata.ReleaseLabel}"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="0,4,0,0"

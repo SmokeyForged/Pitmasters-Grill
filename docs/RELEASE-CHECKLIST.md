@@ -11,6 +11,7 @@ This checklist does not replace judgment. It gives the release owner a consisten
 - [ ] Confirm the intended version number.
 - [ ] Confirm the app version in the project file.
 - [ ] Confirm README current-release references are correct.
+- [ ] Confirm `PmgReleaseVersion` in `PitmastersGrill/PitmastersGrill.csproj` is the intended release version.
 - [ ] Confirm patch notes exist for the release.
 - [ ] Confirm release notes accurately describe PMG's public-data boundaries.
 - [ ] Confirm update-awareness wording is accurate and does not imply auto-install behavior.

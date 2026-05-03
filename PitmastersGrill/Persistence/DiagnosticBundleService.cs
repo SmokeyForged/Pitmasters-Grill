@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -10,7 +10,7 @@ namespace PitmastersGrill.Persistence
 {
     public static class DiagnosticBundleService
     {
-        private const string VersionLabel = "General Release-v1.3.0";
+        private static string VersionLabel => PitmastersGrill.Services.AppReleaseMetadata.ReleaseLabel;
         private const int MaximumBundlesToRetain = 20;
 
         public static string GetDiagnosticsDirectory()

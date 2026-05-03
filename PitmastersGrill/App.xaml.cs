@@ -19,7 +19,7 @@ namespace PitmastersGrill
             base.OnStartup(e);
 
             RegisterGlobalExceptionLogging();
-            AppLogger.Initialize("General Release-v1.3.0", e.Args);
+            AppLogger.Initialize(AppReleaseMetadata.ReleaseLabel, e.Args);
             AppLogger.AppInfo("Application startup invoked.");
 
             try
