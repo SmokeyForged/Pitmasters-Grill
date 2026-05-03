@@ -4547,5 +4547,22 @@ namespace PitmastersGrill
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
 
+        private void NestedScrollViewer_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.ScrollViewer scrollViewer)
+            {
+                return;
+            }
+
+            if (e.Handled)
+            {
+                return;
+            }
+
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - e.Delta);
+            e.Handled = true;
+        }
+
+
     }
 }
