@@ -2323,6 +2323,24 @@
                                                     <Run Text="https://github.com/SmokeyForged/Pitmasters-Grill"/>
                                                 </Hyperlink>
                                             </TextBlock>
+
+                        <StackPanel Margin="0,18,0,0">
+                            <TextBlock Text="Updates"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,4" />
+                            <TextBlock Text="Check GitHub for the latest stable PMG release. This does not download, install, or replace files."
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8" />
+                            <Button x:Name="ManualUpdateCheckButton"
+                                    Content="Check for Updates"
+                                    Width="150"
+                                    HorizontalAlignment="Left"
+                                    Click="ManualUpdateCheckButton_Click" />
+                            <TextBlock x:Name="ManualUpdateStatusText"
+                                       Text="Manual update check has not run this session."
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0" />
+                        </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </ScrollViewer>

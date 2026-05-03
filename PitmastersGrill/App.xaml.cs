@@ -1,4 +1,4 @@
-﻿using PitmastersGrill.Models;
+using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using PitmastersGrill.Providers;
 using PitmastersGrill.Services;
@@ -250,6 +250,95 @@ namespace PitmastersGrill
             }
         }
 
+
+        private async Task RunReleaseUpdateAwarenessCheckAsync(Views.StartupSplashWindow splash)
+        {
+            try
+            {
+                await splash.Dispatcher.InvokeAsync(() =>
+                {
+                    splash.ApplyState(new StartupUpdateState
+                    {
+                        StatusText = "Checking for PMG updates",
+                        DetailText = "Checking the latest stable GitHub release. Startup will continue if this check is unavailable.",
+                        IsIndeterminate = true,
+                        ProgressValue = 0,
+                        IsExceptionMessage = false
+                    });
+                });
+
+                var appSettingsService = new AppSettingsService();
+                var settings = appSettingsService.Load();
+                var currentVersion = GetCurrentApplicationVersionText();
+                var updateService = new PmgUpdateAwarenessService(new GitHubLatestReleaseChecker(), currentVersion);
+                var result = await updateService.CheckAsync(settings.SkippedUpdateVersion, CancellationToken.None);
+
+                if (!result.IsUpdateAvailable)
+                {
+                    return;
+                }
+
+                await splash.Dispatcher.InvokeAsync(() =>
+                {
+                    var message =
+                        $"PMG {result.LatestVersion} is available.\n\n" +
+                        $"Current version: {result.CurrentVersion}\n" +
+                        $"Latest version: {result.LatestVersion}\n\n" +
+                        "Yes: open the GitHub release page for manual update.\n" +
+                        "No: remind me later.\n" +
+                        "Cancel: skip this version.";
+
+                    var response = MessageBox.Show(
+                        splash,
+                        message,
+                        "PMG Update Available",
+                        MessageBoxButton.YesNoCancel,
+                        MessageBoxImage.Information);
+
+                    if (response == MessageBoxResult.Yes)
+                    {
+                        new BrowserLauncher().OpenUrl(result.ReleasePageUrl);
+                    }
+                    else if (response == MessageBoxResult.Cancel)
+                    {
+                        settings.SkippedUpdateVersion = result.LatestVersion;
+                        appSettingsService.Save(settings);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.AppInfo("PMG release update check failed. Startup will continue.");
+                AppLogger.ErrorOnly("PMG release update check failure.", ex);
+            }
+            finally
+            {
+                try
+                {
+                    await splash.Dispatcher.InvokeAsync(() =>
+                    {
+                        splash.ApplyState(new StartupUpdateState
+                        {
+                            StatusText = "Checking local intel database",
+                            DetailText = "Initializing PMG and reviewing local intel freshness.",
+                            IsIndeterminate = true,
+                            ProgressValue = 0,
+                            IsExceptionMessage = false
+                        });
+                    });
+                }
+                catch
+                {
+                    // Best effort only. Startup should continue even if the splash is closing.
+                }
+            }
+        }
+
+        private static string GetCurrentApplicationVersionText()
+        {
+            return typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        }
+
         private async Task RunNormalStartupAsync()
         {
             AppLogger.AppInfo("Normal startup sequence begin.");
@@ -263,6 +352,7 @@ namespace PitmastersGrill
                 IsExceptionMessage = false
             });
             splash.Show();
+            await RunReleaseUpdateAwarenessCheckAsync(splash);
 
             try
             {

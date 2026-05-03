@@ -99,6 +99,8 @@ namespace PitmastersGrill.Models
 
         public List<BoardColumnLayoutSetting> BoardColumnLayout { get; set; } = new();
 
+        public string SkippedUpdateVersion { get; set; } = string.Empty;
+
         public AppLogLevel LogLevel { get; set; } = AppLogLevel.Normal;
     }
 }
