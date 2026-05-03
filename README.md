@@ -1,4 +1,4 @@
-﻿# Pitmaster's Grill
+# Pitmaster's Grill
 
 <p align="center">
   <img src="./PitmastersGrill/Assets/AppIcon.png" alt="Pitmaster's Grill icon" width="120" />
@@ -29,8 +29,7 @@ PMG is now in **General Release**.
 
 ---
 
-Current release: **Pitmasters Grill v1.3.0**
-Latest release: **[v1.3.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.3.0)**
+Current release: **[Pitmasters Grill v1.3.0](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.3.0)**
 Full release history: **[GitHub Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**
 
 Repository status on `main`: **1.3.0 general release clarity, supportability, UI polish, and update-awareness improvements are present**. This release improves signal/public-data explanation, release readiness, and safe update awareness. It does **not** add new EVE intel sources, private data access, gameplay automation, or automatic self-install behavior.
