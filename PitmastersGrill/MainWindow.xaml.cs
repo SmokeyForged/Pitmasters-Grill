@@ -1,4 +1,4 @@
-﻿using PitmastersGrill.Diagnostics;
+using PitmastersGrill.Diagnostics;
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using PitmastersGrill.Providers;
@@ -101,7 +101,7 @@ namespace PitmastersGrill
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
         private PilotDetailWindow? _activePilotDetailWindow;
-        private bool _isApplyingSettings;
+        private bool _isApplyingSettings; private bool _isRestoringWindowLayout;
         private bool _isShuttingDown;
         private bool _compactDragPending;
         private Point _compactDragStartPoint;
@@ -367,59 +367,7 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
         }
 
-        private void ApplyCompactModeUi()
-        {
-            if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null)
-            {
-                return;
-            }
-
-            var compact = CompactModeToggleButton.IsChecked == true;
-            var previousCompactMode = _lastAppliedCompactMode;
-            _lastAppliedCompactMode = compact;
-
-            if (compact)
-            {
-                MainTabControl.SelectedIndex = 1;
-                CloseActiveDetailWindow();
-            }
-
-            TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            TopCommandGrid.Margin = new Thickness(0, 0, 0, 6);
-            BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5);
-            MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12);
-            MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1);
-            MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0);
-
-            if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact)
-            {
-                _appSettings.CompactModeEnabled = compact;
-                _mainWindowAppearanceController.SaveSettings(_appSettings);
-            }
-
-            if (!_isApplyingSettings &&
-                (!previousCompactMode.HasValue || previousCompactMode.Value != compact))
-            {
-                AppLogger.UiInfo($"Display mode changed. boardMode={compact}");
-            }
-
-            if (compact && !_isApplyingSettings &&
-                (!previousCompactMode.HasValue || previousCompactMode.Value != compact))
-            {
-                ShowBoardModeHint();
-            }
-            else if (!compact)
-            {
-                HideBoardModeHint();
-            }
-
-            UpdateWindowMinimumSize();
-            UpdateBoardFooterVisibility();
-            UpdateBoardSummaryBanner();
-            UpdateAnalysisTab();
-        }
-
-        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged) { SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", previousCompactMode.Value ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); } private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!ReferenceEquals(sender, MainTabControl))
             {
@@ -4506,95 +4454,7 @@ namespace PitmastersGrill
             }
         }
 
-        private void RestoreWindowLayoutFromSettings()
-        {
-            var workAreas = GetMonitorWorkAreasDip();
-            var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas);
-            var restoreResult = _windowLayoutController.BuildRestoreResult(
-                _appSettings,
-                MinWidth,
-                MinHeight,
-                MinimumSavedWindowWidth,
-                MinimumSavedWindowHeight,
-                MinimumVisibleWindowEdge,
-                DefaultWindowWidth,
-                DefaultWindowHeight,
-                workAreas);
-
-            AppLogger.UiInfo(
-                $"Window layout restore decision={restoreResult.RestoreDecision} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={virtualDesktopSummary}");
-
-            WindowState = WindowState.Normal;
-            Left = restoreResult.TargetBounds.Left;
-            Top = restoreResult.TargetBounds.Top;
-            Width = restoreResult.TargetBounds.Width;
-            Height = restoreResult.TargetBounds.Height;
-            _lastKnownNormalBounds = restoreResult.TargetBounds;
-
-            if (restoreResult.ShouldRestoreMaximized)
-            {
-                WindowState = WindowState.Maximized;
-            }
-
-            _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState;
-
-            AppLogger.UiInfo(
-                $"Window layout restore applied finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}");
-        }
-
-        private void SaveWindowLayoutToSettings(string reason)
-        {
-            var effectiveState = WindowState == WindowState.Minimized
-                ? _lastNonMinimizedWindowState
-                : WindowState;
-
-            if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds))
-            {
-                _lastKnownNormalBounds = RestoreBounds;
-            }
-            else if (WindowState == WindowState.Normal)
-            {
-                TrackCurrentNormalWindowBounds("Save");
-            }
-
-            var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds)
-                ? _lastKnownNormalBounds
-                : effectiveState == WindowState.Maximized
-                    ? RestoreBounds
-                    : new Rect(Left, Top, Width, Height);
-
-            var workAreas = GetMonitorWorkAreasDip();
-            if (!_windowLayoutController.TryBuildLayoutSnapshot(
-                    bounds,
-                    effectiveState,
-                    MinWidth,
-                    MinHeight,
-                    MinimumSavedWindowWidth,
-                    MinimumSavedWindowHeight,
-                    MinimumVisibleWindowEdge,
-                    workAreas,
-                    out var snapshot,
-                    out var failureReason))
-            {
-                AppLogger.UiWarn(
-                    $"Window layout save skipped. reason='{reason}' bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}");
-                return;
-            }
-
-            _windowLayoutController.ApplySnapshot(_appSettings, snapshot);
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo(
-                $"Window layout saved. reason='{reason}' bounds={_windowLayoutController.DescribeRect(bounds)} maximized={_appSettings.SavedWindowIsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}");
-        }
-
-        private void ClearSavedWindowLayoutSettings()
-        {
-            _windowLayoutController.ClearSavedLayout(_appSettings);
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-        }
-
-        private Rect GetDefaultWindowBoundsForCurrentDisplay()
+        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; } private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); } private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult( _appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo( $"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo( $"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); } private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); } private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot( bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn( $"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo( $"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); } private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); } private Rect GetDefaultWindowBoundsForCurrentDisplay()
         {
             return _windowLayoutController.GetDefaultWindowBounds(
                 GetMonitorWorkAreasDip(),

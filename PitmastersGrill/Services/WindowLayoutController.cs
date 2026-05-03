@@ -9,11 +9,17 @@ namespace PitmastersGrill.Services
     public sealed class WindowLayoutRestoreResult
     {
         public required Rect TargetBounds { get; init; }
+
         public required string RestoreDecision { get; init; }
+
         public required string RestoreReason { get; init; }
+
         public required bool HasSavedBounds { get; init; }
+
         public required Rect SavedBounds { get; init; }
+
         public required bool ShouldRestoreMaximized { get; init; }
+
         public required WindowState LastNonMinimizedWindowState { get; init; }
     }
 
@@ -21,6 +27,31 @@ namespace PitmastersGrill.Services
     {
         public WindowLayoutRestoreResult BuildRestoreResult(
             AppSettings settings,
+            double minWidth,
+            double minHeight,
+            double minimumSavedWindowWidth,
+            double minimumSavedWindowHeight,
+            double minimumVisibleWindowEdge,
+            double defaultWindowWidth,
+            double defaultWindowHeight,
+            IReadOnlyList<Rect> workAreas)
+        {
+            return BuildRestoreResult(
+                settings,
+                WindowLayoutMode.Normal,
+                minWidth,
+                minHeight,
+                minimumSavedWindowWidth,
+                minimumSavedWindowHeight,
+                minimumVisibleWindowEdge,
+                defaultWindowWidth,
+                defaultWindowHeight,
+                workAreas);
+        }
+
+        public WindowLayoutRestoreResult BuildRestoreResult(
+            AppSettings settings,
+            WindowLayoutMode mode,
             double minWidth,
             double minHeight,
             double minimumSavedWindowWidth,
@@ -42,7 +73,7 @@ namespace PitmastersGrill.Services
                 defaultWindowWidth,
                 defaultWindowHeight);
 
-            var hasSavedBounds = TryGetSavedWindowBounds(settings, out var savedBounds);
+            var hasSavedBounds = TryGetSavedWindowBounds(settings, mode, out var savedBounds);
             Rect targetBounds;
             string restoreDecision;
             string restoreReason;
@@ -51,17 +82,17 @@ namespace PitmastersGrill.Services
             {
                 targetBounds = fallbackBounds;
                 restoreDecision = "Fallback";
-                restoreReason = "No saved bounds were available.";
+                restoreReason = $"No saved {mode} bounds were available.";
             }
             else if (!TryValidateWindowBounds(
-                         savedBounds,
-                         minWidth,
-                         minHeight,
-                         minimumSavedWindowWidth,
-                         minimumSavedWindowHeight,
-                         minimumVisibleWindowEdge,
-                         workAreas,
-                         out var failureReason))
+                savedBounds,
+                minWidth,
+                minHeight,
+                minimumSavedWindowWidth,
+                minimumSavedWindowHeight,
+                minimumVisibleWindowEdge,
+                workAreas,
+                out var failureReason))
             {
                 targetBounds = fallbackBounds;
                 restoreDecision = "Fallback";
@@ -71,8 +102,10 @@ namespace PitmastersGrill.Services
             {
                 targetBounds = savedBounds;
                 restoreDecision = "Applied";
-                restoreReason = "Saved bounds are visible on the current monitor layout.";
+                restoreReason = $"Saved {mode} bounds are visible on the current monitor layout.";
             }
+
+            var shouldRestoreMaximized = IsSavedLayoutMaximized(settings, mode);
 
             return new WindowLayoutRestoreResult
             {
@@ -81,10 +114,8 @@ namespace PitmastersGrill.Services
                 RestoreReason = restoreReason,
                 HasSavedBounds = hasSavedBounds,
                 SavedBounds = hasSavedBounds ? savedBounds : Rect.Empty,
-                ShouldRestoreMaximized = settings.SavedWindowIsMaximized,
-                LastNonMinimizedWindowState = settings.SavedWindowIsMaximized
-                    ? WindowState.Maximized
-                    : WindowState.Normal
+                ShouldRestoreMaximized = shouldRestoreMaximized,
+                LastNonMinimizedWindowState = shouldRestoreMaximized ? WindowState.Maximized : WindowState.Normal
             };
         }
 
@@ -103,14 +134,14 @@ namespace PitmastersGrill.Services
             snapshot = new WindowLayoutSnapshot();
 
             if (!TryValidateWindowBounds(
-                    bounds,
-                    minWidth,
-                    minHeight,
-                    minimumSavedWindowWidth,
-                    minimumSavedWindowHeight,
-                    minimumVisibleWindowEdge,
-                    workAreas,
-                    out failureReason))
+                bounds,
+                minWidth,
+                minHeight,
+                minimumSavedWindowWidth,
+                minimumSavedWindowHeight,
+                minimumVisibleWindowEdge,
+                workAreas,
+                out failureReason))
             {
                 return false;
             }
@@ -129,6 +160,11 @@ namespace PitmastersGrill.Services
 
         public void ApplySnapshot(AppSettings settings, WindowLayoutSnapshot snapshot)
         {
+            ApplySnapshot(settings, snapshot, WindowLayoutMode.Normal);
+        }
+
+        public void ApplySnapshot(AppSettings settings, WindowLayoutSnapshot snapshot, WindowLayoutMode mode)
+        {
             if (settings == null)
             {
                 throw new ArgumentNullException(nameof(settings));
@@ -139,6 +175,23 @@ namespace PitmastersGrill.Services
                 throw new ArgumentNullException(nameof(snapshot));
             }
 
+            if (mode == WindowLayoutMode.Board)
+            {
+                settings.SavedBoardWindowLeft = snapshot.Left;
+                settings.SavedBoardWindowTop = snapshot.Top;
+                settings.SavedBoardWindowWidth = snapshot.Width;
+                settings.SavedBoardWindowHeight = snapshot.Height;
+                settings.SavedBoardWindowIsMaximized = snapshot.IsMaximized;
+                return;
+            }
+
+            settings.SavedNormalWindowLeft = snapshot.Left;
+            settings.SavedNormalWindowTop = snapshot.Top;
+            settings.SavedNormalWindowWidth = snapshot.Width;
+            settings.SavedNormalWindowHeight = snapshot.Height;
+            settings.SavedNormalWindowIsMaximized = snapshot.IsMaximized;
+
+            // Keep legacy fields synchronized so existing code or older settings readers still see the normal layout.
             settings.SavedWindowLeft = snapshot.Left;
             settings.SavedWindowTop = snapshot.Top;
             settings.SavedWindowWidth = snapshot.Width;
@@ -148,10 +201,31 @@ namespace PitmastersGrill.Services
 
         public void ClearSavedLayout(AppSettings settings)
         {
+            ClearSavedLayout(settings, WindowLayoutMode.Normal);
+        }
+
+        public void ClearSavedLayout(AppSettings settings, WindowLayoutMode mode)
+        {
             if (settings == null)
             {
                 throw new ArgumentNullException(nameof(settings));
             }
+
+            if (mode == WindowLayoutMode.Board)
+            {
+                settings.SavedBoardWindowLeft = null;
+                settings.SavedBoardWindowTop = null;
+                settings.SavedBoardWindowWidth = null;
+                settings.SavedBoardWindowHeight = null;
+                settings.SavedBoardWindowIsMaximized = false;
+                return;
+            }
+
+            settings.SavedNormalWindowLeft = null;
+            settings.SavedNormalWindowTop = null;
+            settings.SavedNormalWindowWidth = null;
+            settings.SavedNormalWindowHeight = null;
+            settings.SavedNormalWindowIsMaximized = false;
 
             settings.SavedWindowLeft = null;
             settings.SavedWindowTop = null;
@@ -160,7 +234,18 @@ namespace PitmastersGrill.Services
             settings.SavedWindowIsMaximized = false;
         }
 
+        public void ClearAllSavedLayouts(AppSettings settings)
+        {
+            ClearSavedLayout(settings, WindowLayoutMode.Normal);
+            ClearSavedLayout(settings, WindowLayoutMode.Board);
+        }
+
         public bool TryGetSavedWindowBounds(AppSettings settings, out Rect bounds)
+        {
+            return TryGetSavedWindowBounds(settings, WindowLayoutMode.Normal, out bounds);
+        }
+
+        public bool TryGetSavedWindowBounds(AppSettings settings, WindowLayoutMode mode, out Rect bounds)
         {
             if (settings == null)
             {
@@ -169,21 +254,43 @@ namespace PitmastersGrill.Services
 
             bounds = Rect.Empty;
 
-            if (!settings.SavedWindowLeft.HasValue ||
-                !settings.SavedWindowTop.HasValue ||
-                !settings.SavedWindowWidth.HasValue ||
-                !settings.SavedWindowHeight.HasValue)
+            var left = mode == WindowLayoutMode.Board ? settings.SavedBoardWindowLeft : settings.SavedNormalWindowLeft;
+            var top = mode == WindowLayoutMode.Board ? settings.SavedBoardWindowTop : settings.SavedNormalWindowTop;
+            var width = mode == WindowLayoutMode.Board ? settings.SavedBoardWindowWidth : settings.SavedNormalWindowWidth;
+            var height = mode == WindowLayoutMode.Board ? settings.SavedBoardWindowHeight : settings.SavedNormalWindowHeight;
+
+            if (mode == WindowLayoutMode.Normal &&
+                (!left.HasValue || !top.HasValue || !width.HasValue || !height.HasValue) &&
+                settings.SavedWindowLeft.HasValue &&
+                settings.SavedWindowTop.HasValue &&
+                settings.SavedWindowWidth.HasValue &&
+                settings.SavedWindowHeight.HasValue)
+            {
+                left = settings.SavedWindowLeft;
+                top = settings.SavedWindowTop;
+                width = settings.SavedWindowWidth;
+                height = settings.SavedWindowHeight;
+            }
+
+            if (!left.HasValue || !top.HasValue || !width.HasValue || !height.HasValue)
             {
                 return false;
             }
 
-            bounds = new Rect(
-                settings.SavedWindowLeft.Value,
-                settings.SavedWindowTop.Value,
-                settings.SavedWindowWidth.Value,
-                settings.SavedWindowHeight.Value);
-
+            bounds = new Rect(left.Value, top.Value, width.Value, height.Value);
             return true;
+        }
+
+        public bool IsSavedLayoutMaximized(AppSettings settings, WindowLayoutMode mode)
+        {
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            return mode == WindowLayoutMode.Board
+                ? settings.SavedBoardWindowIsMaximized
+                : settings.SavedNormalWindowIsMaximized || settings.SavedWindowIsMaximized;
         }
 
         public bool TryValidateWindowBounds(
@@ -212,6 +319,7 @@ namespace PitmastersGrill.Services
             foreach (var workArea in workAreas ?? Array.Empty<Rect>())
             {
                 var intersection = Rect.Intersect(bounds, workArea);
+
                 if (!intersection.IsEmpty &&
                     intersection.Width >= minimumVisibleWindowEdge &&
                     intersection.Height >= minimumVisibleWindowEdge)
@@ -232,10 +340,7 @@ namespace PitmastersGrill.Services
             double defaultWindowWidth,
             double defaultWindowHeight)
         {
-            var workArea = workAreas != null && workAreas.Count > 0
-                ? workAreas[0]
-                : new Rect(0, 0, 1280, 800);
-
+            var workArea = workAreas != null && workAreas.Count > 0 ? workAreas[0] : new Rect(0, 0, 1280, 800);
             var width = Math.Max(minimumSavedWindowWidth, defaultWindowWidth);
             var height = Math.Max(minimumSavedWindowHeight, defaultWindowHeight);
 
@@ -251,16 +356,16 @@ namespace PitmastersGrill.Services
         public bool IsUsableWindowBounds(Rect bounds)
         {
             return !bounds.IsEmpty &&
-                   !double.IsNaN(bounds.Left) &&
-                   !double.IsNaN(bounds.Top) &&
-                   !double.IsNaN(bounds.Width) &&
-                   !double.IsNaN(bounds.Height) &&
-                   !double.IsInfinity(bounds.Left) &&
-                   !double.IsInfinity(bounds.Top) &&
-                   !double.IsInfinity(bounds.Width) &&
-                   !double.IsInfinity(bounds.Height) &&
-                   bounds.Width > 0 &&
-                   bounds.Height > 0;
+                !double.IsNaN(bounds.Left) &&
+                !double.IsNaN(bounds.Top) &&
+                !double.IsNaN(bounds.Width) &&
+                !double.IsNaN(bounds.Height) &&
+                !double.IsInfinity(bounds.Left) &&
+                !double.IsInfinity(bounds.Top) &&
+                !double.IsInfinity(bounds.Width) &&
+                !double.IsInfinity(bounds.Height) &&
+                bounds.Width > 0 &&
+                bounds.Height > 0;
         }
 
         public string BuildVirtualDesktopSummary(IReadOnlyList<Rect> workAreas)
@@ -271,6 +376,7 @@ namespace PitmastersGrill.Services
             }
 
             var virtualBounds = workAreas[0];
+
             foreach (var workArea in workAreas.Skip(1))
             {
                 virtualBounds = Rect.Union(virtualBounds, workArea);
@@ -282,7 +388,7 @@ namespace PitmastersGrill.Services
         public string DescribeRect(Rect bounds)
         {
             return bounds.IsEmpty
-                ? "<empty>"
+                ? string.Empty
                 : $"[{bounds.Left:0.##},{bounds.Top:0.##},{bounds.Width:0.##},{bounds.Height:0.##}]";
         }
     }

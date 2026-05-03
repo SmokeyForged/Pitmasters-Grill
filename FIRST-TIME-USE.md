@@ -277,3 +277,9 @@ Continue with:
 - [`HOW-IT-WORKS.md`](./HOW-IT-WORKS.md)
 - [`EVE-TOS-COMPLIANCE.md`](./EVE-TOS-COMPLIANCE.md)
 - [`HOW-TO-NAVIGATE-THIS-REPO.md`](./HOW-TO-NAVIGATE-THIS-REPO.md)
+
+## Reading PMG Signals
+
+PMG signals are public historical evidence summaries. They are useful prompts for judgment, but they do not prove what a pilot is currently flying, fitting, doing, or intending.
+
+Use the in-app Help > Signal Reference section or `SIGNAL-REFERENCE.md` when a signal label is unclear.
