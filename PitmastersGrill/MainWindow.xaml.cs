@@ -4084,22 +4084,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            var visibleRows = _currentRows.ToList();
-            var watchedCount = visibleRows.Count(row => row.IsWatched);
-            var baitCount = visibleRows.Count(row => row.BaitOverride || row.HasDerivedBaitEvidence);
-            var hardCynoCount = visibleRows.Count(row =>
-                string.Equals(row.BoardSignalKind, "ConfirmedNormal", StringComparison.OrdinalIgnoreCase));
-            var covertCynoCount = visibleRows.Count(row =>
-                string.Equals(row.BoardSignalKind, "ConfirmedCovert", StringComparison.OrdinalIgnoreCase));
-
-            BoardSummaryText.Text = string.Join(" | ", new[]
-            {
-                $"Visible {visibleRows.Count}",
-                $"Watched {watchedCount}",
-                $"Bait {baitCount}",
-                $"Hard Cyno {hardCynoCount}",
-                $"Covert Cyno {covertCynoCount}"
-            });
+            BoardSummaryText.Text = BoardSummaryTextBuilder.Build(_currentRows);
         }
 
         private void CurrentRows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
