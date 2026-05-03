@@ -59,6 +59,40 @@ Required properties:
 - avoids ambiguous duplicate filenames,
 - remains stable across releases.
 
+## Release Naming Inventory
+
+The v1.4.0 release-automation work inventoried recent stable GitHub releases before choosing a forward naming convention.
+
+| Release | Tag | Release title | ZIP asset |
+|---|---|---|---|
+| 1.3.0 | `v1.3.0` | `Pitmasters Grill 1.3.0` | `PMG_General-Release_v1.3.zip` |
+| 1.2.0 | `v1.2.0` | `Pitmasters Grill 1.2.0` | `PMG_General-Release_v1.2.zip` |
+| 1.1.0 | `v1.1.0` | `Pitmasters Grill 1.1.0` | `PMG_General-Release_v1.1.0.zip` |
+
+Historical asset naming drift exists. v1.2.0 and v1.3.0 used shortened `major.minor` asset names, while v1.1.0 used full semantic version text.
+
+Release automation should tolerate historical drift when reading older releases, but it should generate full semantic version artifact names going forward.
+
+## Canonical Release Naming
+
+Starting with v1.4.0, release automation should use these canonical patterns:
+
+```text
+Release title: Pitmasters Grill <major>.<minor>.<patch>
+Tag: v<major>.<minor>.<patch>
+ZIP asset: PMG_General-Release_v<major>.<minor>.<patch>.zip
+```
+
+Example for v1.4.0:
+
+```text
+Release title: Pitmasters Grill 1.4.0
+Tag: v1.4.0
+ZIP asset: PMG_General-Release_v1.4.0.zip
+```
+
+The ZIP asset should use the same full version value as `PmgReleaseVersion`, prefixed with `v`.
+
 ## Proposed Automation Phases
 
 ### Phase 1: Release Readiness Check
