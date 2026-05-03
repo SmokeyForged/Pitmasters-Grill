@@ -111,6 +111,19 @@ A local command or script verifies:
 
 Output should be a readable release readiness summary.
 
+
+### Implemented Readiness Check
+
+The first check-only automation helper is:
+
+```powershell
+.\tools\Check-ReleaseReadiness.ps1
+```
+
+The script is intentionally non-publishing. It reads `PmgReleaseVersion`, derives the expected release title/tag/ZIP name, checks release documentation state, runs `git --no-pager diff --check`, and can run `dotnet test` plus `dotnet build`.
+
+For development validation on a feature branch or dirty worktree, use explicit override switches such as `-AllowNonMain`, `-AllowDirty`, and `-SkipDotnetChecks`. Release use should avoid those overrides.
+
 ### Phase 2: Package Artifact Preparation
 
 Automation prepares publish output and release artifacts, but does not publish.

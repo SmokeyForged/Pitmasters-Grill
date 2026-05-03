@@ -136,3 +136,4 @@ When release automation is used or modified:
 - [ ] Confirm GitHub release draft metadata matches the intended version.
 - [ ] Confirm automation stops on dirty working tree, failed validation, missing notes, or version mismatch.
 - [ ] Confirm final publish remains operator-controlled unless explicitly requested.
+- [ ] Run `./tools/Check-ReleaseReadiness.ps1` from the repository root and preserve the output with release validation notes.
