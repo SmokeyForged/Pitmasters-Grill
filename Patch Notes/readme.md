@@ -11,19 +11,19 @@ Use patch notes for version-by-version release history. Keep the main `README.md
 Current General Release:
 
 ```text
-Pitmasters Grill v1.2.0
+Pitmasters Grill v1.3.0
 ```
 
 Release page:
 
 ```text
-https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.2.0
+https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.3.0
 ```
 
 Current release notes:
 
 ```text
-General-Release_1-2-0.md
+General-Release_1-3-0.md
 ```
 
 ---
@@ -35,7 +35,7 @@ Use clear release-stage filenames.
 Examples:
 
 ```text
-General-Release_1-2-0.md
+General-Release_1-3-0.md
 General-Release_1-1-0.md
 Technical-Preview_0.9.5.1_patch_notes.md
 Technical-Preview_0.9.4_patch_notes.md

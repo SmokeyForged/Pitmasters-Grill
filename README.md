@@ -1,4 +1,4 @@
-# Pitmaster's Grill
+﻿# Pitmaster's Grill
 
 <p align="center">
   <img src="./PitmastersGrill/Assets/AppIcon.png" alt="Pitmaster's Grill icon" width="120" />
@@ -29,11 +29,11 @@ PMG is now in **General Release**.
 
 ---
 
-Current release: **Pitmasters Grill v1.2.0**  
-Latest release: **[v1.2.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.2.0)**  
+Current release: **Pitmasters Grill v1.3.0**
+Latest release: **[v1.3.0 General Release](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.3.0)**
 Full release history: **[GitHub Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**
 
-Repository status on `main`: **1.2.0 general release foundation and support improvements are present**. This release focuses on maintainability, automated validation, and safer future iteration. It does **not** add new EVE intel sources or change PMG's public-data boundaries.
+Repository status on `main`: **1.3.0 general release clarity, supportability, UI polish, and update-awareness improvements are present**. This release improves signal/public-data explanation, release readiness, and safe update awareness. It does **not** add new EVE intel sources, private data access, gameplay automation, or automatic self-install behavior.
 
 ---
 
@@ -68,6 +68,7 @@ PMG can:
 - optionally use R2Z2 for live zKill-known killmail ingestion
 - cache public intel locally to reduce repeated lookup cost
 - export diagnostics for troubleshooting
+- check for newer stable PMG releases without downloading, installing, replacing files, or restarting
 - open zKill for deeper manual review
 
 PMG does **not** read EVE client memory, inspect network traffic, automate gameplay, use private ESI character data, or claim live grid/location/cloak certainty.
@@ -78,12 +79,12 @@ PMG does **not** read EVE client memory, inspect network traffic, automate gamep
 
 PMG is organized around a few top-level tabs:
 
-- **Analysis** — summary view for the current visible board.
-- **Grill** — the main pilot board.
-- **Intel** — killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls.
-- **Ignore List** — manage ignored pilots, corporations, and alliances.
-- **Settings** — app behavior, PMG themes, visibility, and layout options.
-- **Help** — shortcut and workflow reference.
+- **Analysis** â€” summary view for the current visible board.
+- **Grill** â€” the main pilot board.
+- **Intel** â€” killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls.
+- **Ignore List** â€” manage ignored pilots, corporations, and alliances.
+- **Settings** â€” app behavior, PMG themes, visibility, layout options, and manual version/update checks.
+- **Help** â€” shortcut and workflow reference.
 
 ---
 
@@ -123,8 +124,8 @@ New here? Start with:
 - **[Patch Notes](./Patch%20Notes/)**  
   Full release history and version notes.
 
-- **[1.2.0 General Release Notes](./Patch%20Notes/General-Release_1-2-0.md)**  
-  Summary of the 1.2.0 support, maintainability, CI, and validation work.
+- **[1.3.0 General Release Notes](./Patch%20Notes/General-Release_1-3-0.md)**
+  Summary of the 1.3.0 clarity, supportability, UI polish, release-readiness, and update-awareness work.
 
 - **[Current Feature Snapshot](./PMG-FEATURES.md)**  
   A deeper overview of PMG's current feature set and limitations.

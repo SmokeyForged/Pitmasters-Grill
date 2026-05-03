@@ -91,14 +91,22 @@ Startup should prioritize user-visible readiness.
 Expected pattern:
 
 1. show splash/startup flow
-2. initialize core services safely
-3. show main window
-4. schedule background work after UI render
-5. avoid blocking UI thread with network/database work
+2. run optional fail-open release awareness checks without blocking startup
+3. initialize core services safely
+4. show main window
+5. schedule background work after UI render
+6. avoid blocking UI thread with network/database work
 
 Background Historical Repair and live feed behavior should not run inside constructors or `InitializeComponent`.
 
 ---
+
+## Update Awareness
+Update awareness is intentionally not a full self-updater.
+
+Startup and Settings -> Version may check GitHub for the latest stable PMG release. These checks must remain fail-open, cancellable where practical, and user-confirmed before opening a browser. They must not download release assets, replace executable files, restart PMG, or introduce rollback behavior unless a future release explicitly scopes and tests a real updater.
+
+Manual checks should be able to verify the release-check pipeline even when a startup prompt was skipped for a specific version.
 
 ## Freshness Model
 
@@ -358,6 +366,8 @@ Before release:
 - Background Historical Repair does not block startup
 - R2Z2 remains disabled by default
 - diagnostics export works
+- Settings -> Version update check works or fails with a clear message
+- startup update awareness continues if GitHub/network is unavailable
 - README/docs match release
 - patch notes exist
 - version metadata is correct

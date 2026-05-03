@@ -16,6 +16,7 @@ If you are new to the repo, start with these files:
 | `PitmastersGrill/` | Main application source code. |
 | `PitmastersGrill.Tests/` | Deterministic non-UI automated test project. |
 | `.github/workflows/` | Windows build/test CI workflow definitions. |
+| `docs/` | Release checklist, dependency maintenance, and supporting maintainer docs. |
 | `Patch Notes/` | Version-by-version release notes. |
 | `PMG-FEATURES.md` | Current feature overview and limitations. |
 | `HOW-IT-WORKS.md` | Technical overview of PMG's data flow and evidence model. |
@@ -37,6 +38,7 @@ Pitmasters-Grill/
 +-- EVE-TOS-COMPLIANCE.md
 +-- DEVELOPER-NOTES.md
 +-- .github/workflows/
++-- docs/
 +-- Patch Notes/
 +-- PitmastersGrill/
 +-- PitmastersGrill.Tests/
@@ -244,12 +246,29 @@ The README should stay short and navigational. Detailed release history belongs 
 Current General Release notes should use a filename similar to:
 
 ```text
-Patch Notes/General-Release_1-2-0.md
+Patch Notes/General-Release_1-3-0.md
 ```
 
 Release-preparation or foundation notes should be promoted into the matching General Release note before public release.
 
 ---
+
+## Update Awareness and Version Checking
+Release-awareness code lives in the main application service layer and startup/UI wiring.
+
+Relevant code areas may include:
+
+```text
+PitmastersGrill/App.xaml.cs
+PitmastersGrill/MainWindow.xaml
+PitmastersGrill/MainWindow.xaml.cs
+PitmastersGrill/Services/GitHubLatestReleaseChecker.cs
+PitmastersGrill/Services/PmgUpdateAwarenessService.cs
+PitmastersGrill/Services/ReleaseVersionComparer.cs
+PitmastersGrill/Models/AppSettings.cs
+```
+
+The feature is awareness-only. It checks GitHub for stable releases, can open the release page, and must not self-install or replace files.
 
 ## Public Data Boundaries
 
