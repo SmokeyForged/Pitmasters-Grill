@@ -78,12 +78,12 @@ PMG does **not** read EVE client memory, inspect network traffic, automate gamep
 
 PMG is organized around a few top-level tabs:
 
-- **Analysis** â€” summary view for the current visible board.
-- **Grill** â€” the main pilot board.
-- **Intel** â€” killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls.
-- **Ignore List** â€” manage ignored pilots, corporations, and alliances.
-- **Settings** â€” app behavior, PMG themes, visibility, layout options, and manual version/update checks.
-- **Help** â€” shortcut and workflow reference.
+- **Analysis** summary view for the current visible board.
+- **Grill** the main pilot board.
+- **Intel** killmail intel status, freshness tools, R2Z2, diagnostics, and cache controls.
+- **Ignore List** manage ignored pilots, corporations, and alliances.
+- **Settings** app behavior, PMG themes, visibility, layout options, and manual version/update checks.
+- **Help** shortcut and workflow reference.
 
 ---
 
