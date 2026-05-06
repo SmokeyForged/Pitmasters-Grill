@@ -86,6 +86,7 @@ namespace PitmastersGrill
         private readonly EveSessionContextService _eveSessionContextService;
         private readonly MainWindowDiagnostics _diagnostics;
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
+        private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -176,6 +177,51 @@ namespace PitmastersGrill
             };
             _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
+            _intelStatusDetailsPresenter = new IntelStatusDetailsPresenter(
+                IntelLastUpdatedText,
+                IntelOldestKillmailDayText,
+                IntelNewestKillmailDayText,
+                IntelCurrentUpdateStatusText,
+                IntelTotalProgressBar,
+                IntelTotalProgressText,
+                IntelCurrentDayProgressBar,
+                IntelCurrentDayProgressText,
+                IntelLiveFeedSourceText,
+                IntelLiveFeedStatusText,
+                IntelLiveFeedEnabledText,
+                IntelLiveFeedRecentImportsText,
+                IntelLiveFeedNextSequenceText,
+                IntelLiveFeedLastProcessedSequenceText,
+                IntelLiveFeedLastSuccessText,
+                IntelLiveFeedLastCaughtUpText,
+                IntelLiveFeedLastErrorText,
+                TodaysFreshnessStatusText,
+                TodaysFreshnessVisiblePilotsText,
+                TodaysFreshnessEntitiesQueriedText,
+                TodaysFreshnessResultsFoundText,
+                TodaysFreshnessKnownSkippedText,
+                TodaysFreshnessImportedText,
+                TodaysFreshnessFailedText,
+                TodaysFreshnessLastRunText,
+                TodaysFreshnessDetailText,
+                TodaysFreshnessLastErrorText,
+                RunTodaysFreshnessButton,
+                HistoricalFreshnessStatusText,
+                HistoricalFreshnessModeText,
+                HistoricalFreshnessVisiblePilotsText,
+                HistoricalFreshnessCandidatesConsideredText,
+                HistoricalFreshnessCandidatesSkippedCooldownText,
+                HistoricalFreshnessPilotsCheckedText,
+                HistoricalFreshnessDaysCheckedText,
+                HistoricalFreshnessEntitiesQueriedText,
+                HistoricalFreshnessResultsFoundText,
+                HistoricalFreshnessKnownSkippedText,
+                HistoricalFreshnessImportedText,
+                HistoricalFreshnessFailedText,
+                HistoricalFreshnessLastRunText,
+                HistoricalFreshnessDetailText,
+                HistoricalFreshnessLastErrorText,
+                RunHistoricalFreshnessButton);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
@@ -1483,344 +1529,8 @@ namespace PitmastersGrill
             {
                 return;
             }
-
-            if (IntelLastUpdatedText != null)
-            {
-                IntelLastUpdatedText.Text = FormatIntelTimestamp(snapshot.LastSuccessfulUpdateAtUtc, "No successful local intel update recorded yet.");
-            }
-
-            if (IntelOldestKillmailDayText != null)
-            {
-                IntelOldestKillmailDayText.Text = FormatIntelDay(snapshot.EarliestCompleteDayUtc, "No local killmail days recorded yet.");
-            }
-
-            if (IntelNewestKillmailDayText != null)
-            {
-                IntelNewestKillmailDayText.Text = FormatIntelDay(snapshot.LatestCompleteDayUtc, "No local killmail days recorded yet.");
-            }
-
-            if (IntelCurrentUpdateStatusText != null)
-            {
-                IntelCurrentUpdateStatusText.Text = BuildIntelCurrentUpdateStatusText(snapshot);
-            }
-
-            if (IntelTotalProgressBar != null)
-            {
-                IntelTotalProgressBar.IsIndeterminate = snapshot.TotalProgressIsIndeterminate;
-                IntelTotalProgressBar.Value = snapshot.TotalProgressIsIndeterminate
-                    ? 0
-                    : Math.Max(0, Math.Min(100, snapshot.TotalProgressPercent));
-            }
-
-            if (IntelTotalProgressText != null)
-            {
-                IntelTotalProgressText.Text = string.IsNullOrWhiteSpace(snapshot.TotalProgressText)
-                    ? "No update currently running."
-                    : snapshot.TotalProgressText;
-            }
-
-            if (IntelCurrentDayProgressBar != null)
-            {
-                IntelCurrentDayProgressBar.IsIndeterminate = snapshot.CurrentDayProgressIsIndeterminate;
-                IntelCurrentDayProgressBar.Value = snapshot.CurrentDayProgressIsIndeterminate
-                    ? 0
-                    : Math.Max(0, Math.Min(100, snapshot.CurrentDayProgressPercent));
-            }
-
-            if (IntelCurrentDayProgressText != null)
-            {
-                IntelCurrentDayProgressText.Text = string.IsNullOrWhiteSpace(snapshot.CurrentDayProgressText)
-                    ? "No update currently running."
-                    : snapshot.CurrentDayProgressText;
-            }
-
-            var liveFeed = snapshot.LiveFeed ?? new R2Z2LiveFeedSnapshot();
-
-            if (IntelLiveFeedSourceText != null)
-            {
-                IntelLiveFeedSourceText.Text = string.IsNullOrWhiteSpace(liveFeed.Source)
-                    ? "R2Z2"
-                    : liveFeed.Source;
-            }
-
-            if (IntelLiveFeedStatusText != null)
-            {
-                var statusText = string.IsNullOrWhiteSpace(liveFeed.Status)
-                    ? "Disabled"
-                    : liveFeed.Status;
-
-                var nextRetryText = FormatIntelTimestamp(liveFeed.NextRetryAtUtc, "");
-                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
-                    (statusText.Contains("wait", StringComparison.OrdinalIgnoreCase) ||
-                     statusText.Contains("backing off", StringComparison.OrdinalIgnoreCase)))
-                {
-                    statusText = $"{statusText} (retry {nextRetryText})";
-                }
-
-                IntelLiveFeedStatusText.Text = statusText;
-            }
-
-            if (IntelLiveFeedEnabledText != null)
-            {
-                IntelLiveFeedEnabledText.Text = liveFeed.Enabled ? "Yes" : "No";
-            }
-
-            if (IntelLiveFeedRecentImportsText != null)
-            {
-                IntelLiveFeedRecentImportsText.Text = liveFeed.RecentLiveImportsCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (IntelLiveFeedNextSequenceText != null)
-            {
-                IntelLiveFeedNextSequenceText.Text = liveFeed.NextSequenceId.HasValue
-                    ? liveFeed.NextSequenceId.Value.ToString(CultureInfo.InvariantCulture)
-                    : "Not initialized";
-            }
-
-            if (IntelLiveFeedLastProcessedSequenceText != null)
-            {
-                IntelLiveFeedLastProcessedSequenceText.Text = liveFeed.LastProcessedSequenceId.HasValue
-                    ? liveFeed.LastProcessedSequenceId.Value.ToString(CultureInfo.InvariantCulture)
-                    : "None";
-            }
-
-            if (IntelLiveFeedLastSuccessText != null)
-            {
-                IntelLiveFeedLastSuccessText.Text = FormatIntelTimestamp(
-                    liveFeed.LastSuccessAtUtc,
-                    "No live imports recorded yet.");
-            }
-
-            if (IntelLiveFeedLastCaughtUpText != null)
-            {
-                IntelLiveFeedLastCaughtUpText.Text = FormatIntelTimestamp(
-                    liveFeed.LastCaughtUpAtUtc,
-                    "No caught-up wait recorded yet.");
-            }
-
-            if (IntelLiveFeedLastErrorText != null)
-            {
-                var lastErrorTime = FormatIntelTimestamp(liveFeed.LastErrorAtUtc, "");
-                IntelLiveFeedLastErrorText.Text = string.IsNullOrWhiteSpace(liveFeed.LastError)
-                    ? "No live-feed errors recorded."
-                    : string.IsNullOrWhiteSpace(lastErrorTime)
-                        ? liveFeed.LastError
-                        : $"{lastErrorTime} - {liveFeed.LastError}";
-            }
-
-            var todaysFreshness = snapshot.TodaysFreshness ?? new TodaysFreshnessSnapshot();
-            if (TodaysFreshnessStatusText != null)
-            {
-                var statusText = string.IsNullOrWhiteSpace(todaysFreshness.Status)
-                    ? "Idle"
-                    : todaysFreshness.Status;
-
-                var nextRetryText = FormatIntelTimestamp(todaysFreshness.NextRetryAtUtc, "");
-                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
-                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
-                {
-                    statusText = $"{statusText} (retry {nextRetryText})";
-                }
-
-                TodaysFreshnessStatusText.Text = statusText;
-            }
-
-            if (TodaysFreshnessVisiblePilotsText != null)
-            {
-                TodaysFreshnessVisiblePilotsText.Text = todaysFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessEntitiesQueriedText != null)
-            {
-                TodaysFreshnessEntitiesQueriedText.Text = todaysFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessResultsFoundText != null)
-            {
-                TodaysFreshnessResultsFoundText.Text = todaysFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessKnownSkippedText != null)
-            {
-                TodaysFreshnessKnownSkippedText.Text = todaysFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessImportedText != null)
-            {
-                TodaysFreshnessImportedText.Text = todaysFreshness.NewKillmailsImported.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessFailedText != null)
-            {
-                TodaysFreshnessFailedText.Text = todaysFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessLastRunText != null)
-            {
-                TodaysFreshnessLastRunText.Text = FormatIntelTimestamp(
-                    todaysFreshness.LastRunAtUtc,
-                    "No Today's Freshness run recorded yet.");
-            }
-
-            if (TodaysFreshnessDetailText != null)
-            {
-                TodaysFreshnessDetailText.Text = string.IsNullOrWhiteSpace(todaysFreshness.DetailText)
-                    ? "Today's Freshness is idle."
-                    : todaysFreshness.DetailText;
-            }
-
-            if (TodaysFreshnessLastErrorText != null)
-            {
-                TodaysFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(todaysFreshness.LastError)
-                    ? "No Today's Freshness errors recorded."
-                    : todaysFreshness.LastError;
-            }
-
-            var historicalFreshness = snapshot.HistoricalFreshness ?? new HistoricalFreshnessSnapshot();
-
-            if (RunTodaysFreshnessButton != null)
-            {
-                var isRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                var historicalIsRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                          string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                RunTodaysFreshnessButton.IsEnabled = !isRunning && !historicalIsRunning && !_isShuttingDown;
-                RunTodaysFreshnessButton.Content = isRunning
-                    ? "Today's Freshness Running..."
-                    : historicalIsRunning
-                        ? "Historical Freshness Running..."
-                    : "Refresh Today's zKill Intel";
-            }
-
-            if (HistoricalFreshnessStatusText != null)
-            {
-                var statusText = string.IsNullOrWhiteSpace(historicalFreshness.Status)
-                    ? "Idle"
-                    : historicalFreshness.Status;
-
-                var nextRetryText = FormatIntelTimestamp(historicalFreshness.NextRetryAtUtc, "");
-                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
-                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
-                {
-                    statusText = $"{statusText} (retry {nextRetryText})";
-                }
-
-                HistoricalFreshnessStatusText.Text = statusText;
-            }
-
-            if (HistoricalFreshnessModeText != null)
-            {
-                HistoricalFreshnessModeText.Text = string.IsNullOrWhiteSpace(historicalFreshness.Mode)
-                    ? "Not run yet"
-                    : historicalFreshness.Mode;
-            }
-
-            if (HistoricalFreshnessVisiblePilotsText != null)
-            {
-                HistoricalFreshnessVisiblePilotsText.Text = historicalFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessCandidatesConsideredText != null)
-            {
-                HistoricalFreshnessCandidatesConsideredText.Text = historicalFreshness.CandidatePilotsConsidered.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessCandidatesSkippedCooldownText != null)
-            {
-                HistoricalFreshnessCandidatesSkippedCooldownText.Text = historicalFreshness.CandidatePilotsSkippedCooldown.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessPilotsCheckedText != null)
-            {
-                HistoricalFreshnessPilotsCheckedText.Text = historicalFreshness.PilotsChecked.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessDaysCheckedText != null)
-            {
-                HistoricalFreshnessDaysCheckedText.Text = historicalFreshness.HistoricalDaysChecked.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessEntitiesQueriedText != null)
-            {
-                HistoricalFreshnessEntitiesQueriedText.Text = historicalFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessResultsFoundText != null)
-            {
-                HistoricalFreshnessResultsFoundText.Text = historicalFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessKnownSkippedText != null)
-            {
-                HistoricalFreshnessKnownSkippedText.Text = historicalFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessImportedText != null)
-            {
-                HistoricalFreshnessImportedText.Text = historicalFreshness.MissingImportedCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessFailedText != null)
-            {
-                HistoricalFreshnessFailedText.Text = historicalFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessLastRunText != null)
-            {
-                HistoricalFreshnessLastRunText.Text = FormatIntelTimestamp(
-                    historicalFreshness.LastRunAtUtc,
-                    "No Historical Freshness run recorded yet.");
-            }
-
-            if (HistoricalFreshnessDetailText != null)
-            {
-                HistoricalFreshnessDetailText.Text = string.IsNullOrWhiteSpace(historicalFreshness.DetailText)
-                    ? "Historical Freshness is idle."
-                    : historicalFreshness.DetailText;
-            }
-
-            if (HistoricalFreshnessLastErrorText != null)
-            {
-                HistoricalFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(historicalFreshness.LastError)
-                    ? "No Historical Freshness errors recorded."
-                    : historicalFreshness.LastError;
-            }
-
-            if (RunHistoricalFreshnessButton != null)
-            {
-                var isRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                var todaysIsRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                      string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                RunHistoricalFreshnessButton.IsEnabled = !isRunning && !todaysIsRunning && !_isShuttingDown;
-                RunHistoricalFreshnessButton.Content = isRunning
-                    ? "Historical Freshness Running..."
-                    : todaysIsRunning
-                        ? "Today's Freshness Running..."
-                    : "Repair Recent Historical Intel";
-            }
-        }
-
-        private static string BuildIntelCurrentUpdateStatusText(IntelUpdateStatusSnapshot snapshot)
-        {
-            return PublicDataStatusTextBuilder.BuildIntelCurrentUpdateStatusText(snapshot);
-        }
-
-        private static string FormatIntelTimestamp(string value, string emptyText)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return emptyText;
-            }
-
-            return DateTime.TryParse(value, out var parsed)
-                ? parsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
-                : value;
-        }
-
-        private static string FormatIntelDay(string value, string emptyText)
-        {
-            return string.IsNullOrWhiteSpace(value) ? emptyText : value;
+            var projection = IntelStatusDetailsProjection.Create(snapshot, _isShuttingDown);
+            _intelStatusDetailsPresenter.Apply(projection);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
