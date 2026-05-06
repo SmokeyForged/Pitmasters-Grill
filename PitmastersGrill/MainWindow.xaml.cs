@@ -87,6 +87,7 @@ namespace PitmastersGrill
         private readonly MainWindowDiagnostics _diagnostics;
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
         private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
+        private readonly IntelActionsController _intelActionsController = null!;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -287,6 +288,17 @@ namespace PitmastersGrill
                 this,
                 DiagnosticsStatusText,
                 _browserLauncher);
+            _intelActionsController = new IntelActionsController(
+                this,
+                _backgroundIntelUpdateService,
+                _settingsTabController,
+                () => _appSettings,
+                () => _mainWindowAppearanceController.SaveSettings(_appSettings),
+                () => _isApplyingSettings,
+                () => _isShuttingDown,
+                _windowShutdownCts.Token,
+                () => _currentRows.ToList(),
+                RefreshCurrentBoardRowsFromLocalIntelAsync);
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -2655,34 +2667,8 @@ namespace PitmastersGrill
 
         private async void EnableLiveZkillFeedCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
             var enabled = EnableLiveZkillFeedCheckBox.IsChecked == true;
-            _settingsTabController.SetLiveZkillFeedEnabled(_appSettings, enabled);
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Live zKill feed setting changed. enabled={enabled}");
-
-            try
-            {
-                await _backgroundIntelUpdateService.SetLiveFeedEnabledAsync(enabled, _windowShutdownCts.Token);
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Live zKill feed toggle cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Live zKill feed toggle failed.", ex);
-
-                MessageBox.Show(
-                    $"Failed to update the live zKill feed setting.\n\n{ex.Message}",
-                    "PMG Live Feed Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            await _intelActionsController.HandleLiveFeedToggleAsync(enabled);
         }
 
         private void BackgroundHistoricalRepairEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -2700,128 +2686,17 @@ namespace PitmastersGrill
 
         private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
-            if (visibleCharacterIds.Count == 0)
-            {
-                MessageBox.Show(
-                    "Today's Freshness needs at least one visible Grill pilot with a resolved character ID.",
-                    "PMG Today's Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            try
-            {
-                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
-                var result = await _backgroundIntelUpdateService.RunTodaysFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
-
-                if (!result.Success &&
-                    string.Equals(result.LastError, "Another freshness operation is already running.", StringComparison.Ordinal))
-                {
-                    MessageBox.Show(
-                        "Another freshness operation is already running.",
-                        "PMG Today's Freshness",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                if (!_isShuttingDown && result.NewKillmailsImported > 0)
-                {
-                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Today's Freshness");
-                }
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Today's Freshness cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Today's Freshness failed from the Intel UI.", ex);
-
-                MessageBox.Show(
-                    $"Today's Freshness failed.\n\n{ex.Message}",
-                    "PMG Today's Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            await _intelActionsController.RunTodaysFreshnessAsync();
         }
 
         private async void RunHistoricalFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
-            if (visibleCharacterIds.Count == 0)
-            {
-                MessageBox.Show(
-                    "Historical Freshness needs at least one visible Grill pilot with a resolved character ID.",
-                    "PMG Historical Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            try
-            {
-                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
-                var result = await _backgroundIntelUpdateService.RunHistoricalFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
-
-                if (!result.Success &&
-                    string.Equals(result.LastError, "Another freshness operation is already running.", StringComparison.Ordinal))
-                {
-                    MessageBox.Show(
-                        "Another freshness operation is already running.",
-                        "PMG Historical Freshness",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                if (!result.Success &&
-                    string.Equals(result.LastError, "Historical Freshness already running.", StringComparison.Ordinal))
-                {
-                    MessageBox.Show(
-                        "Historical Freshness is already running.",
-                        "PMG Historical Freshness",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                if (!_isShuttingDown && result.MissingImportedCount > 0)
-                {
-                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Historical Freshness");
-                }
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Historical Freshness cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Historical Freshness failed from the Intel UI.", ex);
-
-                MessageBox.Show(
-                    $"Historical Freshness failed.\n\n{ex.Message}",
-                    "PMG Historical Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            await _intelActionsController.RunHistoricalFreshnessAsync();
         }
 
         public List<long> GetVisibleCharacterIdsForBackgroundHistoricalRepair()
         {
-            return GetVisibleCharacterIdsForTodaysFreshness();
-        }
-
-        private List<long> GetVisibleCharacterIdsForTodaysFreshness()
-        {
-            return _currentRows
-                .Select(row => row.CharacterId)
-                .Where(characterId => long.TryParse(characterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
-                .Select(characterId => long.Parse(characterId!, CultureInfo.InvariantCulture))
-                .Distinct()
-                .ToList();
+            return _intelActionsController.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
         }
 
         private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)

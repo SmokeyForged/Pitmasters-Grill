@@ -63,7 +63,7 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains("Backing off (retry ", projection.LiveFeedStatusText);
             Assert.Contains("2026-05-06", projection.LiveFeedStatusText);
             Assert.Contains("rate limited (retry ", projection.TodaysFreshnessStatusText);
-            Assert.Contains("rate limited (retry ", projection.HistoricalFreshnessStatusText);
+            Assert.Contains("Rate limited (retry ", projection.HistoricalFreshnessStatusText);
             Assert.Contains("HTTP 429", projection.LiveFeedLastErrorText);
             Assert.Contains("2026-05-06", projection.LiveFeedLastErrorText);
         }
