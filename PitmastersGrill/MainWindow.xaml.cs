@@ -88,6 +88,7 @@ namespace PitmastersGrill
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
         private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
         private readonly IntelActionsController _intelActionsController = null!;
+        private readonly IntelMaintenanceActionsController _intelMaintenanceActionsController = null!;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -299,6 +300,19 @@ namespace PitmastersGrill
                 _windowShutdownCts.Token,
                 () => _currentRows.ToList(),
                 RefreshCurrentBoardRowsFromLocalIntelAsync);
+            _intelMaintenanceActionsController = new IntelMaintenanceActionsController(
+                () => _boardPopulationEntryController.IsClipboardProcessing,
+                SetDiagnosticsStatus,
+                enabled => RebuildKillmailDerivedIntelButton.IsEnabled = enabled,
+                enabled => EnableKillmailDbPullButton.IsEnabled = enabled,
+                () => _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings),
+                () => _isShuttingDown,
+                _windowShutdownCts.Token,
+                cancellationToken => _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(cancellationToken),
+                (seedDays, cancellationToken) => _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, cancellationToken),
+                RefreshCacheStatsUi,
+                RefreshConfirmedCynoModuleStateForCurrentRows,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image));
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -2408,7 +2422,7 @@ namespace PitmastersGrill
 
         private async void EnableKillmailDbPullButton_Click(object sender, RoutedEventArgs e)
         {
-            await RunEnableKillmailDbPullAsync();
+            await _intelMaintenanceActionsController.RunEnableKillmailDbPullAsync();
         }
 
 
@@ -2509,62 +2523,7 @@ namespace PitmastersGrill
 
         private async void RebuildKillmailDerivedIntelButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_boardPopulationEntryController.IsClipboardProcessing)
-            {
-                SetDiagnosticsStatus("Derived intel rebuild blocked while a lookup is active.");
-                MessageBox.Show(
-                    "A board lookup is currently running. Let it finish before rebuilding derived killmail intel.",
-                    "PMG Killmail Derived Intel",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            var confirm = MessageBox.Show(
-                "Rebuild killmail derived intel from local extracted killmail archives?\n\nThis only rebuilds derived confirmed cyno-module and industrial-cyno bait observations. It does not clear notes, settings, themes, ignore lists, manual overrides, or unrelated cache data.",
-                "PMG Killmail Derived Intel",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (confirm != MessageBoxResult.Yes)
-            {
-                SetDiagnosticsStatus("Derived intel rebuild cancelled.");
-                return;
-            }
-
-            try
-            {
-                RebuildKillmailDerivedIntelButton.IsEnabled = false;
-                SetDiagnosticsStatus("Rebuilding killmail derived intel...");
-                var result = await _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(_windowShutdownCts.Token);
-                RefreshCacheStatsUi();
-                RefreshConfirmedCynoModuleStateForCurrentRows();
-
-                SetDiagnosticsStatus(result.Message);
-                MessageBox.Show(
-                    result.Message,
-                    result.NoLocalSourceAvailable ? "PMG Killmail Derived Intel Source Missing" : "PMG Killmail Derived Intel",
-                    MessageBoxButton.OK,
-                    result.NoLocalSourceAvailable ? MessageBoxImage.Information : MessageBoxImage.None);
-            }
-            catch (OperationCanceledException)
-            {
-                SetDiagnosticsStatus("Derived intel rebuild cancelled.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.DatabaseError("Killmail derived intel rebuild failed.", ex);
-                SetDiagnosticsStatus("Derived intel rebuild failed.");
-                MessageBox.Show(
-                    $"Failed to rebuild killmail derived intel.\n\n{ex.Message}",
-                    "PMG Killmail Derived Intel Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            finally
-            {
-                RebuildKillmailDerivedIntelButton.IsEnabled = true;
-            }
+            await _intelMaintenanceActionsController.RunRebuildKillmailDerivedIntelAsync();
         }
 
         private void RunCacheMaintenanceAction(string title, bool requiresConfirmation, Action action)
@@ -4087,45 +4046,6 @@ namespace PitmastersGrill
         {
             return _windowLayoutController.BuildVirtualDesktopSummary(GetMonitorWorkAreasDip());
         }
-
-        private async Task RunEnableKillmailDbPullAsync()
-        {
-            try
-            {
-                EnableKillmailDbPullButton.IsEnabled = false;
-
-                var seedDays = _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings);
-
-                AppLogger.UiInfo(
-                    $"Enable KillMail DB Pull requested. seedDays={seedDays} displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
-
-                await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, _windowShutdownCts.Token);
-
-                AppLogger.UiInfo($"Enable KillMail DB Pull completed successfully. seedDays={seedDays}");
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Enable KillMail DB Pull cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Enable KillMail DB Pull failed.", ex);
-
-                MessageBox.Show(
-                    $"Failed to enable killmail DB pull.\n\n{ex.Message}",
-                    "PMG Killmail DB Pull Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            finally
-            {
-                if (!_isShuttingDown)
-                {
-                    EnableKillmailDbPullButton.IsEnabled = true;
-                }
-            }
-        }
-
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool AddClipboardFormatListener(IntPtr hwnd);
