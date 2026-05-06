@@ -89,6 +89,9 @@ namespace PitmastersGrill
         private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
         private readonly IntelActionsController _intelActionsController = null!;
         private readonly IntelMaintenanceActionsController _intelMaintenanceActionsController = null!;
+        private readonly ProviderHealthPresenter _providerHealthPresenter;
+        private readonly DiagnosticsCacheStatsPresenter _diagnosticsCacheStatsPresenter;
+        private readonly DiagnosticsCacheMaintenanceController _diagnosticsCacheMaintenanceController = null!;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -179,6 +182,8 @@ namespace PitmastersGrill
             };
             _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
+            _providerHealthPresenter = new ProviderHealthPresenter();
+            _diagnosticsCacheStatsPresenter = new DiagnosticsCacheStatsPresenter();
             _intelStatusDetailsPresenter = new IntelStatusDetailsPresenter(
                 IntelLastUpdatedText,
                 IntelOldestKillmailDayText,
@@ -313,6 +318,18 @@ namespace PitmastersGrill
                 RefreshCacheStatsUi,
                 RefreshConfirmedCynoModuleStateForCurrentRows,
                 (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image));
+            _diagnosticsCacheMaintenanceController = new DiagnosticsCacheMaintenanceController(
+                () => _boardPopulationEntryController.IsClipboardProcessing,
+                SetDiagnosticsStatus,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
+                () => DiagnosticTelemetry.GetProviderHealthSnapshots(),
+                snapshots => _providerHealthPresenter.ApplySnapshots(_providerHealthRows, snapshots),
+                () => _cacheMaintenanceService.GetStats(),
+                () => _cacheMaintenanceService.ClearExpired(),
+                () => _cacheMaintenanceService.Vacuum(),
+                () => _cacheMaintenanceService.ClearAll(),
+                _diagnosticsCacheStatsPresenter,
+                text => CacheStatsText.Text = text);
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -2458,67 +2475,32 @@ namespace PitmastersGrill
 
         private void RefreshProviderHealthButton_Click(object sender, RoutedEventArgs e)
         {
-            RefreshProviderHealthUi();
-            SetDiagnosticsStatus("Provider health refreshed.");
+            _diagnosticsCacheMaintenanceController.RefreshProviderHealth();
         }
 
         private void RefreshProviderHealthUi()
         {
-            if (ProviderHealthGrid == null)
-            {
-                return;
-            }
-
-            _providerHealthRows.Clear();
-            foreach (var snapshot in DiagnosticTelemetry.GetProviderHealthSnapshots())
-            {
-                _providerHealthRows.Add(snapshot);
-            }
+            _diagnosticsCacheMaintenanceController.RefreshProviderHealthUi();
         }
 
         private void RefreshCacheStatsButton_Click(object sender, RoutedEventArgs e)
         {
-            RefreshCacheStatsUi();
-            SetDiagnosticsStatus("Cache stats refreshed.");
+            _diagnosticsCacheMaintenanceController.RefreshCacheStats();
         }
 
         private void ClearExpiredCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            RunCacheMaintenanceAction(
-                "Clear expired cache",
-                requiresConfirmation: true,
-                action: () =>
-                {
-                    var removed = _cacheMaintenanceService.ClearExpired();
-                    SetDiagnosticsStatus($"Expired cache cleanup removed {removed:N0} rows.");
-                    AppLogger.DatabaseInfo($"Cache maintenance UI cleared expired rows. removedRows={removed}");
-                });
+            _diagnosticsCacheMaintenanceController.ClearExpiredCache();
         }
 
         private void VacuumCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            RunCacheMaintenanceAction(
-                "Compact cache database",
-                requiresConfirmation: true,
-                action: () =>
-                {
-                    _cacheMaintenanceService.Vacuum();
-                    SetDiagnosticsStatus("Cache database compacted.");
-                    AppLogger.DatabaseInfo("Cache maintenance UI compacted SQLite database.");
-                });
+            _diagnosticsCacheMaintenanceController.VacuumCache();
         }
 
         private void ClearAllCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            RunCacheMaintenanceAction(
-                "Clear all resolver/stat cache rows",
-                requiresConfirmation: true,
-                action: () =>
-                {
-                    var removed = _cacheMaintenanceService.ClearAll();
-                    SetDiagnosticsStatus($"All resolver/stat cache cleanup removed {removed:N0} rows.");
-                    AppLogger.DatabaseWarn($"Cache maintenance UI cleared all resolver/stat cache rows. removedRows={removed}");
-                });
+            _diagnosticsCacheMaintenanceController.ClearAllCache();
         }
 
         private async void RebuildKillmailDerivedIntelButton_Click(object sender, RoutedEventArgs e)
@@ -2526,67 +2508,9 @@ namespace PitmastersGrill
             await _intelMaintenanceActionsController.RunRebuildKillmailDerivedIntelAsync();
         }
 
-        private void RunCacheMaintenanceAction(string title, bool requiresConfirmation, Action action)
-        {
-            if (_boardPopulationEntryController.IsClipboardProcessing)
-            {
-                SetDiagnosticsStatus("Cache maintenance blocked while a lookup is active.");
-                MessageBox.Show(
-                    "A board lookup is currently running. Let it finish before changing the local cache.",
-                    "PMG Cache Maintenance",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            if (requiresConfirmation)
-            {
-                var result = MessageBox.Show(
-                    $"{title}?\n\nThis only affects PMG local cache tables and does not delete unrelated files.",
-                    "PMG Cache Maintenance",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-
-                if (result != MessageBoxResult.Yes)
-                {
-                    SetDiagnosticsStatus("Cache maintenance cancelled.");
-                    return;
-                }
-            }
-
-            try
-            {
-                action();
-                RefreshCacheStatsUi();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.DatabaseError($"Cache maintenance failed. action='{title}'", ex);
-                SetDiagnosticsStatus("Cache maintenance failed.");
-                MessageBox.Show(
-                    $"Cache maintenance failed.\n\n{ex.Message}",
-                    "PMG Cache Maintenance Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
         private void RefreshCacheStatsUi()
         {
-            if (CacheStatsText == null)
-            {
-                return;
-            }
-
-            try
-            {
-                CacheStatsText.Text = CacheMaintenanceService.FormatStats(_cacheMaintenanceService.GetStats());
-            }
-            catch (Exception ex)
-            {
-                AppLogger.DatabaseError("Cache stats refresh failed.", ex);
-                CacheStatsText.Text = $"Cache stats failed: {ex.Message}";
-            }
+            _diagnosticsCacheMaintenanceController.RefreshCacheStatsUi();
         }
 
 
