@@ -155,6 +155,7 @@ namespace PitmastersGrill
             InitializeComponent();
             AppLogger.UiInfo("MainWindow InitializeComponent end.");
             WireDiagnosticsSupportView();
+            WireIntelSupportView();
             RegisterCompactBoardDragHandlers();
             Loaded += MainWindow_Loaded;
 
@@ -186,50 +187,50 @@ namespace PitmastersGrill
             _providerHealthPresenter = new ProviderHealthPresenter();
             _diagnosticsCacheStatsPresenter = new DiagnosticsCacheStatsPresenter();
             _intelStatusDetailsPresenter = new IntelStatusDetailsPresenter(
-                IntelLastUpdatedText,
-                IntelOldestKillmailDayText,
-                IntelNewestKillmailDayText,
-                IntelCurrentUpdateStatusText,
-                IntelTotalProgressBar,
-                IntelTotalProgressText,
-                IntelCurrentDayProgressBar,
-                IntelCurrentDayProgressText,
-                IntelLiveFeedSourceText,
-                IntelLiveFeedStatusText,
-                IntelLiveFeedEnabledText,
-                IntelLiveFeedRecentImportsText,
-                IntelLiveFeedNextSequenceText,
-                IntelLiveFeedLastProcessedSequenceText,
-                IntelLiveFeedLastSuccessText,
-                IntelLiveFeedLastCaughtUpText,
-                IntelLiveFeedLastErrorText,
-                TodaysFreshnessStatusText,
-                TodaysFreshnessVisiblePilotsText,
-                TodaysFreshnessEntitiesQueriedText,
-                TodaysFreshnessResultsFoundText,
-                TodaysFreshnessKnownSkippedText,
-                TodaysFreshnessImportedText,
-                TodaysFreshnessFailedText,
-                TodaysFreshnessLastRunText,
-                TodaysFreshnessDetailText,
-                TodaysFreshnessLastErrorText,
-                RunTodaysFreshnessButton,
-                HistoricalFreshnessStatusText,
-                HistoricalFreshnessModeText,
-                HistoricalFreshnessVisiblePilotsText,
-                HistoricalFreshnessCandidatesConsideredText,
-                HistoricalFreshnessCandidatesSkippedCooldownText,
-                HistoricalFreshnessPilotsCheckedText,
-                HistoricalFreshnessDaysCheckedText,
-                HistoricalFreshnessEntitiesQueriedText,
-                HistoricalFreshnessResultsFoundText,
-                HistoricalFreshnessKnownSkippedText,
-                HistoricalFreshnessImportedText,
-                HistoricalFreshnessFailedText,
-                HistoricalFreshnessLastRunText,
-                HistoricalFreshnessDetailText,
-                HistoricalFreshnessLastErrorText,
-                RunHistoricalFreshnessButton);
+                IntelSupportViewControl.IntelLastUpdatedTextBlock,
+                IntelSupportViewControl.IntelOldestKillmailDayTextBlock,
+                IntelSupportViewControl.IntelNewestKillmailDayTextBlock,
+                IntelSupportViewControl.IntelCurrentUpdateStatusTextBlock,
+                IntelSupportViewControl.IntelTotalProgressBarControl,
+                IntelSupportViewControl.IntelTotalProgressTextBlock,
+                IntelSupportViewControl.IntelCurrentDayProgressBarControl,
+                IntelSupportViewControl.IntelCurrentDayProgressTextBlock,
+                IntelSupportViewControl.IntelLiveFeedSourceTextBlock,
+                IntelSupportViewControl.IntelLiveFeedStatusTextBlock,
+                IntelSupportViewControl.IntelLiveFeedEnabledTextBlock,
+                IntelSupportViewControl.IntelLiveFeedRecentImportsTextBlock,
+                IntelSupportViewControl.IntelLiveFeedNextSequenceTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastProcessedSequenceTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastSuccessTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastCaughtUpTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastErrorTextBlock,
+                IntelSupportViewControl.TodaysFreshnessStatusTextBlock,
+                IntelSupportViewControl.TodaysFreshnessVisiblePilotsTextBlock,
+                IntelSupportViewControl.TodaysFreshnessEntitiesQueriedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessResultsFoundTextBlock,
+                IntelSupportViewControl.TodaysFreshnessKnownSkippedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessImportedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessFailedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessLastRunTextBlock,
+                IntelSupportViewControl.TodaysFreshnessDetailTextBlock,
+                IntelSupportViewControl.TodaysFreshnessLastErrorTextBlock,
+                IntelSupportViewControl.RunTodaysFreshnessButtonControl,
+                IntelSupportViewControl.HistoricalFreshnessStatusTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessModeTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessVisiblePilotsTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessCandidatesConsideredTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessCandidatesSkippedCooldownTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessPilotsCheckedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessDaysCheckedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessEntitiesQueriedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessResultsFoundTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessKnownSkippedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessImportedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessFailedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessLastRunTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessDetailTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessLastErrorTextBlock,
+                IntelSupportViewControl.RunHistoricalFreshnessButtonControl);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
@@ -310,7 +311,7 @@ namespace PitmastersGrill
                 () => _boardPopulationEntryController.IsClipboardProcessing,
                 SetDiagnosticsStatus,
                 enabled => DiagnosticsSupportViewControl.SetRebuildKillmailDerivedIntelEnabled(enabled),
-                enabled => EnableKillmailDbPullButton.IsEnabled = enabled,
+                enabled => IntelSupportViewControl.EnableKillmailDbPullButtonControl.IsEnabled = enabled,
                 () => _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings),
                 () => _isShuttingDown,
                 _windowShutdownCts.Token,
@@ -342,19 +343,19 @@ namespace PitmastersGrill
                 PanelModeRestartNoticeText,
                 WindowOpacitySlider,
                 WindowOpacityValueText,
-                MaxKillmailAgeDaysTextBox,
-                EffectiveMaxKillmailAgeText,
-                KillmailDataRootPathTextBox,
-                KillmailDataPathModeText,
-                EffectiveKillmailDataPathText,
+                IntelSupportViewControl.MaxKillmailAgeDaysTextBoxControl,
+                IntelSupportViewControl.EffectiveMaxKillmailAgeTextBlock,
+                IntelSupportViewControl.KillmailDataRootPathTextBoxControl,
+                IntelSupportViewControl.KillmailDataPathModeTextBlock,
+                IntelSupportViewControl.EffectiveKillmailDataPathTextBlock,
                 VisualThemeComboBox,
                 ColorBlindModeComboBox,
                 DiagnosticsSupportViewControl.LogLevelComboBoxControl);
             _settingsTabController.ApplySettingsToControls(
                 _appSettings,
-                EnableLiveZkillFeedCheckBox,
-                BackgroundHistoricalRepairEnabledCheckBox,
-                PilotDetailPlacementComboBox);
+                IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl,
+                IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl,
+                IntelSupportViewControl.PilotDetailPlacementComboBoxControl);
 
             InitializeBoardColumnLayoutUi();
             InitializeBoardColumnVisibilityUi();
@@ -900,6 +901,20 @@ namespace PitmastersGrill
             DiagnosticsSupportViewControl.RebuildKillmailDerivedIntelRequested += RebuildKillmailDerivedIntelButton_Click;
         }
 
+        private void WireIntelSupportView()
+        {
+            IntelSupportViewControl.SaveMaxKillmailAgeRequested += SaveMaxKillmailAgeButton_Click;
+            IntelSupportViewControl.UseDefaultMaxKillmailAgeRequested += UseDefaultMaxKillmailAgeButton_Click;
+            IntelSupportViewControl.EnableKillmailDbPullRequested += EnableKillmailDbPullButton_Click;
+            IntelSupportViewControl.EnableLiveZkillFeedToggled += EnableLiveZkillFeedCheckBox_Checked;
+            IntelSupportViewControl.BackgroundHistoricalRepairToggled += BackgroundHistoricalRepairEnabledCheckBox_Checked;
+            IntelSupportViewControl.PilotDetailPlacementSelectionChanged += PilotDetailPlacementComboBox_SelectionChanged;
+            IntelSupportViewControl.SaveKillmailPathRequested += SaveKillmailPathButton_Click;
+            IntelSupportViewControl.UseDefaultKillmailPathRequested += UseDefaultKillmailPathButton_Click;
+            IntelSupportViewControl.RunTodaysFreshnessRequested += RunTodaysFreshnessButton_Click;
+            IntelSupportViewControl.RunHistoricalFreshnessRequested += RunHistoricalFreshnessButton_Click;
+        }
+
         private void VisualThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isApplyingSettings || VisualThemeComboBox == null)
@@ -935,12 +950,14 @@ namespace PitmastersGrill
 
         private void PilotDetailPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || PilotDetailPlacementComboBox == null)
+            if (_isApplyingSettings || IntelSupportViewControl == null)
             {
                 return;
             }
 
-            _settingsTabController.SetPilotDetailPlacementPreference(_appSettings, PilotDetailPlacementComboBox.SelectedIndex);
+            _settingsTabController.SetPilotDetailPlacementPreference(
+                _appSettings,
+                IntelSupportViewControl.PilotDetailPlacementComboBoxControl.SelectedIndex);
 
             _mainWindowAppearanceController.SaveSettings(_appSettings);
             AppLogger.UiInfo($"Pilot detail placement preference changed. preference={_appSettings.PilotDetailPlacementPreference}");
@@ -1556,9 +1573,9 @@ namespace PitmastersGrill
         {
             _intelUpdateBannerController.HandleStatusChanged(
                 snapshot,
-                IntelUpdateBanner,
-                IntelUpdateStatusText,
-                IntelUpdateDetailText);
+                IntelSupportViewControl.IntelUpdateBannerControl,
+                IntelSupportViewControl.IntelUpdateStatusTextBlock,
+                IntelSupportViewControl.IntelUpdateDetailTextBlock);
 
             if (Dispatcher.CheckAccess())
             {
@@ -1574,9 +1591,9 @@ namespace PitmastersGrill
         {
             _intelUpdateBannerController.ApplySnapshot(
                 snapshot,
-                IntelUpdateBanner,
-                IntelUpdateStatusText,
-                IntelUpdateDetailText);
+                IntelSupportViewControl.IntelUpdateBannerControl,
+                IntelSupportViewControl.IntelUpdateStatusTextBlock,
+                IntelSupportViewControl.IntelUpdateDetailTextBlock);
 
             ApplyIntelStatusDetails(snapshot);
         }
@@ -1766,7 +1783,7 @@ namespace PitmastersGrill
                 clipboardGetText: () => Clipboard.GetText(),
                 setBoardButtonsEnabled: enabled =>
                 {
-                    EnableKillmailDbPullButton.IsEnabled = enabled;
+                    IntelSupportViewControl.EnableKillmailDbPullButtonControl.IsEnabled = enabled;
                     ClearBoardButton.IsEnabled = enabled;
                 },
                 beginForegroundPriority: () => _backgroundIntelUpdateService.BeginForegroundPriority(),
@@ -2533,39 +2550,39 @@ namespace PitmastersGrill
         {
             _mainWindowAppearanceController.SaveMaxKillmailAge(
                 _appSettings,
-                MaxKillmailAgeDaysTextBox,
-                EffectiveMaxKillmailAgeText);
+                IntelSupportViewControl.MaxKillmailAgeDaysTextBoxControl,
+                IntelSupportViewControl.EffectiveMaxKillmailAgeTextBlock);
         }
 
         private void UseDefaultMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
         {
             _mainWindowAppearanceController.ResetMaxKillmailAgeToDefault(
                 _appSettings,
-                MaxKillmailAgeDaysTextBox,
-                EffectiveMaxKillmailAgeText);
+                IntelSupportViewControl.MaxKillmailAgeDaysTextBoxControl,
+                IntelSupportViewControl.EffectiveMaxKillmailAgeTextBlock);
         }
 
         private void SaveKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
             _mainWindowAppearanceController.SaveKillmailPath(
                 _appSettings,
-                KillmailDataRootPathTextBox,
-                KillmailDataPathModeText,
-                EffectiveKillmailDataPathText);
+                IntelSupportViewControl.KillmailDataRootPathTextBoxControl,
+                IntelSupportViewControl.KillmailDataPathModeTextBlock,
+                IntelSupportViewControl.EffectiveKillmailDataPathTextBlock);
         }
 
         private void UseDefaultKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
             _mainWindowAppearanceController.ResetKillmailPathToDefault(
                 _appSettings,
-                KillmailDataRootPathTextBox,
-                KillmailDataPathModeText,
-                EffectiveKillmailDataPathText);
+                IntelSupportViewControl.KillmailDataRootPathTextBoxControl,
+                IntelSupportViewControl.KillmailDataPathModeTextBlock,
+                IntelSupportViewControl.EffectiveKillmailDataPathTextBlock);
         }
 
         private async void EnableLiveZkillFeedCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            var enabled = EnableLiveZkillFeedCheckBox.IsChecked == true;
+            var enabled = IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl.IsChecked == true;
             await _intelActionsController.HandleLiveFeedToggleAsync(enabled);
         }
 
@@ -2576,7 +2593,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            var enabled = BackgroundHistoricalRepairEnabledCheckBox.IsChecked == true;
+            var enabled = IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl.IsChecked == true;
             _settingsTabController.SetBackgroundHistoricalRepairEnabled(_appSettings, enabled);
             _mainWindowAppearanceController.SaveSettings(_appSettings);
             AppLogger.UiInfo($"Background historical repair setting changed. enabled={enabled}");
