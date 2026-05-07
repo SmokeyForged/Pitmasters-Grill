@@ -154,6 +154,7 @@ namespace PitmastersGrill
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
             InitializeComponent();
             AppLogger.UiInfo("MainWindow InitializeComponent end.");
+            WireDiagnosticsSupportView();
             RegisterCompactBoardDragHandlers();
             Loaded += MainWindow_Loaded;
 
@@ -292,7 +293,7 @@ namespace PitmastersGrill
                 () => _isShuttingDown);
             _diagnosticsActionController = new DiagnosticsActionController(
                 this,
-                DiagnosticsStatusText,
+                DiagnosticsSupportViewControl.DiagnosticsStatusTextBlock,
                 _browserLauncher);
             _intelActionsController = new IntelActionsController(
                 this,
@@ -308,7 +309,7 @@ namespace PitmastersGrill
             _intelMaintenanceActionsController = new IntelMaintenanceActionsController(
                 () => _boardPopulationEntryController.IsClipboardProcessing,
                 SetDiagnosticsStatus,
-                enabled => RebuildKillmailDerivedIntelButton.IsEnabled = enabled,
+                enabled => DiagnosticsSupportViewControl.SetRebuildKillmailDerivedIntelEnabled(enabled),
                 enabled => EnableKillmailDbPullButton.IsEnabled = enabled,
                 () => _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings),
                 () => _isShuttingDown,
@@ -329,7 +330,7 @@ namespace PitmastersGrill
                 () => _cacheMaintenanceService.Vacuum(),
                 () => _cacheMaintenanceService.ClearAll(),
                 _diagnosticsCacheStatsPresenter,
-                text => CacheStatsText.Text = text);
+                text => DiagnosticsSupportViewControl.SetCacheStatsText(text));
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -348,7 +349,7 @@ namespace PitmastersGrill
                 EffectiveKillmailDataPathText,
                 VisualThemeComboBox,
                 ColorBlindModeComboBox,
-                LogLevelComboBox);
+                DiagnosticsSupportViewControl.LogLevelComboBoxControl);
             _settingsTabController.ApplySettingsToControls(
                 _appSettings,
                 EnableLiveZkillFeedCheckBox,
@@ -371,7 +372,7 @@ namespace PitmastersGrill
             _currentRows.CollectionChanged += CurrentRows_CollectionChanged;
             AnalysisAllianceListBox.ItemsSource = _analysisAllianceItems;
             AnalysisCorpListBox.ItemsSource = _analysisCorpItems;
-            ProviderHealthGrid.ItemsSource = _providerHealthRows;
+            DiagnosticsSupportViewControl.SetProviderHealthItemsSource(_providerHealthRows);
             RefreshProviderHealthUi();
             RefreshCacheStatsUi();
             UpdateLastRefreshed();
@@ -877,12 +878,26 @@ namespace PitmastersGrill
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || LogLevelComboBox == null)
+            if (_isApplyingSettings || DiagnosticsSupportViewControl == null)
             {
                 return;
             }
 
-            _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, LogLevelComboBox);
+            _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, DiagnosticsSupportViewControl.LogLevelComboBoxControl);
+        }
+
+        private void WireDiagnosticsSupportView()
+        {
+            DiagnosticsSupportViewControl.OpenLogsRequested += OpenLogsButton_Click;
+            DiagnosticsSupportViewControl.PackageDiagnosticsRequested += PackageDiagnosticsButton_Click;
+            DiagnosticsSupportViewControl.OpenDiagnosticsFolderRequested += OpenDiagnosticsFolderButton_Click;
+            DiagnosticsSupportViewControl.LogLevelSelectionChanged += LogLevelComboBox_SelectionChanged;
+            DiagnosticsSupportViewControl.RefreshProviderHealthRequested += RefreshProviderHealthButton_Click;
+            DiagnosticsSupportViewControl.RefreshCacheStatsRequested += RefreshCacheStatsButton_Click;
+            DiagnosticsSupportViewControl.ClearExpiredCacheRequested += ClearExpiredCacheButton_Click;
+            DiagnosticsSupportViewControl.VacuumCacheRequested += VacuumCacheButton_Click;
+            DiagnosticsSupportViewControl.ClearAllCacheRequested += ClearAllCacheButton_Click;
+            DiagnosticsSupportViewControl.RebuildKillmailDerivedIntelRequested += RebuildKillmailDerivedIntelButton_Click;
         }
 
         private void VisualThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
