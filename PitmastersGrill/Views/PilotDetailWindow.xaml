@@ -59,66 +59,66 @@
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource HeaderTextBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,4"/>
+                           Margin="0,0,0,4" AutomationProperties.AutomationId="PilotNameText"/>
 
                 <TextBlock x:Name="AffiliationText"
                            Foreground="{DynamicResource BodyTextBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,2"/>
+                           Margin="0,0,0,2" AutomationProperties.AutomationId="AffiliationText"/>
 
                 <TextBlock x:Name="ActivityText"
                            Foreground="{DynamicResource MutedTextBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,2"/>
+                           Margin="0,0,0,2" AutomationProperties.AutomationId="ActivityText"/>
 
                 <TextBlock x:Name="KillLossText"
                            Foreground="{DynamicResource MutedTextBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,10"/>
+                           Margin="0,0,0,10" AutomationProperties.AutomationId="KillLossText"/>
 
                 <WrapPanel Margin="0,0,0,8">
                     <Button x:Name="KnownCynoOverrideLink"
                             Style="{StaticResource DetailLinkButtonStyle}"
                             Content="Known-Cyno Override"
-                            Click="KnownCynoOverrideLink_Click"/>
+                            Click="KnownCynoOverrideLink_Click" AutomationProperties.AutomationId="KnownCynoOverrideLink"/>
                     <Button x:Name="BaitOverrideLink"
                             Style="{StaticResource DetailLinkButtonStyle}"
                             Content="Bait"
-                            Click="BaitOverrideLink_Click"/>
+                            Click="BaitOverrideLink_Click" AutomationProperties.AutomationId="BaitOverrideLink"/>
                     <Button x:Name="WatchPilotLink"
                             Style="{StaticResource DetailLinkButtonStyle}"
                             Content="Watch"
-                            Click="WatchPilotLink_Click"/>
+                            Click="WatchPilotLink_Click" AutomationProperties.AutomationId="WatchPilotLink"/>
                 </WrapPanel>
 
                 <TextBlock x:Name="BaitSignalText"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource BoardSignalBaitBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,2"/>
+                           Margin="0,0,0,2" AutomationProperties.AutomationId="BaitSignalText"/>
 
                 <TextBlock x:Name="CynoSignalText"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource AccentAshBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,2"/>
+                           Margin="0,0,0,2" AutomationProperties.AutomationId="CynoSignalText"/>
 
                 <TextBlock x:Name="EvidenceText"
                            Foreground="{DynamicResource BodyTextBrush}"
                            TextWrapping="Wrap"
                            TextTrimming="CharacterEllipsis"
-                           Margin="0,0,0,2"/>
+                           Margin="0,0,0,2" AutomationProperties.AutomationId="EvidenceText"/>
 
                 <TextBlock x:Name="LimitationsText"
                            Foreground="{DynamicResource MutedTextBrush}"
                            TextWrapping="Wrap"
-                           Margin="0,0,0,8"/>
+                           Margin="0,0,0,8" AutomationProperties.AutomationId="LimitationsText"/>
 
                 <TextBlock x:Name="BottomFreshnessText"
                            Foreground="{DynamicResource MutedTextBrush}"
                            FontSize="11"
                            TextWrapping="Wrap"
-                           Margin="0,2,0,0"/>
+                           Margin="0,2,0,0" AutomationProperties.AutomationId="BottomFreshnessText"/>
             </StackPanel>
 
             <WrapPanel Grid.Row="1"
@@ -127,23 +127,23 @@
                 <Button x:Name="IgnorePilotLink"
                         Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Ignore Pilot"
-                        Click="IgnorePilotLink_Click"/>
+                        Click="IgnorePilotLink_Click" AutomationProperties.AutomationId="IgnorePilotLink"/>
                 <Button x:Name="IgnoreCorpLink"
                         Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Ignore Corp"
-                        Click="IgnoreCorpLink_Click"/>
+                        Click="IgnoreCorpLink_Click" AutomationProperties.AutomationId="IgnoreCorpLink"/>
                 <Button x:Name="IgnoreAllianceLink"
                         Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Ignore Alliance"
-                        Click="IgnoreAllianceLink_Click"/>
+                        Click="IgnoreAllianceLink_Click" AutomationProperties.AutomationId="IgnoreAllianceLink"/>
                 <Button x:Name="OpenZkillLink"
                         Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Open zKill"
-                        Click="OpenZkillLink_Click"/>
+                        Click="OpenZkillLink_Click" AutomationProperties.AutomationId="OpenZkillLink"/>
                 <Button x:Name="CloseLink"
                         Style="{StaticResource DetailLinkButtonStyle}"
                         Content="Close"
-                        Click="CloseLink_Click"/>
+                        Click="CloseLink_Click" AutomationProperties.AutomationId="CloseLink"/>
             </WrapPanel>
         </Grid>
     </Border>

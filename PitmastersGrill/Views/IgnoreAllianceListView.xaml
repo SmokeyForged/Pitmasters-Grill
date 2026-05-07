@@ -51,13 +51,13 @@
                              Background="{DynamicResource SurfaceBrush}"
                              Foreground="{DynamicResource BodyTextBrush}"
                              BorderBrush="{DynamicResource PanelBorderBrush}"
-                             Margin="0,0,0,10"/>
+                             Margin="0,0,0,10" AutomationProperties.AutomationId="IgnoreIdsInputTextBox"/>
 
                     <WrapPanel>
                         <ComboBox x:Name="IgnoreTypeComboBox"
                                   Width="150"
                                   Height="32"
-                                  Margin="0,0,8,8">
+                                  Margin="0,0,8,8" AutomationProperties.AutomationId="IgnoreTypeComboBox">
                             <ComboBoxItem Content="Pilot"/>
                             <ComboBoxItem Content="Corporation"/>
                             <ComboBoxItem Content="Alliance"/>
@@ -68,35 +68,35 @@
                                 Width="92"
                                 Height="32"
                                 Margin="0,0,8,8"
-                                Click="AddIgnoreIdsButton_Click"/>
+                                Click="AddIgnoreIdsButton_Click" AutomationProperties.AutomationId="AddIgnoreIdsButton"/>
 
                         <Button x:Name="SaveIgnoreListButton"
                                 Content="Save List"
                                 Width="92"
                                 Height="32"
                                 Margin="0,0,8,8"
-                                Click="SaveIgnoreListButton_Click"/>
+                                Click="SaveIgnoreListButton_Click" AutomationProperties.AutomationId="SaveIgnoreListButton"/>
 
                         <Button x:Name="RemoveSelectedIgnoreButton"
                                 Content="Remove Selected"
                                 Width="124"
                                 Height="32"
                                 Margin="0,0,8,8"
-                                Click="RemoveSelectedIgnoreButton_Click"/>
+                                Click="RemoveSelectedIgnoreButton_Click" AutomationProperties.AutomationId="RemoveSelectedIgnoreButton"/>
 
                         <Button x:Name="ClearIgnoreListButton"
                                 Content="Clear All"
                                 Width="92"
                                 Height="32"
                                 Margin="0,0,8,8"
-                                Click="ClearIgnoreListButton_Click"/>
+                                Click="ClearIgnoreListButton_Click" AutomationProperties.AutomationId="ClearIgnoreListButton"/>
 
                         <Button x:Name="RefreshNamesButton"
                                 Content="Refresh Names"
                                 Width="116"
                                 Height="32"
                                 Margin="0,0,8,8"
-                                Click="RefreshNamesButton_Click"/>
+                                Click="RefreshNamesButton_Click" AutomationProperties.AutomationId="RefreshNamesButton"/>
                     </WrapPanel>
                 </StackPanel>
             </Border>
@@ -122,7 +122,7 @@
                               SelectionMode="Extended"
                               Background="{DynamicResource SurfaceBrush}"
                               Foreground="{DynamicResource BodyTextBrush}"
-                              BorderBrush="{DynamicResource PanelBorderBrush}">
+                              BorderBrush="{DynamicResource PanelBorderBrush}" AutomationProperties.AutomationId="IgnoredEntriesGrid">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="1*"/>
                             <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="2*"/>
@@ -134,7 +134,7 @@
 
             <TextBlock x:Name="IgnoreListStatusText"
                        Margin="12,0,12,12"
-                       Foreground="{DynamicResource MutedTextBrush}"/>
+                       Foreground="{DynamicResource MutedTextBrush}" AutomationProperties.AutomationId="IgnoreListStatusText"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

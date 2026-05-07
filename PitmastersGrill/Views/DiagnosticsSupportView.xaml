@@ -34,7 +34,7 @@
                             HorizontalAlignment="Left"
                             Margin="0,0,10,8"
                             Content="Logs"
-                            Click="OpenLogsButton_Click"/>
+                            Click="OpenLogsButton_Click" AutomationProperties.AutomationId="OpenLogsButton"/>
 
                     <Button x:Name="PackageDiagnosticsButton"
                             Width="160"
@@ -42,7 +42,7 @@
                             HorizontalAlignment="Left"
                             Margin="0,0,10,8"
                             Content="Export Diagnostics Package"
-                            Click="PackageDiagnosticsButton_Click"/>
+                            Click="PackageDiagnosticsButton_Click" AutomationProperties.AutomationId="PackageDiagnosticsButton"/>
 
                     <Button x:Name="OpenDiagnosticsFolderButton"
                             Width="160"
@@ -50,7 +50,7 @@
                             HorizontalAlignment="Left"
                             Margin="0,0,10,8"
                             Content="Diagnostics Folder"
-                            Click="OpenDiagnosticsFolderButton_Click"/>
+                            Click="OpenDiagnosticsFolderButton_Click" AutomationProperties.AutomationId="OpenDiagnosticsFolderButton"/>
 
                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                VerticalAlignment="Center"
@@ -61,7 +61,7 @@
                               Width="140"
                               VerticalAlignment="Center"
                               Margin="0,0,0,8"
-                              SelectionChanged="LogLevelComboBox_SelectionChanged">
+                              SelectionChanged="LogLevelComboBox_SelectionChanged" AutomationProperties.AutomationId="LogLevelComboBox">
                         <ComboBoxItem Content="Normal"/>
                         <ComboBoxItem Content="Debug"/>
                     </ComboBox>
@@ -70,7 +70,7 @@
                 <TextBlock x:Name="DiagnosticsStatusText"
                            Style="{StaticResource SettingsLabelStyle}"
                            Margin="0,6,0,0"
-                           Text="Diagnostics ready."/>
+                           Text="Diagnostics ready." AutomationProperties.AutomationId="DiagnosticsStatusText"/>
 
                 <TextBlock Text="Provider Health"
                            FontSize="16"
@@ -84,14 +84,14 @@
                             Padding="14,6"
                             Margin="0,0,10,0"
                             Content="Refresh Providers"
-                            Click="RefreshProviderHealthButton_Click"/>
+                            Click="RefreshProviderHealthButton_Click" AutomationProperties.AutomationId="RefreshProviderHealthButton"/>
                 </WrapPanel>
 
                 <DataGrid x:Name="ProviderHealthGrid"
                           AutoGenerateColumns="False"
                           IsReadOnly="True"
                           Height="150"
-                          Margin="0,0,0,12">
+                          Margin="0,0,0,12" AutomationProperties.AutomationId="ProviderHealthGrid">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Provider" Binding="{Binding ProviderName}" Width="1.4*"/>
                         <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="0.9*"/>
@@ -116,38 +116,38 @@
                             Padding="14,6"
                             Margin="0,0,10,8"
                             Content="Refresh Cache Stats"
-                            Click="RefreshCacheStatsButton_Click"/>
+                            Click="RefreshCacheStatsButton_Click" AutomationProperties.AutomationId="RefreshCacheStatsButton"/>
                     <Button x:Name="ClearExpiredCacheButton"
                             Width="150"
                             Padding="14,6"
                             Margin="0,0,10,8"
                             Content="Clear Expired"
-                            Click="ClearExpiredCacheButton_Click"/>
+                            Click="ClearExpiredCacheButton_Click" AutomationProperties.AutomationId="ClearExpiredCacheButton"/>
                     <Button x:Name="VacuumCacheButton"
                             Width="150"
                             Padding="14,6"
                             Margin="0,0,10,8"
                             Content="Compact / Vacuum"
-                            Click="VacuumCacheButton_Click"/>
+                            Click="VacuumCacheButton_Click" AutomationProperties.AutomationId="VacuumCacheButton"/>
                     <Button x:Name="ClearAllCacheButton"
                             Width="150"
                             Padding="14,6"
                             Margin="0,0,10,8"
                             Content="Clear All Cache"
-                            Click="ClearAllCacheButton_Click"/>
+                            Click="ClearAllCacheButton_Click" AutomationProperties.AutomationId="ClearAllCacheButton"/>
                     <Button x:Name="RebuildKillmailDerivedIntelButton"
                             Width="210"
                             Padding="14,6"
                             Margin="0,0,10,8"
                             Content="Rebuild Killmail Derived Intel"
-                            Click="RebuildKillmailDerivedIntelButton_Click"/>
+                            Click="RebuildKillmailDerivedIntelButton_Click" AutomationProperties.AutomationId="RebuildKillmailDerivedIntelButton"/>
                 </WrapPanel>
 
                 <TextBlock x:Name="CacheStatsText"
                            Style="{StaticResource SettingsLabelStyle}"
                            FontFamily="Consolas"
                            TextWrapping="Wrap"
-                           Text="Cache stats not loaded."/>
+                           Text="Cache stats not loaded." AutomationProperties.AutomationId="CacheStatsText"/>
 
                 <TextBlock Style="{StaticResource SettingsLabelStyle}"
                            Margin="0,10,0,0"

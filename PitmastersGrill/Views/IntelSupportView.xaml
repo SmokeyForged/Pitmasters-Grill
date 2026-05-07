@@ -32,17 +32,17 @@
                             Padding="12,8"
                             BorderBrush="{DynamicResource PanelBorderBrush}"
                             BorderThickness="1"
-                            Margin="0,0,0,12">
+                            Margin="0,0,0,12" AutomationProperties.AutomationId="IntelUpdateBanner">
                         <StackPanel>
                             <TextBlock x:Name="IntelUpdateStatusText"
                                        Foreground="White"
                                        FontWeight="SemiBold"
                                        FontSize="16"
-                                       Text="Intel current"/>
+                                       Text="Intel current" AutomationProperties.AutomationId="IntelUpdateStatusText"/>
                             <TextBlock x:Name="IntelUpdateDetailText"
                                        Foreground="#F3F3F3"
                                        FontSize="12"
-                                       Text="Through latest archive"/>
+                                       Text="Through latest archive" AutomationProperties.AutomationId="IntelUpdateDetailText"/>
                         </StackPanel>
                     </Border>
 
@@ -60,7 +60,7 @@
                                     <TextBlock x:Name="IntelLastUpdatedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No successful local intel update recorded yet."/>
+                                               Text="No successful local intel update recorded yet." AutomationProperties.AutomationId="IntelLastUpdatedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -70,7 +70,7 @@
                                     <TextBlock x:Name="IntelCurrentUpdateStatusText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No update currently running."/>
+                                               Text="No update currently running." AutomationProperties.AutomationId="IntelCurrentUpdateStatusText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -80,7 +80,7 @@
                                     <TextBlock x:Name="IntelOldestKillmailDayText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No local killmail days recorded yet."/>
+                                               Text="No local killmail days recorded yet." AutomationProperties.AutomationId="IntelOldestKillmailDayText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -90,7 +90,7 @@
                                     <TextBlock x:Name="IntelNewestKillmailDayText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No local killmail days recorded yet."/>
+                                               Text="No local killmail days recorded yet." AutomationProperties.AutomationId="IntelNewestKillmailDayText"/>
                                 </StackPanel>
                             </UniformGrid>
 
@@ -102,11 +102,11 @@
                                          Margin="0,6,0,4"
                                          Minimum="0"
                                          Maximum="100"
-                                         Value="0"/>
+                                         Value="0" AutomationProperties.AutomationId="IntelTotalProgressBar"/>
                             <TextBlock x:Name="IntelTotalProgressText"
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,0,0,12"
-                                       Text="No catch-up update is currently required."/>
+                                       Text="No catch-up update is currently required." AutomationProperties.AutomationId="IntelTotalProgressText"/>
 
                             <TextBlock Text="Current-Day Progress"
                                        FontWeight="SemiBold"
@@ -116,11 +116,11 @@
                                          Margin="0,6,0,4"
                                          Minimum="0"
                                          Maximum="100"
-                                         Value="0"/>
+                                         Value="0" AutomationProperties.AutomationId="IntelCurrentDayProgressBar"/>
                             <TextBlock x:Name="IntelCurrentDayProgressText"
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,0,0,0"
-                                       Text="No update currently running."/>
+                                       Text="No update currently running." AutomationProperties.AutomationId="IntelCurrentDayProgressText"/>
                         </StackPanel>
                     </Border>
 
@@ -145,7 +145,7 @@
                                     <TextBlock x:Name="IntelLiveFeedSourceText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="R2Z2"/>
+                                               Text="R2Z2" AutomationProperties.AutomationId="IntelLiveFeedSourceText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -155,7 +155,7 @@
                                     <TextBlock x:Name="IntelLiveFeedStatusText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="Disabled"/>
+                                               Text="Disabled" AutomationProperties.AutomationId="IntelLiveFeedStatusText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -165,7 +165,7 @@
                                     <TextBlock x:Name="IntelLiveFeedEnabledText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No"/>
+                                               Text="No" AutomationProperties.AutomationId="IntelLiveFeedEnabledText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -175,7 +175,7 @@
                                     <TextBlock x:Name="IntelLiveFeedRecentImportsText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="IntelLiveFeedRecentImportsText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -185,7 +185,7 @@
                                     <TextBlock x:Name="IntelLiveFeedNextSequenceText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="Not initialized"/>
+                                               Text="Not initialized" AutomationProperties.AutomationId="IntelLiveFeedNextSequenceText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -195,7 +195,7 @@
                                     <TextBlock x:Name="IntelLiveFeedLastProcessedSequenceText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="None"/>
+                                               Text="None" AutomationProperties.AutomationId="IntelLiveFeedLastProcessedSequenceText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -205,7 +205,7 @@
                                     <TextBlock x:Name="IntelLiveFeedLastSuccessText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No live imports recorded yet."/>
+                                               Text="No live imports recorded yet." AutomationProperties.AutomationId="IntelLiveFeedLastSuccessText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -215,7 +215,7 @@
                                     <TextBlock x:Name="IntelLiveFeedLastCaughtUpText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No caught-up wait recorded yet."/>
+                                               Text="No caught-up wait recorded yet." AutomationProperties.AutomationId="IntelLiveFeedLastCaughtUpText"/>
                                 </StackPanel>
                             </UniformGrid>
 
@@ -227,7 +227,7 @@
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="No live-feed errors recorded."/>
+                                       Text="No live-feed errors recorded." AutomationProperties.AutomationId="IntelLiveFeedLastErrorText"/>
                         </StackPanel>
                     </Border>
 
@@ -248,7 +248,7 @@
                                         Width="200"
                                         Padding="14,6"
                                         Content="Refresh Today's zKill Intel"
-                                        Click="RunTodaysFreshnessButton_Click"/>
+                                        Click="RunTodaysFreshnessButton_Click" AutomationProperties.AutomationId="RunTodaysFreshnessButton"/>
                             </DockPanel>
 
                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
@@ -265,7 +265,7 @@
                                     <TextBlock x:Name="TodaysFreshnessStatusText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="Idle"/>
+                                               Text="Idle" AutomationProperties.AutomationId="TodaysFreshnessStatusText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -275,7 +275,7 @@
                                     <TextBlock x:Name="TodaysFreshnessVisiblePilotsText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="TodaysFreshnessVisiblePilotsText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -285,7 +285,7 @@
                                     <TextBlock x:Name="TodaysFreshnessEntitiesQueriedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="TodaysFreshnessEntitiesQueriedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -295,7 +295,7 @@
                                     <TextBlock x:Name="TodaysFreshnessResultsFoundText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="TodaysFreshnessResultsFoundText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -305,7 +305,7 @@
                                     <TextBlock x:Name="TodaysFreshnessKnownSkippedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="TodaysFreshnessKnownSkippedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -315,7 +315,7 @@
                                     <TextBlock x:Name="TodaysFreshnessImportedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="TodaysFreshnessImportedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -325,7 +325,7 @@
                                     <TextBlock x:Name="TodaysFreshnessFailedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="TodaysFreshnessFailedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -335,7 +335,7 @@
                                     <TextBlock x:Name="TodaysFreshnessLastRunText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No Today's Freshness run recorded yet."/>
+                                               Text="No Today's Freshness run recorded yet." AutomationProperties.AutomationId="TodaysFreshnessLastRunText"/>
                                 </StackPanel>
                             </UniformGrid>
 
@@ -347,7 +347,7 @@
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="Today's Freshness is idle."/>
+                                       Text="Today's Freshness is idle." AutomationProperties.AutomationId="TodaysFreshnessDetailText"/>
 
                             <TextBlock Text="Last Error"
                                        FontWeight="SemiBold"
@@ -357,7 +357,7 @@
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="No Today's Freshness errors recorded."/>
+                                       Text="No Today's Freshness errors recorded." AutomationProperties.AutomationId="TodaysFreshnessLastErrorText"/>
                         </StackPanel>
                     </Border>
 
@@ -378,7 +378,7 @@
                                         Width="210"
                                         Padding="14,6"
                                         Content="Repair Recent Historical Intel"
-                                        Click="RunHistoricalFreshnessButton_Click"/>
+                                        Click="RunHistoricalFreshnessButton_Click" AutomationProperties.AutomationId="RunHistoricalFreshnessButton"/>
                             </DockPanel>
 
                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
@@ -395,7 +395,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessStatusText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="Idle"/>
+                                               Text="Idle" AutomationProperties.AutomationId="HistoricalFreshnessStatusText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -405,7 +405,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessModeText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="Not run yet"/>
+                                               Text="Not run yet" AutomationProperties.AutomationId="HistoricalFreshnessModeText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -415,7 +415,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessVisiblePilotsText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessVisiblePilotsText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -425,7 +425,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessCandidatesConsideredText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessCandidatesConsideredText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -435,7 +435,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessCandidatesSkippedCooldownText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessCandidatesSkippedCooldownText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -445,7 +445,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessPilotsCheckedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessPilotsCheckedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -455,7 +455,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessDaysCheckedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessDaysCheckedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -465,7 +465,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessEntitiesQueriedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessEntitiesQueriedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -475,7 +475,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessResultsFoundText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessResultsFoundText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -485,7 +485,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessKnownSkippedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessKnownSkippedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -495,7 +495,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessImportedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessImportedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,0,8">
@@ -505,7 +505,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessFailedText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="0"/>
+                                               Text="0" AutomationProperties.AutomationId="HistoricalFreshnessFailedText"/>
                                 </StackPanel>
 
                                 <StackPanel Margin="0,0,12,8">
@@ -515,7 +515,7 @@
                                     <TextBlock x:Name="HistoricalFreshnessLastRunText"
                                                Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,4,0,0"
-                                               Text="No Historical Freshness run recorded yet."/>
+                                               Text="No Historical Freshness run recorded yet." AutomationProperties.AutomationId="HistoricalFreshnessLastRunText"/>
                                 </StackPanel>
                             </UniformGrid>
 
@@ -527,7 +527,7 @@
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="Historical Freshness is idle."/>
+                                       Text="Historical Freshness is idle." AutomationProperties.AutomationId="HistoricalFreshnessDetailText"/>
 
                             <TextBlock Text="Last Error"
                                        FontWeight="SemiBold"
@@ -537,7 +537,7 @@
                                        Style="{StaticResource SettingsLabelStyle}"
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap"
-                                       Text="No Historical Freshness errors recorded."/>
+                                       Text="No Historical Freshness errors recorded." AutomationProperties.AutomationId="HistoricalFreshnessLastErrorText"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -569,7 +569,7 @@
 
                         <TextBlock x:Name="EffectiveMaxKillmailAgeText"
                                    Style="{StaticResource SettingsLabelStyle}"
-                                   Text="Effective max killmail age: 30 days"/>
+                                   Text="Effective max killmail age: 30 days" AutomationProperties.AutomationId="EffectiveMaxKillmailAgeText"/>
 
                         <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                    Margin="0,6,0,4"
@@ -578,7 +578,7 @@
                         <TextBox x:Name="MaxKillmailAgeDaysTextBox"
                                  Margin="0,0,0,10"
                                  Width="140"
-                                 HorizontalAlignment="Left"/>
+                                 HorizontalAlignment="Left" AutomationProperties.AutomationId="MaxKillmailAgeDaysTextBox"/>
 
                         <WrapPanel Margin="0,0,0,12">
                             <Button x:Name="SaveMaxKillmailAgeButton"
@@ -586,14 +586,14 @@
                                     Padding="14,6"
                                     Margin="0,0,10,0"
                                     Content="Save Age"
-                                    Click="SaveMaxKillmailAgeButton_Click"/>
+                                    Click="SaveMaxKillmailAgeButton_Click" AutomationProperties.AutomationId="SaveMaxKillmailAgeButton"/>
 
                             <Button x:Name="UseDefaultMaxKillmailAgeButton"
                                     Width="120"
                                     Padding="14,6"
                                     Margin="0,0,10,0"
                                     Content="Use Default"
-                                    Click="UseDefaultMaxKillmailAgeButton_Click"/>
+                                    Click="UseDefaultMaxKillmailAgeButton_Click" AutomationProperties.AutomationId="UseDefaultMaxKillmailAgeButton"/>
                         </WrapPanel>
 
                         <TextBlock Style="{StaticResource SettingsLabelStyle}"
@@ -606,7 +606,7 @@
                                     Margin="0,0,10,0"
                                     HorizontalAlignment="Left"
                                     Content="Enable KillMail DB Pull"
-                                    Click="EnableKillmailDbPullButton_Click"/>
+                                    Click="EnableKillmailDbPullButton_Click" AutomationProperties.AutomationId="EnableKillmailDbPullButton"/>
                         </WrapPanel>
 
                         <TextBlock Text="Live zKill Feed"
@@ -619,7 +619,7 @@
                                   Content="Enable R2Z2 live zKill feed"
                                   Margin="0,0,0,8"
                                   Checked="EnableLiveZkillFeedCheckBox_Checked"
-                                  Unchecked="EnableLiveZkillFeedCheckBox_Checked"/>
+                                  Unchecked="EnableLiveZkillFeedCheckBox_Checked" AutomationProperties.AutomationId="EnableLiveZkillFeedCheckBox"/>
 
                         <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                    Margin="0,0,0,12"
@@ -636,7 +636,7 @@
                                   Content="Run Background Historical Repair after startup"
                                   Margin="0,0,0,8"
                                   Checked="BackgroundHistoricalRepairEnabledCheckBox_Checked"
-                                  Unchecked="BackgroundHistoricalRepairEnabledCheckBox_Checked"/>
+                                  Unchecked="BackgroundHistoricalRepairEnabledCheckBox_Checked" AutomationProperties.AutomationId="BackgroundHistoricalRepairEnabledCheckBox"/>
 
                         <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                    Margin="0,0,0,12"
@@ -653,7 +653,7 @@
                                   Width="220"
                                   HorizontalAlignment="Left"
                                   Margin="0,0,0,8"
-                                  SelectionChanged="PilotDetailPlacementComboBox_SelectionChanged">
+                                  SelectionChanged="PilotDetailPlacementComboBox_SelectionChanged" AutomationProperties.AutomationId="PilotDetailPlacementComboBox">
                             <ComboBoxItem Content="Auto, prefer right"/>
                             <ComboBoxItem Content="Auto, prefer left"/>
                         </ComboBox>
@@ -669,12 +669,12 @@
 
                         <TextBlock x:Name="KillmailDataPathModeText"
                                    Style="{StaticResource SettingsLabelStyle}"
-                                   Text="Using default LocalAppData path."/>
+                                   Text="Using default LocalAppData path." AutomationProperties.AutomationId="KillmailDataPathModeText"/>
 
                         <TextBlock x:Name="EffectiveKillmailDataPathText"
                                    Style="{StaticResource SettingsLabelStyle}"
                                    TextWrapping="Wrap"
-                                   Text="Effective path: --"/>
+                                   Text="Effective path: --" AutomationProperties.AutomationId="EffectiveKillmailDataPathText"/>
 
                         <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                    Margin="0,6,0,4"
@@ -684,7 +684,7 @@
                                  Margin="0,0,0,10"
                                  Width="420"
                                  MaxWidth="620"
-                                 HorizontalAlignment="Left"/>
+                                 HorizontalAlignment="Left" AutomationProperties.AutomationId="KillmailDataRootPathTextBox"/>
 
                         <WrapPanel>
                             <Button x:Name="SaveKillmailPathButton"
@@ -692,14 +692,14 @@
                                     Padding="14,6"
                                     Margin="0,0,10,0"
                                     Content="Save Path"
-                                    Click="SaveKillmailPathButton_Click"/>
+                                    Click="SaveKillmailPathButton_Click" AutomationProperties.AutomationId="SaveKillmailPathButton"/>
 
                             <Button x:Name="UseDefaultKillmailPathButton"
                                     Width="120"
                                     Padding="14,6"
                                     Margin="0,0,10,0"
                                     Content="Use Default"
-                                    Click="UseDefaultKillmailPathButton_Click"/>
+                                    Click="UseDefaultKillmailPathButton_Click" AutomationProperties.AutomationId="UseDefaultKillmailPathButton"/>
                         </WrapPanel>
 
                         <TextBlock Style="{StaticResource SettingsLabelStyle}"
