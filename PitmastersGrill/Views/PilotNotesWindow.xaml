@@ -27,7 +27,7 @@
                        FontSize="18"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource HeaderTextBrush}"
-                       Margin="0,0,0,8"/>
+                       Margin="0,0,0,8" AutomationProperties.AutomationId="PilotNameText"/>
 
             <TextBox x:Name="NotesTextBox"
                      Grid.Row="1"
@@ -35,7 +35,7 @@
                      TextWrapping="Wrap"
                      VerticalScrollBarVisibility="Auto"
                      MinHeight="120"
-                     Margin="0,0,0,10"/>
+                     Margin="0,0,0,10" AutomationProperties.AutomationId="NotesTextBox"/>
 
             <WrapPanel Grid.Row="2"
                        HorizontalAlignment="Right">

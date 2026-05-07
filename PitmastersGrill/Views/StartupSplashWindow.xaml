@@ -35,14 +35,14 @@
                        FontSize="16"
                        FontWeight="SemiBold"
                        Foreground="White"
-                       TextWrapping="Wrap" />
+                       TextWrapping="Wrap"  AutomationProperties.AutomationId="StatusTextBlock"/>
 
             <TextBlock Grid.Row="4"
                        x:Name="DetailTextBlock"
                        Text="Preparing startup update state."
                        FontSize="13"
                        Foreground="#D0D0D0"
-                       TextWrapping="Wrap" />
+                       TextWrapping="Wrap"  AutomationProperties.AutomationId="DetailTextBlock"/>
 
             <ProgressBar Grid.Row="6"
                          x:Name="ProgressBarControl"
@@ -50,7 +50,7 @@
                          Minimum="0"
                          Maximum="100"
                          Value="0"
-                         IsIndeterminate="False" />
+                         IsIndeterminate="False"  AutomationProperties.AutomationId="ProgressBarControl"/>
 
             <TextBlock Grid.Row="7"
                        x:Name="ExceptionTextBlock"
@@ -60,7 +60,7 @@
                        FontWeight="SemiBold"
                        Foreground="#FFCC66"
                        TextWrapping="Wrap"
-                       Visibility="Collapsed" />
+                       Visibility="Collapsed"  AutomationProperties.AutomationId="ExceptionTextBlock"/>
         </Grid>
     </Border>
 </Window>

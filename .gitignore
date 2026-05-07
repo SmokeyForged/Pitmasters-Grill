@@ -64,3 +64,4 @@ coverage/
 # Local publish profiles
 PitmastersGrill/Properties/PublishProfiles/
 .release/
+artifacts/smoke-tests/

@@ -17,7 +17,7 @@
         PreviewKeyDown="Window_PreviewKeyDown"
         LocationChanged="Window_LocationChanged"
         SizeChanged="Window_SizeChanged"
-        StateChanged="Window_StateChanged">
+        StateChanged="Window_StateChanged" AutomationProperties.AutomationId="RootWindow">
 
     <Window.Resources>
         <local:ThreatCynoHullHighlightConverter x:Key="ThreatCynoHullHighlightConverter" />
@@ -454,7 +454,7 @@
                                 Panel.ZIndex="1"
                                 Background="#101418"
                                 IsItemsHost="True"
-                                KeyboardNavigation.TabIndex="1" />
+                                KeyboardNavigation.TabIndex="1"/>
 
                             <Border
                                 x:Name="ContentPanel"
@@ -469,7 +469,7 @@
                                     x:Name="PART_SelectedContentHost"
                                     Margin="0"
                                     ContentSource="SelectedContent"
-                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                             </Border>
                         </Grid>
                     </ControlTemplate>
@@ -498,7 +498,7 @@
                                 ContentSource="Header"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                RecognizesAccessKey="True" />
+                                RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
@@ -576,7 +576,7 @@
                                    Height="32"
                                    Stretch="Uniform"
                                    SnapsToDevicePixels="True"
-                                   UseLayoutRounding="True"/>
+                                   UseLayoutRounding="True" AutomationProperties.AutomationId="HeaderLogoImage"/>
                         </Border>
                         <TextBlock Text="Pitmasters Grill"
                                    FontSize="20"
@@ -594,18 +594,18 @@
                                 Margin="0,0,6,0"
                                 ToolTip="Minimize PMG"
                                 Content="_"
-                                Click="MinimizeWindowButton_Click"/>
+                                Click="MinimizeWindowButton_Click" AutomationProperties.AutomationId="MinimizeWindowButton"/>
                         <Button x:Name="MaximizeRestoreWindowButton"
                                 Style="{StaticResource WindowControlButtonStyle}"
                                 Margin="0,0,6,0"
                                 ToolTip="Maximize PMG"
                                 Content="[]"
-                                Click="MaximizeRestoreWindowButton_Click"/>
+                                Click="MaximizeRestoreWindowButton_Click" AutomationProperties.AutomationId="MaximizeRestoreWindowButton"/>
                         <Button x:Name="CloseWindowButton"
                                 Style="{StaticResource WindowControlButtonStyle}"
                                 ToolTip="Close PMG"
                                 Content="X"
-                                Click="CloseWindowButton_Click"/>
+                                Click="CloseWindowButton_Click" AutomationProperties.AutomationId="CloseWindowButton"/>
                     </StackPanel>
 
                 </Grid>
@@ -686,14 +686,14 @@
             </Grid>
         </Border>
 
-        <Grid x:Name="MainContentGrid" Grid.Row="1" Margin="12">
+        <Grid x:Name="MainContentGrid" Grid.Row="1" Margin="12" AutomationProperties.AutomationId="MainContentGrid">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid x:Name="TopCommandGrid" Grid.Row="0" Margin="0,0,0,6">
+            <Grid x:Name="TopCommandGrid" Grid.Row="0" Margin="0,0,0,6" AutomationProperties.AutomationId="TopCommandGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -712,7 +712,7 @@
                         BorderThickness="1"
                         Cursor="SizeAll"
                         ToolTip="Drag to move PMG while Board Mode is enabled."
-                        MouseLeftButtonDown="CompactWindowDragHandle_MouseLeftButtonDown">
+                        MouseLeftButtonDown="CompactWindowDragHandle_MouseLeftButtonDown" AutomationProperties.AutomationId="CompactWindowDragHandle">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -736,7 +736,7 @@
                         Style="{StaticResource CommandStripButtonStyle}"
                         Margin="0,0,8,0"
                         Content="Clear"
-                        Click="ClearBoardButton_Click"/>
+                        Click="ClearBoardButton_Click" AutomationProperties.AutomationId="ClearBoardButton"/>
 
                 <TextBlock Grid.Column="1"
                            Margin="0,0,16,0"
@@ -751,14 +751,14 @@
                               Style="{StaticResource CompactModeToggleStyle}"
                               Margin="0,0,8,0"
                               Checked="CompactModeToggleButton_Changed"
-                              Unchecked="CompactModeToggleButton_Changed"/>
+                              Unchecked="CompactModeToggleButton_Changed" AutomationProperties.AutomationId="CompactModeToggleButton"/>
 
                 <Button Grid.Column="4"
                         x:Name="ExitApplicationButton"
                         Style="{StaticResource CommandStripButtonStyle}"
                         Content="Exit"
                         ToolTip="Exit PMG and stop PMG-owned background work."
-                        Click="ExitApplicationButton_Click"/>
+                        Click="ExitApplicationButton_Click" AutomationProperties.AutomationId="ExitApplicationButton"/>
             </Grid>
 
             <TabControl x:Name="MainTabControl"
@@ -766,7 +766,7 @@
                         Background="{DynamicResource WindowBackgroundBrush}"
                         BorderBrush="{DynamicResource PanelBorderBrush}"
                         SelectionChanged="MainTabControl_SelectionChanged"
-                        ItemContainerStyle="{StaticResource CompactAwareTabItemStyle}">
+                        ItemContainerStyle="{StaticResource CompactAwareTabItemStyle}" AutomationProperties.AutomationId="MainTabControl">
                 <TabItem Header="Analysis">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   Padding="12"
@@ -786,29 +786,29 @@
                                                Margin="0,0,0,8"/>
                                     <TextBlock x:Name="AnalysisEmptyStateText"
                                                Style="{StaticResource SettingsLabelStyle}"
-                                               Text="No visible pilots yet. Load or refresh the Grill to see aggregate analysis."/>
+                                               Text="No visible pilots yet. Load or refresh the Grill to see aggregate analysis." AutomationProperties.AutomationId="AnalysisEmptyStateText"/>
                                     <StackPanel x:Name="AnalysisDetailsPanel"
-                                                Visibility="Collapsed">
+                                                Visibility="Collapsed" AutomationProperties.AutomationId="AnalysisDetailsPanel">
                                         <TextBlock x:Name="AnalysisVisibleCountsText"
                                                    Style="{StaticResource SettingsLabelStyle}"
-                                                   Text="Visible pilots: 0 | Watched pilots: 0"/>
+                                                   Text="Visible pilots: 0 | Watched pilots: 0" AutomationProperties.AutomationId="AnalysisVisibleCountsText"/>
                                         <TextBlock x:Name="AnalysisSignalsText"
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,2,0,0"
-                                                   Text="Confirmed cynos: Hard 0 | Covert 0 | Bait 0"/>
+                                                   Text="Confirmed cynos: Hard 0 | Covert 0 | Bait 0" AutomationProperties.AutomationId="AnalysisSignalsText"/>
                                         <TextBlock x:Name="AnalysisUniqueCountsText"
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,8,0,0"
-                                                   Text="Unique corps: 0 | Unique alliances: 0"/>
+                                                   Text="Unique corps: 0 | Unique alliances: 0" AutomationProperties.AutomationId="AnalysisUniqueCountsText"/>
                                         <TextBlock x:Name="AnalysisAllianceTopText"
                                                    Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,8,0,0"/>
+                                                   Margin="0,8,0,0" AutomationProperties.AutomationId="AnalysisAllianceTopText"/>
                                         <TextBlock x:Name="AnalysisCorpTopText"
                                                    Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,2,0,0"/>
+                                                   Margin="0,2,0,0" AutomationProperties.AutomationId="AnalysisCorpTopText"/>
                                         <TextBlock x:Name="AnalysisHighlightsText"
                                                    Style="{StaticResource SettingsLabelStyle}"
-                                                   Margin="0,8,0,0"/>
+                                                   Margin="0,8,0,0" AutomationProperties.AutomationId="AnalysisHighlightsText"/>
                                         <Grid Margin="0,10,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -827,7 +827,7 @@
                                                          Foreground="{DynamicResource BodyTextBrush}"
                                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                         MouseDoubleClick="AnalysisAllianceListBox_MouseDoubleClick">
+                                                         MouseDoubleClick="AnalysisAllianceListBox_MouseDoubleClick" AutomationProperties.AutomationId="AnalysisAllianceListBox">
                                                     <ListBox.ItemTemplate>
                                                         <DataTemplate>
                                                             <TextBlock Text="{Binding DisplayText}"
@@ -850,7 +850,7 @@
                                                          Foreground="{DynamicResource BodyTextBrush}"
                                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                         MouseDoubleClick="AnalysisCorpListBox_MouseDoubleClick">
+                                                         MouseDoubleClick="AnalysisCorpListBox_MouseDoubleClick" AutomationProperties.AutomationId="AnalysisCorpListBox">
                                                     <ListBox.ItemTemplate>
                                                         <DataTemplate>
                                                             <TextBlock Text="{Binding DisplayText}"
@@ -898,7 +898,7 @@
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,0,0,0"
                                                    Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not detected"/>
+                                                   Text="Not detected" AutomationProperties.AutomationId="AnalysisCurrentCharacterText"/>
 
                                         <TextBlock Grid.Row="1"
                                                    Grid.Column="0"
@@ -910,7 +910,7 @@
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,0,0,0"
                                                    Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not detected"/>
+                                                   Text="Not detected" AutomationProperties.AutomationId="AnalysisCurrentSystemText"/>
 
                                         <TextBlock Grid.Row="2"
                                                    Grid.Column="0"
@@ -922,7 +922,7 @@
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,0,0,0"
                                                    Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not configured"/>
+                                                   Text="Not configured" AutomationProperties.AutomationId="AnalysisEvidenceSourceText"/>
 
                                         <TextBlock Grid.Row="3"
                                                    Grid.Column="0"
@@ -934,7 +934,7 @@
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,0,0,0"
                                                    Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Not detected"/>
+                                                   Text="Not detected" AutomationProperties.AutomationId="AnalysisObservedAtText"/>
 
                                         <TextBlock Grid.Row="4"
                                                    Grid.Column="0"
@@ -946,7 +946,7 @@
                                                    Style="{StaticResource SettingsLabelStyle}"
                                                    Margin="0,0,0,0"
                                                    Foreground="{DynamicResource BodyTextBrush}"
-                                                   Text="Unable to infer EVE context"/>
+                                                   Text="Unable to infer EVE context" AutomationProperties.AutomationId="AnalysisContextStatusText"/>
                                     </Grid>
                                     <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                Margin="0,8,0,0"
@@ -960,7 +960,7 @@
                 </TabItem>
                 <TabItem Header="Grill">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
-                        <Grid x:Name="BoardOverlayHost">
+                        <Grid x:Name="BoardOverlayHost" AutomationProperties.AutomationId="BoardOverlayHost">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="60*"/>
                                 <ColumnDefinition Width="12*"/>
@@ -991,13 +991,13 @@
                                       PreviewMouseLeftButtonDown="PilotBoard_PreviewMouseLeftButtonDown"
                                       PreviewMouseLeftButtonUp="PilotBoard_PreviewMouseLeftButtonUp"
                                       PreviewMouseMove="PilotBoard_PreviewMouseMove"
-                                      SizeChanged="PilotBoard_SizeChanged" Grid.ColumnSpan="4">
+                                      SizeChanged="PilotBoard_SizeChanged" Grid.ColumnSpan="4" AutomationProperties.AutomationId="PilotBoard">
                                 <DataGrid.Resources>
                                     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
                                     <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
                                 </DataGrid.Resources>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42" MinWidth="34">
+                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42" MinWidth="34" AutomationProperties.AutomationId="SigColumn">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock HorizontalAlignment="Center"
@@ -1010,7 +1010,7 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
 
-                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="120" MinWidth="72">
+                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="120" MinWidth="72" AutomationProperties.AutomationId="CharacterColumn">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <DockPanel LastChildFill="True">
@@ -1021,12 +1021,12 @@
                                                                FontWeight="Bold"
                                                                Foreground="{DynamicResource WatchedPilotMarkerBrush}"
                                                                Text="★"
-                                                               Visibility="Collapsed"/>
+                                                               Visibility="Collapsed" AutomationProperties.AutomationId="WatchedPilotMarker"/>
                                                     <Button x:Name="PilotNoteButton"
                                                             DockPanel.Dock="Right"
                                                             Style="{StaticResource PilotNoteButtonStyle}"
                                                             Content="✎"
-                                                            Click="PilotNoteButton_Click"/>
+                                                            Click="PilotNoteButton_Click" AutomationProperties.AutomationId="PilotNoteButton"/>
                                                     <TextBlock Text="{Binding CharacterName}"
                                                                VerticalAlignment="Center"
                                                                ToolTip="{Binding BoardHoverToolTip}"
@@ -1045,17 +1045,17 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="120" MinWidth="72"/>
-                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="140" MinWidth="82"/>
-                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="55" MinWidth="42"/>
-                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="55" MinWidth="42"/>
+                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="120" MinWidth="72" AutomationProperties.AutomationId="AllianceColumn"/>
+                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="140" MinWidth="82" AutomationProperties.AutomationId="CorpColumn"/>
+                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="55" MinWidth="42" AutomationProperties.AutomationId="KillsColumn"/>
+                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="55" MinWidth="42" AutomationProperties.AutomationId="LossesColumn"/>
                                     <DataGridTextColumn x:Name="AvgFleetSizeColumn"
                                                         Header="Avg Fleet Size"
                                                         Binding="{Binding AvgAttackersWhenAttacking, StringFormat={}{0:0}}"
-                                                        Width="70" MinWidth="48"/>
-                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="100" MinWidth="64"/>
-                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" SortMemberPath="LastShipSeenAtUtc" Width="90" MinWidth="54"/>
-                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="110" MinWidth="70"/>
+                                                        Width="70" MinWidth="48" AutomationProperties.AutomationId="AvgFleetSizeColumn"/>
+                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="100" MinWidth="64" AutomationProperties.AutomationId="LastShipSeenColumn"/>
+                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" SortMemberPath="LastShipSeenAtUtc" Width="90" MinWidth="54" AutomationProperties.AutomationId="LastSeenColumn"/>
+                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="110" MinWidth="70" AutomationProperties.AutomationId="CynoHullSeenColumn"/>
                                 </DataGrid.Columns>
                             </DataGrid>
 
@@ -1071,7 +1071,7 @@
                                     BorderThickness="1"
                                     CornerRadius="4"
                                     Panel.ZIndex="20"
-                                    Grid.ColumnSpan="4">
+                                    Grid.ColumnSpan="4" AutomationProperties.AutomationId="BoardModeHintOverlay">
                                 <TextBlock Text="Board Mode enabled. Press Insert to return to normal mode."
                                            Foreground="{DynamicResource HeaderTextBrush}"
                                            FontWeight="SemiBold"/>
@@ -1089,7 +1089,7 @@
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="4"
-                                    Panel.ZIndex="10" Grid.Column="3">
+                                    Panel.ZIndex="10" Grid.Column="3" AutomationProperties.AutomationId="DetailPane">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -1120,14 +1120,14 @@
                                                Foreground="{DynamicResource HeaderTextBrush}"
                                                TextWrapping="Wrap"
                                                TextTrimming="None"
-                                               Margin="0,0,12,0"/>
+                                               Margin="0,0,12,0" AutomationProperties.AutomationId="SelectedCharacterText"/>
 
                                     <Button Grid.Row="0"
                                             Grid.Column="1"
                                             x:Name="CloseDetailsButton"
                                             Padding="12,4"
                                             Content="Close Details"
-                                            Click="CloseDetailsButton_Click"/>
+                                            Click="CloseDetailsButton_Click" AutomationProperties.AutomationId="CloseDetailsButton"/>
 
                                     <TextBlock Grid.Row="1"
                                                Grid.ColumnSpan="2"
@@ -1135,7 +1135,7 @@
                                                Margin="0,12,0,0"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Full Corp: --"/>
+                                               Text="Full Corp: --" AutomationProperties.AutomationId="FullCorpText"/>
 
                                     <TextBlock Grid.Row="2"
                                                Grid.ColumnSpan="2"
@@ -1143,7 +1143,7 @@
                                                Margin="0,8,0,0"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Full Alliance: --"/>
+                                               Text="Full Alliance: --" AutomationProperties.AutomationId="FullAllianceText"/>
 
                                     <TextBlock Grid.Row="3"
                                                Grid.ColumnSpan="2"
@@ -1151,7 +1151,7 @@
                                                Margin="0,8,0,0"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Freshness: --"/>
+                                               Text="Freshness: --" AutomationProperties.AutomationId="FreshnessText"/>
 
                                     <TextBlock Grid.Row="4"
                                                Grid.ColumnSpan="2"
@@ -1159,7 +1159,7 @@
                                                Margin="0,8,0,0"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Recent Public Kill/Loss Activity: --"/>
+                                               Text="Recent Public Kill/Loss Activity: --" AutomationProperties.AutomationId="RecentPublicActivityText"/>
 
                                     <TextBlock Grid.Row="5"
                                                Grid.ColumnSpan="2"
@@ -1168,7 +1168,7 @@
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource AccentEmberBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Cyno Signal: Unknown"/>
+                                               Text="Cyno Signal: Unknown" AutomationProperties.AutomationId="CynoSignalText"/>
 
                                     <ProgressBar Grid.Row="6"
                                                  Grid.ColumnSpan="2"
@@ -1179,7 +1179,7 @@
                                                  Value="0"
                                                  Foreground="{DynamicResource AccentEmberBrush}"
                                                  Background="{DynamicResource SurfaceBrush}"
-                                                 Margin="0,0,0,6"/>
+                                                 Margin="0,0,0,6" AutomationProperties.AutomationId="CynoConfidenceBar"/>
 
                                     <TextBlock Grid.Row="7"
                                                Grid.ColumnSpan="2"
@@ -1187,7 +1187,7 @@
                                                Margin="0,0,0,4"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Evidence: --"/>
+                                               Text="Evidence: --" AutomationProperties.AutomationId="CynoEvidenceText"/>
 
                                     <TextBlock Grid.Row="8"
                                                Grid.ColumnSpan="2"
@@ -1195,7 +1195,7 @@
                                                Margin="0,0,0,4"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Limitations: --"/>
+                                               Text="Limitations: --" AutomationProperties.AutomationId="CynoLimitationsText"/>
 
                                     <TextBlock Grid.Row="9"
                                                Grid.ColumnSpan="2"
@@ -1203,7 +1203,7 @@
                                                Margin="0,8,0,0"
                                                Foreground="{DynamicResource MutedTextBrush}"
                                                TextWrapping="Wrap"
-                                               Text="Sources / Freshness: --"/>
+                                               Text="Sources / Freshness: --" AutomationProperties.AutomationId="ExplainabilityText"/>
 
                                     <Grid Grid.Row="10"
                                           Grid.ColumnSpan="2"
@@ -1224,20 +1224,20 @@
                                                     Style="{StaticResource DetailActionLinkButtonStyle}"
                                                     Foreground="{DynamicResource SuccessGreenBrush}"
                                                     Content="Watch"
-                                                    Click="WatchPilotDetailAction_Click"/>
+                                                    Click="WatchPilotDetailAction_Click" AutomationProperties.AutomationId="WatchPilotDetailAction"/>
                                             <CheckBox x:Name="BaitOverrideCheckBox"
                                                       VerticalAlignment="Center"
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Content="Bait"
                                                       Margin="0,0,10,0"
                                                       Checked="BaitOverrideCheckBox_Changed"
-                                                      Unchecked="BaitOverrideCheckBox_Changed"/>
+                                                      Unchecked="BaitOverrideCheckBox_Changed" AutomationProperties.AutomationId="BaitOverrideCheckBox"/>
                                             <CheckBox x:Name="KnownCynoOverrideCheckBox"
                                                       VerticalAlignment="Center"
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Content="Known-Cyno Override"
                                                       Checked="KnownCynoOverrideCheckBox_Changed"
-                                                      Unchecked="KnownCynoOverrideCheckBox_Changed"/>
+                                                      Unchecked="KnownCynoOverrideCheckBox_Changed" AutomationProperties.AutomationId="KnownCynoOverrideCheckBox"/>
                                         </StackPanel>
                                     </Grid>
 
@@ -1254,7 +1254,7 @@
                                                  AcceptsReturn="True"
                                                  TextWrapping="Wrap"
                                                  VerticalScrollBarVisibility="Auto"
-                                                 MinHeight="100"/>
+                                                 MinHeight="100" AutomationProperties.AutomationId="NotesTagsBox"/>
 
                                         <StackPanel Grid.Row="1"
                                                     Orientation="Horizontal"
@@ -1263,12 +1263,12 @@
                                                     Padding="12,6"
                                                     Margin="0,0,8,0"
                                                     Content="Ignore Alliance"
-                                                    Click="IgnoreAllianceButton_Click"/>
+                                                    Click="IgnoreAllianceButton_Click" AutomationProperties.AutomationId="IgnoreAllianceButton"/>
 
                                             <Button x:Name="OpenZkillButton"
                                                     Padding="12,6"
                                                     Content="Open zKill"
-                                                    Click="OpenZkillButton_Click"/>
+                                                    Click="OpenZkillButton_Click" AutomationProperties.AutomationId="OpenZkillButton"/>
                                         </StackPanel>
                                     </Grid>
                                 </Grid>
@@ -1278,10 +1278,10 @@
                 </TabItem>
 
                 <TabItem Header="Intel">
-                    <views:IntelSupportView x:Name="IntelSupportViewControl"/>
+                    <views:IntelSupportView x:Name="IntelSupportViewControl" AutomationProperties.AutomationId="IntelSupportViewControl"/>
                 </TabItem>
                 <TabItem Header="Ignore List">
-                    <views:IgnoreAllianceListView x:Name="IgnoreAllianceListViewControl"/>
+                    <views:IgnoreAllianceListView x:Name="IgnoreAllianceListViewControl" AutomationProperties.AutomationId="IgnoreAllianceListViewControl"/>
                 </TabItem>
 
                 <TabItem Header="Settings">
@@ -1308,7 +1308,7 @@
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Margin="0,0,0,10"
                                                       Checked="DarkModeCheckBox_Changed"
-                                                      Unchecked="DarkModeCheckBox_Changed"/>
+                                                      Unchecked="DarkModeCheckBox_Changed" AutomationProperties.AutomationId="DarkModeCheckBox"/>
 
                                             <TextBlock Text="PMG Theme"
                                                        Foreground="{DynamicResource BodyTextBrush}"
@@ -1318,7 +1318,7 @@
                                                       Width="220"
                                                       HorizontalAlignment="Left"
                                                       Margin="0,0,0,10"
-                                                      SelectionChanged="VisualThemeComboBox_SelectionChanged">
+                                                      SelectionChanged="VisualThemeComboBox_SelectionChanged" AutomationProperties.AutomationId="VisualThemeComboBox">
                                                 <ComboBoxItem Content="Charcoal Ops"/>
                                                 <ComboBoxItem Content="Tactical Grill"/>
                                                 <ComboBoxItem Content="Classic PMG Grill"/>
@@ -1334,7 +1334,7 @@
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Margin="0,0,0,10"
                                                       Checked="AlwaysOnTopCheckBox_Changed"
-                                                      Unchecked="AlwaysOnTopCheckBox_Changed"/>
+                                                      Unchecked="AlwaysOnTopCheckBox_Changed" AutomationProperties.AutomationId="AlwaysOnTopCheckBox"/>
 
                                             <CheckBox x:Name="PanelModeCheckBox"
                                                       Content="Enable Panel Mode on next launch"
@@ -1342,14 +1342,14 @@
                                                       Margin="0,0,0,6"
                                                       Visibility="Collapsed"
                                                       Checked="PanelModeCheckBox_Changed"
-                                                      Unchecked="PanelModeCheckBox_Changed"/>
+                                                      Unchecked="PanelModeCheckBox_Changed" AutomationProperties.AutomationId="PanelModeCheckBox"/>
 
                                             <TextBlock x:Name="PanelModeRestartNoticeText"
                                                        Foreground="{DynamicResource MutedTextBrush}"
                                                        FontSize="12"
                                                        Margin="24,0,0,14"
                                                        Visibility="Collapsed"
-                                                       Text="{x:Static services:AppReleaseMetadata.PanelModeAlwaysEnabledText}"/>
+                                                       Text="{x:Static services:AppReleaseMetadata.PanelModeAlwaysEnabledText}" AutomationProperties.AutomationId="PanelModeRestartNoticeText"/>
 
                                             <TextBlock Text="Window Surface Opacity"
                                                        Foreground="{DynamicResource BodyTextBrush}"
@@ -1367,14 +1367,14 @@
                                                         Maximum="100"
                                                         TickFrequency="5"
                                                         IsSnapToTickEnabled="False"
-                                                        ValueChanged="WindowOpacitySlider_ValueChanged"/>
+                                                        ValueChanged="WindowOpacitySlider_ValueChanged" AutomationProperties.AutomationId="WindowOpacitySlider"/>
 
                                                 <TextBlock Grid.Column="1"
                                                            x:Name="WindowOpacityValueText"
                                                            Margin="12,0,0,0"
                                                            VerticalAlignment="Center"
                                                            Foreground="{DynamicResource BodyTextBrush}"
-                                                           Text="100%"/>
+                                                           Text="100%" AutomationProperties.AutomationId="WindowOpacityValueText"/>
                                             </Grid>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
@@ -1387,7 +1387,7 @@
                                                         Padding="14,6"
                                                         Margin="0,0,10,0"
                                                         Content="Reset Window Layout"
-                                                        Click="ResetWindowLayoutButton_Click"/>
+                                                        Click="ResetWindowLayoutButton_Click" AutomationProperties.AutomationId="ResetWindowLayoutButton"/>
                                             </WrapPanel>
                                         </StackPanel>
                                     </Border>
@@ -1416,7 +1416,7 @@
                                                       Width="260"
                                                       HorizontalAlignment="Left"
                                                       Margin="0,0,0,10"
-                                                      SelectionChanged="ColorBlindModeComboBox_SelectionChanged">
+                                                      SelectionChanged="ColorBlindModeComboBox_SelectionChanged" AutomationProperties.AutomationId="ColorBlindModeComboBox">
                                                 <ComboBoxItem Content="Off / Standard"/>
                                                 <ComboBoxItem Content="Deuteranopia-friendly"/>
                                                 <ComboBoxItem Content="Protanopia-friendly"/>
@@ -1453,7 +1453,7 @@
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Margin="0,8,0,8"
                                                       Checked="ShowBoardGridLinesCheckBox_Changed"
-                                                      Unchecked="ShowBoardGridLinesCheckBox_Changed"/>
+                                                      Unchecked="ShowBoardGridLinesCheckBox_Changed" AutomationProperties.AutomationId="ShowBoardGridLinesCheckBox"/>
 
                                             <TextBlock Text="Grill board text size"
                                                        Foreground="{DynamicResource BodyTextBrush}"
@@ -1463,7 +1463,7 @@
                                                       Width="120"
                                                       HorizontalAlignment="Left"
                                                       Margin="0,0,0,10"
-                                                      SelectionChanged="BoardTextSizeComboBox_SelectionChanged">
+                                                      SelectionChanged="BoardTextSizeComboBox_SelectionChanged" AutomationProperties.AutomationId="BoardTextSizeComboBox">
                                                 <ComboBoxItem Content="10"/>
                                                 <ComboBoxItem Content="11"/>
                                                 <ComboBoxItem Content="12"/>
@@ -1481,7 +1481,7 @@
                                                       Width="180"
                                                       HorizontalAlignment="Left"
                                                       Margin="0,0,0,12"
-                                                      SelectionChanged="BoardFontFamilyComboBox_SelectionChanged">
+                                                      SelectionChanged="BoardFontFamilyComboBox_SelectionChanged" AutomationProperties.AutomationId="BoardFontFamilyComboBox">
                                                 <ComboBoxItem Content="App Default"/>
                                                 <ComboBoxItem Content="Segoe UI"/>
                                                 <ComboBoxItem Content="Consolas"/>
@@ -1506,7 +1506,7 @@
                                                       Foreground="{DynamicResource BodyTextBrush}"
                                                       Margin="0,8,0,4"
                                                       Checked="ShowCorpAllianceCountsCheckBox_Changed"
-                                                      Unchecked="ShowCorpAllianceCountsCheckBox_Changed"/>
+                                                      Unchecked="ShowCorpAllianceCountsCheckBox_Changed" AutomationProperties.AutomationId="ShowCorpAllianceCountsCheckBox"/>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
                                                        Margin="24,0,0,8"
@@ -1518,63 +1518,63 @@
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowSigColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowAllianceColumnCheckBox"
                                                           Content="Alliance"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowAllianceColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowCorpColumnCheckBox"
                                                           Content="Corp"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowCorpColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowKillsColumnCheckBox"
                                                           Content="Kills"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowKillsColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowLossesColumnCheckBox"
                                                           Content="Losses"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowLossesColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowAvgFleetSizeColumnCheckBox"
                                                           Content="Avg Fleet Size"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowAvgFleetSizeColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowLastShipSeenColumnCheckBox"
                                                           Content="Last Ship Seen"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowLastShipSeenColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowLastSeenColumnCheckBox"
                                                           Content="Last Seen"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowLastSeenColumnCheckBox"/>
 
                                                 <CheckBox x:Name="ShowCynoHullSeenColumnCheckBox"
                                                           Content="Cyno Hull Seen"
                                                           Foreground="{DynamicResource BodyTextBrush}"
                                                           Margin="0,0,18,8"
                                                           Checked="BoardColumnVisibilityCheckBox_Changed"
-                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed"/>
+                                                          Unchecked="BoardColumnVisibilityCheckBox_Changed" AutomationProperties.AutomationId="ShowCynoHullSeenColumnCheckBox"/>
                                             </WrapPanel>
 
                                             <WrapPanel>
@@ -1583,21 +1583,21 @@
                                                         Padding="14,6"
                                                         Margin="0,0,10,0"
                                                         Content="Show All"
-                                                        Click="ShowAllBoardColumnsButton_Click"/>
+                                                        Click="ShowAllBoardColumnsButton_Click" AutomationProperties.AutomationId="ShowAllBoardColumnsButton"/>
 
                                                 <Button x:Name="ResetBoardColumnsButton"
                                                         Width="140"
                                                         Padding="14,6"
                                                         Margin="0,0,10,0"
                                                         Content="Reset Visibility Defaults"
-                                                        Click="ResetBoardColumnsButton_Click"/>
+                                                        Click="ResetBoardColumnsButton_Click" AutomationProperties.AutomationId="ResetBoardColumnsButton"/>
 
                                                 <Button x:Name="ResetBoardLayoutButton"
                                                         Width="140"
                                                         Padding="14,6"
                                                         Margin="0,0,10,0"
                                                         Content="Reset Layout"
-                                                        Click="ResetBoardLayoutButton_Click"/>
+                                                        Click="ResetBoardLayoutButton_Click" AutomationProperties.AutomationId="ResetBoardLayoutButton"/>
                                             </WrapPanel>
 
                                             <TextBlock Style="{StaticResource SettingsLabelStyle}"
@@ -1649,11 +1649,11 @@
                                     Content="Check for Updates"
                                     Width="150"
                                     HorizontalAlignment="Left"
-                                    Click="ManualUpdateCheckButton_Click" />
+                                    Click="ManualUpdateCheckButton_Click"  AutomationProperties.AutomationId="ManualUpdateCheckButton"/>
                             <TextBlock x:Name="ManualUpdateStatusText"
                                        Text="Manual update check has not run this session."
                                        TextWrapping="Wrap"
-                                       Margin="0,8,0,0" />
+                                       Margin="0,8,0,0"  AutomationProperties.AutomationId="ManualUpdateStatusText"/>
                         </StackPanel>
                                         </StackPanel>
                                     </Border>
@@ -1661,7 +1661,7 @@
                             </TabItem>
 
                             <TabItem Header="Diagnostics" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
-                                <views:DiagnosticsSupportView x:Name="DiagnosticsSupportViewControl"/>
+                                <views:DiagnosticsSupportView x:Name="DiagnosticsSupportViewControl" AutomationProperties.AutomationId="DiagnosticsSupportViewControl"/>
                             </TabItem>
 
                         </TabControl>
@@ -1697,7 +1697,7 @@
                                             ContentSource="Header"
                                             HorizontalAlignment="Center"
                                             VerticalAlignment="Center"
-                                            RecognizesAccessKey="True" />
+                                            RecognizesAccessKey="True"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsSelected" Value="True">
@@ -1916,7 +1916,7 @@
                     Padding="8,5"
                     Background="{DynamicResource SurfaceAltBrush}"
                     BorderBrush="{DynamicResource PanelBorderBrush}"
-                    BorderThickness="1">
+                    BorderThickness="1" AutomationProperties.AutomationId="BoardStatusFooter">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -1935,7 +1935,7 @@
                                TextWrapping="NoWrap"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
-                               Margin="0,0,12,0"/>
+                               Margin="0,0,12,0" AutomationProperties.AutomationId="BoardPopulationStatusText"/>
 
                     <TextBlock x:Name="LastRefreshedText"
                                Grid.Row="0"
@@ -1944,7 +1944,7 @@
                                Text="Last Refreshed: --"
                                TextWrapping="NoWrap"
                                TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center" AutomationProperties.AutomationId="LastRefreshedText"/>
 
                     <TextBlock x:Name="BoardSummaryText"
                                Grid.Row="1"
@@ -1955,7 +1955,7 @@
                                Margin="0,5,0,0"
                                TextWrapping="Wrap"
                                TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"/>
+                               VerticalAlignment="Center" AutomationProperties.AutomationId="BoardSummaryText"/>
                 </Grid>
             </Border>
         </Grid>
