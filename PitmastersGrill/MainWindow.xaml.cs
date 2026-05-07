@@ -1,20 +1,13 @@
 using PitmastersGrill.Diagnostics;
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
-using PitmastersGrill.Providers;
 using PitmastersGrill.Services;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
+using PitmastersGrill.Views;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -25,7 +18,6 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Navigation;
 using System.Windows.Threading;
-using PitmastersGrill.Views;
 using FormsScreen = System.Windows.Forms.Screen;
 
 namespace PitmastersGrill
@@ -67,6 +59,7 @@ namespace PitmastersGrill
         private readonly PilotBoardRowDetailFormatter _pilotBoardRowDetailFormatter;
         private readonly DetailPaneController _detailPaneController;
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
+        private readonly MainWindowSettingsCoordinator _mainWindowSettingsCoordinator;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly SettingsTabController _settingsTabController;
@@ -131,6 +124,7 @@ namespace PitmastersGrill
         private bool _globalResetWindowHotKeyRegistered;
         private bool _globalClearBoardHotKeyRegistered;
         private bool _globalToggleBoardModeHotKeyRegistered;
+        private bool _isMainWindowInitialized;
         private EveSessionContext? _currentEveSessionContext;
         private DateTime _lastSessionContextRefreshUtc = DateTime.MinValue;
         private bool _isSessionContextRefreshInFlight;
@@ -146,6 +140,11 @@ namespace PitmastersGrill
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
             _settingsTabController = new SettingsTabController();
+            _mainWindowSettingsCoordinator = new MainWindowSettingsCoordinator(
+                _mainWindowAppearanceController,
+                _settingsTabController,
+                _boardDisplaySettingsController,
+                settings => _mainWindowAppearanceController.SaveSettings(settings));
             _analysisTabController = new AnalysisTabController();
             _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
@@ -335,7 +334,7 @@ namespace PitmastersGrill
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
-            _mainWindowAppearanceController.InitializeSettingsUi(
+            _mainWindowSettingsCoordinator.InitializeSettingsUi(
                 _appSettings,
                 DarkModeCheckBox,
                 AlwaysOnTopCheckBox,
@@ -350,16 +349,17 @@ namespace PitmastersGrill
                 IntelSupportViewControl.EffectiveKillmailDataPathTextBlock,
                 VisualThemeComboBox,
                 ColorBlindModeComboBox,
-                DiagnosticsSupportViewControl.LogLevelComboBoxControl);
-            _settingsTabController.ApplySettingsToControls(
-                _appSettings,
+                DiagnosticsSupportViewControl.LogLevelComboBoxControl,
                 IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl,
                 IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl,
-                IntelSupportViewControl.PilotDetailPlacementComboBoxControl);
+                IntelSupportViewControl.PilotDetailPlacementComboBoxControl,
+                ShowBoardGridLinesCheckBox,
+                BoardTextSizeComboBox,
+                BoardFontFamilyComboBox);
 
             InitializeBoardColumnLayoutUi();
             InitializeBoardColumnVisibilityUi();
-            InitializeBoardDisplaySettingsUi();
+            ApplyBoardDisplaySettings();
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
 
@@ -386,6 +386,7 @@ namespace PitmastersGrill
             UpdateAnalysisTab();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
             ApplyEveSessionContext(CreatePendingEveSessionContext());
+            _isMainWindowInitialized = true;
 
             AppLogger.DatabaseInfo(
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
@@ -434,6 +435,13 @@ namespace PitmastersGrill
             AppLogger.UiInfo("MainWindow closing requested.");
             _isShuttingDown = true;
 
+            if (!_isMainWindowInitialized)
+            {
+                AppLogger.UiWarn("MainWindow closed before initialization completed. Skipping full shutdown cleanup.");
+                base.OnClosed(e);
+                return;
+            }
+
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             RequestOwnedBackgroundWorkStop("MainWindow closed");
@@ -478,7 +486,8 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
         }
 
-        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged && previousCompactMode.HasValue) { var wasBoardMode = previousCompactMode.GetValueOrDefault(); var outgoingLayoutMode = wasBoardMode ? WindowLayoutMode.Board : WindowLayoutMode.Normal; SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", outgoingLayoutMode); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); } private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged && previousCompactMode.HasValue) { var wasBoardMode = previousCompactMode.GetValueOrDefault(); var outgoingLayoutMode = wasBoardMode ? WindowLayoutMode.Board : WindowLayoutMode.Normal; SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", outgoingLayoutMode); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); }
+        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!ReferenceEquals(sender, MainTabControl))
             {
@@ -768,28 +777,20 @@ namespace PitmastersGrill
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleDarkModeChanged(
+            _mainWindowSettingsCoordinator.HandleDarkModeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 DarkModeCheckBox.IsChecked == true,
                 Resources,
                 this,
-                ApplyBoardPopulationStatusVisual);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+                ApplyBoardPopulationStatusVisual,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
         }
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleAlwaysOnTopChanged(
+            _mainWindowSettingsCoordinator.HandleAlwaysOnTopChanged(
+                _isApplyingSettings,
                 _appSettings,
                 AlwaysOnTopCheckBox.IsChecked == true,
                 this,
@@ -799,12 +800,8 @@ namespace PitmastersGrill
 
         private void PanelModeCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandlePanelModeChanged(
+            _mainWindowSettingsCoordinator.HandlePanelModeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 PanelModeCheckBox.IsChecked == true,
                 PanelModeRestartNoticeText);
@@ -812,30 +809,14 @@ namespace PitmastersGrill
 
         private void WindowOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_mainWindowAppearanceController == null)
-            {
-                return;
-            }
-
-            var opacityPercent = _mainWindowAppearanceController.CoerceOpacityPercent(WindowOpacitySlider.Value);
-
-            if (WindowOpacityValueText != null)
-            {
-                WindowOpacityValueText.Text = $"{opacityPercent:0}%";
-            }
-
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleWindowOpacityChanged(
+            _mainWindowSettingsCoordinator.HandleWindowOpacityChanged(
+                _isApplyingSettings,
                 _appSettings,
                 WindowOpacitySlider.Value,
                 this,
                 WindowOpacityValueText,
-                Resources);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+                Resources,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
         }
 
         private void ResetWindowLayoutButton_Click(object sender, RoutedEventArgs e)
@@ -879,12 +860,10 @@ namespace PitmastersGrill
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || DiagnosticsSupportViewControl == null)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, DiagnosticsSupportViewControl.LogLevelComboBoxControl);
+            _mainWindowSettingsCoordinator.HandleLogLevelChanged(
+                _isApplyingSettings,
+                _appSettings,
+                DiagnosticsSupportViewControl?.LogLevelComboBoxControl);
         }
 
         private void WireDiagnosticsSupportView()
@@ -917,50 +896,35 @@ namespace PitmastersGrill
 
         private void VisualThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || VisualThemeComboBox == null)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleVisualThemeChanged(
+            _mainWindowSettingsCoordinator.HandleVisualThemeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 VisualThemeComboBox,
                 Resources,
                 this,
-                ApplyBoardPopulationStatusVisual);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+                ApplyBoardPopulationStatusVisual,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
         }
 
         private void ColorBlindModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || ColorBlindModeComboBox == null)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleColorBlindModeChanged(
+            _mainWindowSettingsCoordinator.HandleColorBlindModeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 ColorBlindModeComboBox,
                 Resources,
                 this,
-                ApplyBoardPopulationStatusVisual);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
-            PilotBoard?.Items.Refresh();
+                ApplyBoardPopulationStatusVisual,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources),
+                () => PilotBoard?.Items.Refresh());
         }
 
         private void PilotDetailPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || IntelSupportViewControl == null)
-            {
-                return;
-            }
-
-            _settingsTabController.SetPilotDetailPlacementPreference(
+            _mainWindowSettingsCoordinator.HandlePilotDetailPlacementPreferenceChanged(
+                _isApplyingSettings,
                 _appSettings,
-                IntelSupportViewControl.PilotDetailPlacementComboBoxControl.SelectedIndex);
-
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Pilot detail placement preference changed. preference={_appSettings.PilotDetailPlacementPreference}");
+                IntelSupportViewControl?.PilotDetailPlacementComboBoxControl);
         }
 
         private void InitializeBoardColumnVisibilityUi()
@@ -987,31 +951,6 @@ namespace PitmastersGrill
             ApplyCanonicalBoardColumnLayout("Apply canonical default board layout");
         }
 
-        private void InitializeBoardDisplaySettingsUi()
-        {
-            ApplyBoardDisplaySettingsToControls();
-            ApplyBoardDisplaySettings();
-        }
-
-        private void ApplyBoardDisplaySettingsToControls()
-        {
-            var wasApplyingSettings = _isApplyingSettings;
-            _isApplyingSettings = true;
-
-            try
-            {
-                _boardDisplaySettingsController.ApplySettingsToControls(
-                    _appSettings,
-                    ShowBoardGridLinesCheckBox,
-                    BoardTextSizeComboBox,
-                    BoardFontFamilyComboBox);
-            }
-            finally
-            {
-                _isApplyingSettings = wasApplyingSettings;
-            }
-        }
-
         private void ApplyBoardDisplaySettings()
         {
             _boardDisplaySettingsController.ApplySettingsToBoard(_appSettings, PilotBoard, Resources);
@@ -1019,47 +958,31 @@ namespace PitmastersGrill
 
         private void ShowBoardGridLinesCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings || ShowBoardGridLinesCheckBox == null)
-            {
-                return;
-            }
-
-            _boardDisplaySettingsController.SetShowBoardGridLines(_appSettings, ShowBoardGridLinesCheckBox.IsChecked == true);
-            ApplyBoardDisplaySettings();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo($"Board grid lines changed. enabled={_appSettings.ShowBoardGridLines}");
+            _mainWindowSettingsCoordinator.HandleShowBoardGridLinesChanged(
+                _isApplyingSettings,
+                _appSettings,
+                ShowBoardGridLinesCheckBox,
+                ApplyBoardDisplaySettings);
         }
 
         private void BoardTextSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || BoardTextSizeComboBox == null)
-            {
-                return;
-            }
-
-            _boardDisplaySettingsController.SetBoardTextSize(_appSettings, BoardTextSizeComboBox.SelectedIndex);
-            ApplyBoardDisplaySettings();
-            UpdateWindowMinimumSize();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo($"Board text size changed. size={_appSettings.BoardTextSize}");
+            _mainWindowSettingsCoordinator.HandleBoardTextSizeChanged(
+                _isApplyingSettings,
+                _appSettings,
+                BoardTextSizeComboBox,
+                ApplyBoardDisplaySettings,
+                UpdateWindowMinimumSize);
         }
 
         private void BoardFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || BoardFontFamilyComboBox == null)
-            {
-                return;
-            }
-
-            _boardDisplaySettingsController.SetBoardFontFamily(_appSettings, BoardFontFamilyComboBox.SelectedIndex);
-            ApplyBoardDisplaySettings();
-            UpdateWindowMinimumSize();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo(
-                $"Board font family changed. family='{(_appSettings.BoardFontFamily.Length == 0 ? "Default" : _appSettings.BoardFontFamily)}'");
+            _mainWindowSettingsCoordinator.HandleBoardFontFamilyChanged(
+                _isApplyingSettings,
+                _appSettings,
+                BoardFontFamilyComboBox,
+                ApplyBoardDisplaySettings,
+                UpdateWindowMinimumSize);
         }
 
         private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -2588,15 +2511,10 @@ namespace PitmastersGrill
 
         private void BackgroundHistoricalRepairEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            var enabled = IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl.IsChecked == true;
-            _settingsTabController.SetBackgroundHistoricalRepairEnabled(_appSettings, enabled);
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Background historical repair setting changed. enabled={enabled}");
+            _mainWindowSettingsCoordinator.HandleBackgroundHistoricalRepairChanged(
+                _isApplyingSettings,
+                _appSettings,
+                IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl.IsChecked == true);
         }
 
         private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
@@ -2913,6 +2831,16 @@ namespace PitmastersGrill
             if (_activePilotDetailWindow != null)
             {
                 _activePilotDetailWindow.SaveCurrentState();
+                return;
+            }
+
+            if (_detailPaneController == null
+                || NotesTagsBox == null
+                || KnownCynoOverrideCheckBox == null
+                || BaitOverrideCheckBox == null
+                || PilotBoard == null)
+            {
+                AppLogger.UiWarn("Skipping notes/tag save because detail pane state was not fully initialized.");
                 return;
             }
 
@@ -3961,7 +3889,13 @@ namespace PitmastersGrill
             }
         }
 
-        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; } private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); } private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult( _appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo( $"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo( $"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); } private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); } private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot( bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn( $"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo( $"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); } private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); } private Rect GetDefaultWindowBoundsForCurrentDisplay()
+        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; }
+        private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); }
+        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult(_appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo($"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo($"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); }
+        private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); }
+        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot(bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn($"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo($"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); }
+        private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); }
+        private Rect GetDefaultWindowBoundsForCurrentDisplay()
         {
             return _windowLayoutController.GetDefaultWindowBounds(
                 GetMonitorWorkAreasDip(),
