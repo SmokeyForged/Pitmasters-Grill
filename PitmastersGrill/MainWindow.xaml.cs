@@ -1,20 +1,13 @@
 using PitmastersGrill.Diagnostics;
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
-using PitmastersGrill.Providers;
 using PitmastersGrill.Services;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
+using PitmastersGrill.Views;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -25,7 +18,6 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Navigation;
 using System.Windows.Threading;
-using PitmastersGrill.Views;
 using FormsScreen = System.Windows.Forms.Screen;
 
 namespace PitmastersGrill
@@ -67,6 +59,7 @@ namespace PitmastersGrill
         private readonly PilotBoardRowDetailFormatter _pilotBoardRowDetailFormatter;
         private readonly DetailPaneController _detailPaneController;
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
+        private readonly MainWindowSettingsCoordinator _mainWindowSettingsCoordinator;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly SettingsTabController _settingsTabController;
@@ -86,6 +79,12 @@ namespace PitmastersGrill
         private readonly EveSessionContextService _eveSessionContextService;
         private readonly MainWindowDiagnostics _diagnostics;
         private readonly IntelUpdateBannerController _intelUpdateBannerController;
+        private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
+        private readonly IntelActionsController _intelActionsController = null!;
+        private readonly IntelMaintenanceActionsController _intelMaintenanceActionsController = null!;
+        private readonly ProviderHealthPresenter _providerHealthPresenter;
+        private readonly DiagnosticsCacheStatsPresenter _diagnosticsCacheStatsPresenter;
+        private readonly DiagnosticsCacheMaintenanceController _diagnosticsCacheMaintenanceController = null!;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -125,6 +124,7 @@ namespace PitmastersGrill
         private bool _globalResetWindowHotKeyRegistered;
         private bool _globalClearBoardHotKeyRegistered;
         private bool _globalToggleBoardModeHotKeyRegistered;
+        private bool _isMainWindowInitialized;
         private EveSessionContext? _currentEveSessionContext;
         private DateTime _lastSessionContextRefreshUtc = DateTime.MinValue;
         private bool _isSessionContextRefreshInFlight;
@@ -140,6 +140,11 @@ namespace PitmastersGrill
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
             _settingsTabController = new SettingsTabController();
+            _mainWindowSettingsCoordinator = new MainWindowSettingsCoordinator(
+                _mainWindowAppearanceController,
+                _settingsTabController,
+                _boardDisplaySettingsController,
+                settings => _mainWindowAppearanceController.SaveSettings(settings));
             _analysisTabController = new AnalysisTabController();
             _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
@@ -148,6 +153,8 @@ namespace PitmastersGrill
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
             InitializeComponent();
             AppLogger.UiInfo("MainWindow InitializeComponent end.");
+            WireDiagnosticsSupportView();
+            WireIntelSupportView();
             RegisterCompactBoardDragHandlers();
             Loaded += MainWindow_Loaded;
 
@@ -176,6 +183,53 @@ namespace PitmastersGrill
             };
             _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
             _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
+            _providerHealthPresenter = new ProviderHealthPresenter();
+            _diagnosticsCacheStatsPresenter = new DiagnosticsCacheStatsPresenter();
+            _intelStatusDetailsPresenter = new IntelStatusDetailsPresenter(
+                IntelSupportViewControl.IntelLastUpdatedTextBlock,
+                IntelSupportViewControl.IntelOldestKillmailDayTextBlock,
+                IntelSupportViewControl.IntelNewestKillmailDayTextBlock,
+                IntelSupportViewControl.IntelCurrentUpdateStatusTextBlock,
+                IntelSupportViewControl.IntelTotalProgressBarControl,
+                IntelSupportViewControl.IntelTotalProgressTextBlock,
+                IntelSupportViewControl.IntelCurrentDayProgressBarControl,
+                IntelSupportViewControl.IntelCurrentDayProgressTextBlock,
+                IntelSupportViewControl.IntelLiveFeedSourceTextBlock,
+                IntelSupportViewControl.IntelLiveFeedStatusTextBlock,
+                IntelSupportViewControl.IntelLiveFeedEnabledTextBlock,
+                IntelSupportViewControl.IntelLiveFeedRecentImportsTextBlock,
+                IntelSupportViewControl.IntelLiveFeedNextSequenceTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastProcessedSequenceTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastSuccessTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastCaughtUpTextBlock,
+                IntelSupportViewControl.IntelLiveFeedLastErrorTextBlock,
+                IntelSupportViewControl.TodaysFreshnessStatusTextBlock,
+                IntelSupportViewControl.TodaysFreshnessVisiblePilotsTextBlock,
+                IntelSupportViewControl.TodaysFreshnessEntitiesQueriedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessResultsFoundTextBlock,
+                IntelSupportViewControl.TodaysFreshnessKnownSkippedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessImportedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessFailedTextBlock,
+                IntelSupportViewControl.TodaysFreshnessLastRunTextBlock,
+                IntelSupportViewControl.TodaysFreshnessDetailTextBlock,
+                IntelSupportViewControl.TodaysFreshnessLastErrorTextBlock,
+                IntelSupportViewControl.RunTodaysFreshnessButtonControl,
+                IntelSupportViewControl.HistoricalFreshnessStatusTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessModeTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessVisiblePilotsTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessCandidatesConsideredTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessCandidatesSkippedCooldownTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessPilotsCheckedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessDaysCheckedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessEntitiesQueriedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessResultsFoundTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessKnownSkippedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessImportedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessFailedTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessLastRunTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessDetailTextBlock,
+                IntelSupportViewControl.HistoricalFreshnessLastErrorTextBlock,
+                IntelSupportViewControl.RunHistoricalFreshnessButtonControl);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
@@ -239,12 +293,48 @@ namespace PitmastersGrill
                 () => _isShuttingDown);
             _diagnosticsActionController = new DiagnosticsActionController(
                 this,
-                DiagnosticsStatusText,
+                DiagnosticsSupportViewControl.DiagnosticsStatusTextBlock,
                 _browserLauncher);
+            _intelActionsController = new IntelActionsController(
+                this,
+                _backgroundIntelUpdateService,
+                _settingsTabController,
+                () => _appSettings,
+                () => _mainWindowAppearanceController.SaveSettings(_appSettings),
+                () => _isApplyingSettings,
+                () => _isShuttingDown,
+                _windowShutdownCts.Token,
+                () => _currentRows.ToList(),
+                RefreshCurrentBoardRowsFromLocalIntelAsync);
+            _intelMaintenanceActionsController = new IntelMaintenanceActionsController(
+                () => _boardPopulationEntryController.IsClipboardProcessing,
+                SetDiagnosticsStatus,
+                enabled => DiagnosticsSupportViewControl.SetRebuildKillmailDerivedIntelEnabled(enabled),
+                enabled => IntelSupportViewControl.EnableKillmailDbPullButtonControl.IsEnabled = enabled,
+                () => _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings),
+                () => _isShuttingDown,
+                _windowShutdownCts.Token,
+                cancellationToken => _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(cancellationToken),
+                (seedDays, cancellationToken) => _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, cancellationToken),
+                RefreshCacheStatsUi,
+                RefreshConfirmedCynoModuleStateForCurrentRows,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image));
+            _diagnosticsCacheMaintenanceController = new DiagnosticsCacheMaintenanceController(
+                () => _boardPopulationEntryController.IsClipboardProcessing,
+                SetDiagnosticsStatus,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
+                () => DiagnosticTelemetry.GetProviderHealthSnapshots(),
+                snapshots => _providerHealthPresenter.ApplySnapshots(_providerHealthRows, snapshots),
+                () => _cacheMaintenanceService.GetStats(),
+                () => _cacheMaintenanceService.ClearExpired(),
+                () => _cacheMaintenanceService.Vacuum(),
+                () => _cacheMaintenanceService.ClearAll(),
+                _diagnosticsCacheStatsPresenter,
+                text => DiagnosticsSupportViewControl.SetCacheStatsText(text));
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
-            _mainWindowAppearanceController.InitializeSettingsUi(
+            _mainWindowSettingsCoordinator.InitializeSettingsUi(
                 _appSettings,
                 DarkModeCheckBox,
                 AlwaysOnTopCheckBox,
@@ -252,23 +342,24 @@ namespace PitmastersGrill
                 PanelModeRestartNoticeText,
                 WindowOpacitySlider,
                 WindowOpacityValueText,
-                MaxKillmailAgeDaysTextBox,
-                EffectiveMaxKillmailAgeText,
-                KillmailDataRootPathTextBox,
-                KillmailDataPathModeText,
-                EffectiveKillmailDataPathText,
+                IntelSupportViewControl.MaxKillmailAgeDaysTextBoxControl,
+                IntelSupportViewControl.EffectiveMaxKillmailAgeTextBlock,
+                IntelSupportViewControl.KillmailDataRootPathTextBoxControl,
+                IntelSupportViewControl.KillmailDataPathModeTextBlock,
+                IntelSupportViewControl.EffectiveKillmailDataPathTextBlock,
                 VisualThemeComboBox,
                 ColorBlindModeComboBox,
-                LogLevelComboBox);
-            _settingsTabController.ApplySettingsToControls(
-                _appSettings,
-                EnableLiveZkillFeedCheckBox,
-                BackgroundHistoricalRepairEnabledCheckBox,
-                PilotDetailPlacementComboBox);
+                DiagnosticsSupportViewControl.LogLevelComboBoxControl,
+                IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl,
+                IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl,
+                IntelSupportViewControl.PilotDetailPlacementComboBoxControl,
+                ShowBoardGridLinesCheckBox,
+                BoardTextSizeComboBox,
+                BoardFontFamilyComboBox);
 
             InitializeBoardColumnLayoutUi();
             InitializeBoardColumnVisibilityUi();
-            InitializeBoardDisplaySettingsUi();
+            ApplyBoardDisplaySettings();
 
             AppLogger.ConfigureLogLevel(_appSettings.LogLevel);
 
@@ -282,7 +373,7 @@ namespace PitmastersGrill
             _currentRows.CollectionChanged += CurrentRows_CollectionChanged;
             AnalysisAllianceListBox.ItemsSource = _analysisAllianceItems;
             AnalysisCorpListBox.ItemsSource = _analysisCorpItems;
-            ProviderHealthGrid.ItemsSource = _providerHealthRows;
+            DiagnosticsSupportViewControl.SetProviderHealthItemsSource(_providerHealthRows);
             RefreshProviderHealthUi();
             RefreshCacheStatsUi();
             UpdateLastRefreshed();
@@ -295,6 +386,7 @@ namespace PitmastersGrill
             UpdateAnalysisTab();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
             ApplyEveSessionContext(CreatePendingEveSessionContext());
+            _isMainWindowInitialized = true;
 
             AppLogger.DatabaseInfo(
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
@@ -343,6 +435,13 @@ namespace PitmastersGrill
             AppLogger.UiInfo("MainWindow closing requested.");
             _isShuttingDown = true;
 
+            if (!_isMainWindowInitialized)
+            {
+                AppLogger.UiWarn("MainWindow closed before initialization completed. Skipping full shutdown cleanup.");
+                base.OnClosed(e);
+                return;
+            }
+
             SaveCurrentNotesAndTags();
             CancelBoardPopulationRetry();
             RequestOwnedBackgroundWorkStop("MainWindow closed");
@@ -387,7 +486,8 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
         }
 
-        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged && previousCompactMode.HasValue) { var wasBoardMode = previousCompactMode.GetValueOrDefault(); var outgoingLayoutMode = wasBoardMode ? WindowLayoutMode.Board : WindowLayoutMode.Normal; SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", outgoingLayoutMode); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); } private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged && previousCompactMode.HasValue) { var wasBoardMode = previousCompactMode.GetValueOrDefault(); var outgoingLayoutMode = wasBoardMode ? WindowLayoutMode.Board : WindowLayoutMode.Normal; SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", outgoingLayoutMode); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); }
+        private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!ReferenceEquals(sender, MainTabControl))
             {
@@ -677,28 +777,20 @@ namespace PitmastersGrill
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleDarkModeChanged(
+            _mainWindowSettingsCoordinator.HandleDarkModeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 DarkModeCheckBox.IsChecked == true,
                 Resources,
                 this,
-                ApplyBoardPopulationStatusVisual);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+                ApplyBoardPopulationStatusVisual,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
         }
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleAlwaysOnTopChanged(
+            _mainWindowSettingsCoordinator.HandleAlwaysOnTopChanged(
+                _isApplyingSettings,
                 _appSettings,
                 AlwaysOnTopCheckBox.IsChecked == true,
                 this,
@@ -708,12 +800,8 @@ namespace PitmastersGrill
 
         private void PanelModeCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandlePanelModeChanged(
+            _mainWindowSettingsCoordinator.HandlePanelModeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 PanelModeCheckBox.IsChecked == true,
                 PanelModeRestartNoticeText);
@@ -721,30 +809,14 @@ namespace PitmastersGrill
 
         private void WindowOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_mainWindowAppearanceController == null)
-            {
-                return;
-            }
-
-            var opacityPercent = _mainWindowAppearanceController.CoerceOpacityPercent(WindowOpacitySlider.Value);
-
-            if (WindowOpacityValueText != null)
-            {
-                WindowOpacityValueText.Text = $"{opacityPercent:0}%";
-            }
-
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleWindowOpacityChanged(
+            _mainWindowSettingsCoordinator.HandleWindowOpacityChanged(
+                _isApplyingSettings,
                 _appSettings,
                 WindowOpacitySlider.Value,
                 this,
                 WindowOpacityValueText,
-                Resources);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+                Resources,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
         }
 
         private void ResetWindowLayoutButton_Click(object sender, RoutedEventArgs e)
@@ -788,58 +860,71 @@ namespace PitmastersGrill
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || LogLevelComboBox == null)
-            {
-                return;
-            }
+            _mainWindowSettingsCoordinator.HandleLogLevelChanged(
+                _isApplyingSettings,
+                _appSettings,
+                DiagnosticsSupportViewControl?.LogLevelComboBoxControl);
+        }
 
-            _mainWindowAppearanceController.HandleLogLevelChanged(_appSettings, LogLevelComboBox);
+        private void WireDiagnosticsSupportView()
+        {
+            DiagnosticsSupportViewControl.OpenLogsRequested += OpenLogsButton_Click;
+            DiagnosticsSupportViewControl.PackageDiagnosticsRequested += PackageDiagnosticsButton_Click;
+            DiagnosticsSupportViewControl.OpenDiagnosticsFolderRequested += OpenDiagnosticsFolderButton_Click;
+            DiagnosticsSupportViewControl.LogLevelSelectionChanged += LogLevelComboBox_SelectionChanged;
+            DiagnosticsSupportViewControl.RefreshProviderHealthRequested += RefreshProviderHealthButton_Click;
+            DiagnosticsSupportViewControl.RefreshCacheStatsRequested += RefreshCacheStatsButton_Click;
+            DiagnosticsSupportViewControl.ClearExpiredCacheRequested += ClearExpiredCacheButton_Click;
+            DiagnosticsSupportViewControl.VacuumCacheRequested += VacuumCacheButton_Click;
+            DiagnosticsSupportViewControl.ClearAllCacheRequested += ClearAllCacheButton_Click;
+            DiagnosticsSupportViewControl.RebuildKillmailDerivedIntelRequested += RebuildKillmailDerivedIntelButton_Click;
+        }
+
+        private void WireIntelSupportView()
+        {
+            IntelSupportViewControl.SaveMaxKillmailAgeRequested += SaveMaxKillmailAgeButton_Click;
+            IntelSupportViewControl.UseDefaultMaxKillmailAgeRequested += UseDefaultMaxKillmailAgeButton_Click;
+            IntelSupportViewControl.EnableKillmailDbPullRequested += EnableKillmailDbPullButton_Click;
+            IntelSupportViewControl.EnableLiveZkillFeedToggled += EnableLiveZkillFeedCheckBox_Checked;
+            IntelSupportViewControl.BackgroundHistoricalRepairToggled += BackgroundHistoricalRepairEnabledCheckBox_Checked;
+            IntelSupportViewControl.PilotDetailPlacementSelectionChanged += PilotDetailPlacementComboBox_SelectionChanged;
+            IntelSupportViewControl.SaveKillmailPathRequested += SaveKillmailPathButton_Click;
+            IntelSupportViewControl.UseDefaultKillmailPathRequested += UseDefaultKillmailPathButton_Click;
+            IntelSupportViewControl.RunTodaysFreshnessRequested += RunTodaysFreshnessButton_Click;
+            IntelSupportViewControl.RunHistoricalFreshnessRequested += RunHistoricalFreshnessButton_Click;
         }
 
         private void VisualThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || VisualThemeComboBox == null)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleVisualThemeChanged(
+            _mainWindowSettingsCoordinator.HandleVisualThemeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 VisualThemeComboBox,
                 Resources,
                 this,
-                ApplyBoardPopulationStatusVisual);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
+                ApplyBoardPopulationStatusVisual,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
         }
 
         private void ColorBlindModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || ColorBlindModeComboBox == null)
-            {
-                return;
-            }
-
-            _mainWindowAppearanceController.HandleColorBlindModeChanged(
+            _mainWindowSettingsCoordinator.HandleColorBlindModeChanged(
+                _isApplyingSettings,
                 _appSettings,
                 ColorBlindModeComboBox,
                 Resources,
                 this,
-                ApplyBoardPopulationStatusVisual);
-            _activePilotDetailWindow?.ApplyThemeResources(Resources);
-            PilotBoard?.Items.Refresh();
+                ApplyBoardPopulationStatusVisual,
+                () => _activePilotDetailWindow?.ApplyThemeResources(Resources),
+                () => PilotBoard?.Items.Refresh());
         }
 
         private void PilotDetailPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || PilotDetailPlacementComboBox == null)
-            {
-                return;
-            }
-
-            _settingsTabController.SetPilotDetailPlacementPreference(_appSettings, PilotDetailPlacementComboBox.SelectedIndex);
-
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Pilot detail placement preference changed. preference={_appSettings.PilotDetailPlacementPreference}");
+            _mainWindowSettingsCoordinator.HandlePilotDetailPlacementPreferenceChanged(
+                _isApplyingSettings,
+                _appSettings,
+                IntelSupportViewControl?.PilotDetailPlacementComboBoxControl);
         }
 
         private void InitializeBoardColumnVisibilityUi()
@@ -866,31 +951,6 @@ namespace PitmastersGrill
             ApplyCanonicalBoardColumnLayout("Apply canonical default board layout");
         }
 
-        private void InitializeBoardDisplaySettingsUi()
-        {
-            ApplyBoardDisplaySettingsToControls();
-            ApplyBoardDisplaySettings();
-        }
-
-        private void ApplyBoardDisplaySettingsToControls()
-        {
-            var wasApplyingSettings = _isApplyingSettings;
-            _isApplyingSettings = true;
-
-            try
-            {
-                _boardDisplaySettingsController.ApplySettingsToControls(
-                    _appSettings,
-                    ShowBoardGridLinesCheckBox,
-                    BoardTextSizeComboBox,
-                    BoardFontFamilyComboBox);
-            }
-            finally
-            {
-                _isApplyingSettings = wasApplyingSettings;
-            }
-        }
-
         private void ApplyBoardDisplaySettings()
         {
             _boardDisplaySettingsController.ApplySettingsToBoard(_appSettings, PilotBoard, Resources);
@@ -898,47 +958,31 @@ namespace PitmastersGrill
 
         private void ShowBoardGridLinesCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings || ShowBoardGridLinesCheckBox == null)
-            {
-                return;
-            }
-
-            _boardDisplaySettingsController.SetShowBoardGridLines(_appSettings, ShowBoardGridLinesCheckBox.IsChecked == true);
-            ApplyBoardDisplaySettings();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo($"Board grid lines changed. enabled={_appSettings.ShowBoardGridLines}");
+            _mainWindowSettingsCoordinator.HandleShowBoardGridLinesChanged(
+                _isApplyingSettings,
+                _appSettings,
+                ShowBoardGridLinesCheckBox,
+                ApplyBoardDisplaySettings);
         }
 
         private void BoardTextSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || BoardTextSizeComboBox == null)
-            {
-                return;
-            }
-
-            _boardDisplaySettingsController.SetBoardTextSize(_appSettings, BoardTextSizeComboBox.SelectedIndex);
-            ApplyBoardDisplaySettings();
-            UpdateWindowMinimumSize();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo($"Board text size changed. size={_appSettings.BoardTextSize}");
+            _mainWindowSettingsCoordinator.HandleBoardTextSizeChanged(
+                _isApplyingSettings,
+                _appSettings,
+                BoardTextSizeComboBox,
+                ApplyBoardDisplaySettings,
+                UpdateWindowMinimumSize);
         }
 
         private void BoardFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isApplyingSettings || BoardFontFamilyComboBox == null)
-            {
-                return;
-            }
-
-            _boardDisplaySettingsController.SetBoardFontFamily(_appSettings, BoardFontFamilyComboBox.SelectedIndex);
-            ApplyBoardDisplaySettings();
-            UpdateWindowMinimumSize();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo(
-                $"Board font family changed. family='{(_appSettings.BoardFontFamily.Length == 0 ? "Default" : _appSettings.BoardFontFamily)}'");
+            _mainWindowSettingsCoordinator.HandleBoardFontFamilyChanged(
+                _isApplyingSettings,
+                _appSettings,
+                BoardFontFamilyComboBox,
+                ApplyBoardDisplaySettings,
+                UpdateWindowMinimumSize);
         }
 
         private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -1452,9 +1496,9 @@ namespace PitmastersGrill
         {
             _intelUpdateBannerController.HandleStatusChanged(
                 snapshot,
-                IntelUpdateBanner,
-                IntelUpdateStatusText,
-                IntelUpdateDetailText);
+                IntelSupportViewControl.IntelUpdateBannerControl,
+                IntelSupportViewControl.IntelUpdateStatusTextBlock,
+                IntelSupportViewControl.IntelUpdateDetailTextBlock);
 
             if (Dispatcher.CheckAccess())
             {
@@ -1470,9 +1514,9 @@ namespace PitmastersGrill
         {
             _intelUpdateBannerController.ApplySnapshot(
                 snapshot,
-                IntelUpdateBanner,
-                IntelUpdateStatusText,
-                IntelUpdateDetailText);
+                IntelSupportViewControl.IntelUpdateBannerControl,
+                IntelSupportViewControl.IntelUpdateStatusTextBlock,
+                IntelSupportViewControl.IntelUpdateDetailTextBlock);
 
             ApplyIntelStatusDetails(snapshot);
         }
@@ -1483,344 +1527,8 @@ namespace PitmastersGrill
             {
                 return;
             }
-
-            if (IntelLastUpdatedText != null)
-            {
-                IntelLastUpdatedText.Text = FormatIntelTimestamp(snapshot.LastSuccessfulUpdateAtUtc, "No successful local intel update recorded yet.");
-            }
-
-            if (IntelOldestKillmailDayText != null)
-            {
-                IntelOldestKillmailDayText.Text = FormatIntelDay(snapshot.EarliestCompleteDayUtc, "No local killmail days recorded yet.");
-            }
-
-            if (IntelNewestKillmailDayText != null)
-            {
-                IntelNewestKillmailDayText.Text = FormatIntelDay(snapshot.LatestCompleteDayUtc, "No local killmail days recorded yet.");
-            }
-
-            if (IntelCurrentUpdateStatusText != null)
-            {
-                IntelCurrentUpdateStatusText.Text = BuildIntelCurrentUpdateStatusText(snapshot);
-            }
-
-            if (IntelTotalProgressBar != null)
-            {
-                IntelTotalProgressBar.IsIndeterminate = snapshot.TotalProgressIsIndeterminate;
-                IntelTotalProgressBar.Value = snapshot.TotalProgressIsIndeterminate
-                    ? 0
-                    : Math.Max(0, Math.Min(100, snapshot.TotalProgressPercent));
-            }
-
-            if (IntelTotalProgressText != null)
-            {
-                IntelTotalProgressText.Text = string.IsNullOrWhiteSpace(snapshot.TotalProgressText)
-                    ? "No update currently running."
-                    : snapshot.TotalProgressText;
-            }
-
-            if (IntelCurrentDayProgressBar != null)
-            {
-                IntelCurrentDayProgressBar.IsIndeterminate = snapshot.CurrentDayProgressIsIndeterminate;
-                IntelCurrentDayProgressBar.Value = snapshot.CurrentDayProgressIsIndeterminate
-                    ? 0
-                    : Math.Max(0, Math.Min(100, snapshot.CurrentDayProgressPercent));
-            }
-
-            if (IntelCurrentDayProgressText != null)
-            {
-                IntelCurrentDayProgressText.Text = string.IsNullOrWhiteSpace(snapshot.CurrentDayProgressText)
-                    ? "No update currently running."
-                    : snapshot.CurrentDayProgressText;
-            }
-
-            var liveFeed = snapshot.LiveFeed ?? new R2Z2LiveFeedSnapshot();
-
-            if (IntelLiveFeedSourceText != null)
-            {
-                IntelLiveFeedSourceText.Text = string.IsNullOrWhiteSpace(liveFeed.Source)
-                    ? "R2Z2"
-                    : liveFeed.Source;
-            }
-
-            if (IntelLiveFeedStatusText != null)
-            {
-                var statusText = string.IsNullOrWhiteSpace(liveFeed.Status)
-                    ? "Disabled"
-                    : liveFeed.Status;
-
-                var nextRetryText = FormatIntelTimestamp(liveFeed.NextRetryAtUtc, "");
-                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
-                    (statusText.Contains("wait", StringComparison.OrdinalIgnoreCase) ||
-                     statusText.Contains("backing off", StringComparison.OrdinalIgnoreCase)))
-                {
-                    statusText = $"{statusText} (retry {nextRetryText})";
-                }
-
-                IntelLiveFeedStatusText.Text = statusText;
-            }
-
-            if (IntelLiveFeedEnabledText != null)
-            {
-                IntelLiveFeedEnabledText.Text = liveFeed.Enabled ? "Yes" : "No";
-            }
-
-            if (IntelLiveFeedRecentImportsText != null)
-            {
-                IntelLiveFeedRecentImportsText.Text = liveFeed.RecentLiveImportsCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (IntelLiveFeedNextSequenceText != null)
-            {
-                IntelLiveFeedNextSequenceText.Text = liveFeed.NextSequenceId.HasValue
-                    ? liveFeed.NextSequenceId.Value.ToString(CultureInfo.InvariantCulture)
-                    : "Not initialized";
-            }
-
-            if (IntelLiveFeedLastProcessedSequenceText != null)
-            {
-                IntelLiveFeedLastProcessedSequenceText.Text = liveFeed.LastProcessedSequenceId.HasValue
-                    ? liveFeed.LastProcessedSequenceId.Value.ToString(CultureInfo.InvariantCulture)
-                    : "None";
-            }
-
-            if (IntelLiveFeedLastSuccessText != null)
-            {
-                IntelLiveFeedLastSuccessText.Text = FormatIntelTimestamp(
-                    liveFeed.LastSuccessAtUtc,
-                    "No live imports recorded yet.");
-            }
-
-            if (IntelLiveFeedLastCaughtUpText != null)
-            {
-                IntelLiveFeedLastCaughtUpText.Text = FormatIntelTimestamp(
-                    liveFeed.LastCaughtUpAtUtc,
-                    "No caught-up wait recorded yet.");
-            }
-
-            if (IntelLiveFeedLastErrorText != null)
-            {
-                var lastErrorTime = FormatIntelTimestamp(liveFeed.LastErrorAtUtc, "");
-                IntelLiveFeedLastErrorText.Text = string.IsNullOrWhiteSpace(liveFeed.LastError)
-                    ? "No live-feed errors recorded."
-                    : string.IsNullOrWhiteSpace(lastErrorTime)
-                        ? liveFeed.LastError
-                        : $"{lastErrorTime} - {liveFeed.LastError}";
-            }
-
-            var todaysFreshness = snapshot.TodaysFreshness ?? new TodaysFreshnessSnapshot();
-            if (TodaysFreshnessStatusText != null)
-            {
-                var statusText = string.IsNullOrWhiteSpace(todaysFreshness.Status)
-                    ? "Idle"
-                    : todaysFreshness.Status;
-
-                var nextRetryText = FormatIntelTimestamp(todaysFreshness.NextRetryAtUtc, "");
-                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
-                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
-                {
-                    statusText = $"{statusText} (retry {nextRetryText})";
-                }
-
-                TodaysFreshnessStatusText.Text = statusText;
-            }
-
-            if (TodaysFreshnessVisiblePilotsText != null)
-            {
-                TodaysFreshnessVisiblePilotsText.Text = todaysFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessEntitiesQueriedText != null)
-            {
-                TodaysFreshnessEntitiesQueriedText.Text = todaysFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessResultsFoundText != null)
-            {
-                TodaysFreshnessResultsFoundText.Text = todaysFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessKnownSkippedText != null)
-            {
-                TodaysFreshnessKnownSkippedText.Text = todaysFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessImportedText != null)
-            {
-                TodaysFreshnessImportedText.Text = todaysFreshness.NewKillmailsImported.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessFailedText != null)
-            {
-                TodaysFreshnessFailedText.Text = todaysFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (TodaysFreshnessLastRunText != null)
-            {
-                TodaysFreshnessLastRunText.Text = FormatIntelTimestamp(
-                    todaysFreshness.LastRunAtUtc,
-                    "No Today's Freshness run recorded yet.");
-            }
-
-            if (TodaysFreshnessDetailText != null)
-            {
-                TodaysFreshnessDetailText.Text = string.IsNullOrWhiteSpace(todaysFreshness.DetailText)
-                    ? "Today's Freshness is idle."
-                    : todaysFreshness.DetailText;
-            }
-
-            if (TodaysFreshnessLastErrorText != null)
-            {
-                TodaysFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(todaysFreshness.LastError)
-                    ? "No Today's Freshness errors recorded."
-                    : todaysFreshness.LastError;
-            }
-
-            var historicalFreshness = snapshot.HistoricalFreshness ?? new HistoricalFreshnessSnapshot();
-
-            if (RunTodaysFreshnessButton != null)
-            {
-                var isRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                var historicalIsRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                          string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                RunTodaysFreshnessButton.IsEnabled = !isRunning && !historicalIsRunning && !_isShuttingDown;
-                RunTodaysFreshnessButton.Content = isRunning
-                    ? "Today's Freshness Running..."
-                    : historicalIsRunning
-                        ? "Historical Freshness Running..."
-                    : "Refresh Today's zKill Intel";
-            }
-
-            if (HistoricalFreshnessStatusText != null)
-            {
-                var statusText = string.IsNullOrWhiteSpace(historicalFreshness.Status)
-                    ? "Idle"
-                    : historicalFreshness.Status;
-
-                var nextRetryText = FormatIntelTimestamp(historicalFreshness.NextRetryAtUtc, "");
-                if (!string.IsNullOrWhiteSpace(nextRetryText) &&
-                    statusText.Contains("rate limited", StringComparison.OrdinalIgnoreCase))
-                {
-                    statusText = $"{statusText} (retry {nextRetryText})";
-                }
-
-                HistoricalFreshnessStatusText.Text = statusText;
-            }
-
-            if (HistoricalFreshnessModeText != null)
-            {
-                HistoricalFreshnessModeText.Text = string.IsNullOrWhiteSpace(historicalFreshness.Mode)
-                    ? "Not run yet"
-                    : historicalFreshness.Mode;
-            }
-
-            if (HistoricalFreshnessVisiblePilotsText != null)
-            {
-                HistoricalFreshnessVisiblePilotsText.Text = historicalFreshness.VisiblePilotsTargeted.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessCandidatesConsideredText != null)
-            {
-                HistoricalFreshnessCandidatesConsideredText.Text = historicalFreshness.CandidatePilotsConsidered.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessCandidatesSkippedCooldownText != null)
-            {
-                HistoricalFreshnessCandidatesSkippedCooldownText.Text = historicalFreshness.CandidatePilotsSkippedCooldown.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessPilotsCheckedText != null)
-            {
-                HistoricalFreshnessPilotsCheckedText.Text = historicalFreshness.PilotsChecked.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessDaysCheckedText != null)
-            {
-                HistoricalFreshnessDaysCheckedText.Text = historicalFreshness.HistoricalDaysChecked.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessEntitiesQueriedText != null)
-            {
-                HistoricalFreshnessEntitiesQueriedText.Text = historicalFreshness.EntitiesQueried.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessResultsFoundText != null)
-            {
-                HistoricalFreshnessResultsFoundText.Text = historicalFreshness.ZkillResultsFound.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessKnownSkippedText != null)
-            {
-                HistoricalFreshnessKnownSkippedText.Text = historicalFreshness.AlreadyKnownCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessImportedText != null)
-            {
-                HistoricalFreshnessImportedText.Text = historicalFreshness.MissingImportedCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessFailedText != null)
-            {
-                HistoricalFreshnessFailedText.Text = historicalFreshness.FailedCount.ToString(CultureInfo.InvariantCulture);
-            }
-
-            if (HistoricalFreshnessLastRunText != null)
-            {
-                HistoricalFreshnessLastRunText.Text = FormatIntelTimestamp(
-                    historicalFreshness.LastRunAtUtc,
-                    "No Historical Freshness run recorded yet.");
-            }
-
-            if (HistoricalFreshnessDetailText != null)
-            {
-                HistoricalFreshnessDetailText.Text = string.IsNullOrWhiteSpace(historicalFreshness.DetailText)
-                    ? "Historical Freshness is idle."
-                    : historicalFreshness.DetailText;
-            }
-
-            if (HistoricalFreshnessLastErrorText != null)
-            {
-                HistoricalFreshnessLastErrorText.Text = string.IsNullOrWhiteSpace(historicalFreshness.LastError)
-                    ? "No Historical Freshness errors recorded."
-                    : historicalFreshness.LastError;
-            }
-
-            if (RunHistoricalFreshnessButton != null)
-            {
-                var isRunning = string.Equals(historicalFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(historicalFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                var todaysIsRunning = string.Equals(todaysFreshness.Status, "Running", StringComparison.OrdinalIgnoreCase) ||
-                                      string.Equals(todaysFreshness.Status, "Backing off / rate limited", StringComparison.OrdinalIgnoreCase);
-                RunHistoricalFreshnessButton.IsEnabled = !isRunning && !todaysIsRunning && !_isShuttingDown;
-                RunHistoricalFreshnessButton.Content = isRunning
-                    ? "Historical Freshness Running..."
-                    : todaysIsRunning
-                        ? "Today's Freshness Running..."
-                    : "Repair Recent Historical Intel";
-            }
-        }
-
-        private static string BuildIntelCurrentUpdateStatusText(IntelUpdateStatusSnapshot snapshot)
-        {
-            return PublicDataStatusTextBuilder.BuildIntelCurrentUpdateStatusText(snapshot);
-        }
-
-        private static string FormatIntelTimestamp(string value, string emptyText)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return emptyText;
-            }
-
-            return DateTime.TryParse(value, out var parsed)
-                ? parsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
-                : value;
-        }
-
-        private static string FormatIntelDay(string value, string emptyText)
-        {
-            return string.IsNullOrWhiteSpace(value) ? emptyText : value;
+            var projection = IntelStatusDetailsProjection.Create(snapshot, _isShuttingDown);
+            _intelStatusDetailsPresenter.Apply(projection);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -1998,7 +1706,7 @@ namespace PitmastersGrill
                 clipboardGetText: () => Clipboard.GetText(),
                 setBoardButtonsEnabled: enabled =>
                 {
-                    EnableKillmailDbPullButton.IsEnabled = enabled;
+                    IntelSupportViewControl.EnableKillmailDbPullButtonControl.IsEnabled = enabled;
                     ClearBoardButton.IsEnabled = enabled;
                 },
                 beginForegroundPriority: () => _backgroundIntelUpdateService.BeginForegroundPriority(),
@@ -2686,7 +2394,7 @@ namespace PitmastersGrill
 
         private async void EnableKillmailDbPullButton_Click(object sender, RoutedEventArgs e)
         {
-            await RunEnableKillmailDbPullAsync();
+            await _intelMaintenanceActionsController.RunEnableKillmailDbPullAsync();
         }
 
 
@@ -2722,190 +2430,42 @@ namespace PitmastersGrill
 
         private void RefreshProviderHealthButton_Click(object sender, RoutedEventArgs e)
         {
-            RefreshProviderHealthUi();
-            SetDiagnosticsStatus("Provider health refreshed.");
+            _diagnosticsCacheMaintenanceController.RefreshProviderHealth();
         }
 
         private void RefreshProviderHealthUi()
         {
-            if (ProviderHealthGrid == null)
-            {
-                return;
-            }
-
-            _providerHealthRows.Clear();
-            foreach (var snapshot in DiagnosticTelemetry.GetProviderHealthSnapshots())
-            {
-                _providerHealthRows.Add(snapshot);
-            }
+            _diagnosticsCacheMaintenanceController.RefreshProviderHealthUi();
         }
 
         private void RefreshCacheStatsButton_Click(object sender, RoutedEventArgs e)
         {
-            RefreshCacheStatsUi();
-            SetDiagnosticsStatus("Cache stats refreshed.");
+            _diagnosticsCacheMaintenanceController.RefreshCacheStats();
         }
 
         private void ClearExpiredCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            RunCacheMaintenanceAction(
-                "Clear expired cache",
-                requiresConfirmation: true,
-                action: () =>
-                {
-                    var removed = _cacheMaintenanceService.ClearExpired();
-                    SetDiagnosticsStatus($"Expired cache cleanup removed {removed:N0} rows.");
-                    AppLogger.DatabaseInfo($"Cache maintenance UI cleared expired rows. removedRows={removed}");
-                });
+            _diagnosticsCacheMaintenanceController.ClearExpiredCache();
         }
 
         private void VacuumCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            RunCacheMaintenanceAction(
-                "Compact cache database",
-                requiresConfirmation: true,
-                action: () =>
-                {
-                    _cacheMaintenanceService.Vacuum();
-                    SetDiagnosticsStatus("Cache database compacted.");
-                    AppLogger.DatabaseInfo("Cache maintenance UI compacted SQLite database.");
-                });
+            _diagnosticsCacheMaintenanceController.VacuumCache();
         }
 
         private void ClearAllCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            RunCacheMaintenanceAction(
-                "Clear all resolver/stat cache rows",
-                requiresConfirmation: true,
-                action: () =>
-                {
-                    var removed = _cacheMaintenanceService.ClearAll();
-                    SetDiagnosticsStatus($"All resolver/stat cache cleanup removed {removed:N0} rows.");
-                    AppLogger.DatabaseWarn($"Cache maintenance UI cleared all resolver/stat cache rows. removedRows={removed}");
-                });
+            _diagnosticsCacheMaintenanceController.ClearAllCache();
         }
 
         private async void RebuildKillmailDerivedIntelButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_boardPopulationEntryController.IsClipboardProcessing)
-            {
-                SetDiagnosticsStatus("Derived intel rebuild blocked while a lookup is active.");
-                MessageBox.Show(
-                    "A board lookup is currently running. Let it finish before rebuilding derived killmail intel.",
-                    "PMG Killmail Derived Intel",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            var confirm = MessageBox.Show(
-                "Rebuild killmail derived intel from local extracted killmail archives?\n\nThis only rebuilds derived confirmed cyno-module and industrial-cyno bait observations. It does not clear notes, settings, themes, ignore lists, manual overrides, or unrelated cache data.",
-                "PMG Killmail Derived Intel",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (confirm != MessageBoxResult.Yes)
-            {
-                SetDiagnosticsStatus("Derived intel rebuild cancelled.");
-                return;
-            }
-
-            try
-            {
-                RebuildKillmailDerivedIntelButton.IsEnabled = false;
-                SetDiagnosticsStatus("Rebuilding killmail derived intel...");
-                var result = await _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(_windowShutdownCts.Token);
-                RefreshCacheStatsUi();
-                RefreshConfirmedCynoModuleStateForCurrentRows();
-
-                SetDiagnosticsStatus(result.Message);
-                MessageBox.Show(
-                    result.Message,
-                    result.NoLocalSourceAvailable ? "PMG Killmail Derived Intel Source Missing" : "PMG Killmail Derived Intel",
-                    MessageBoxButton.OK,
-                    result.NoLocalSourceAvailable ? MessageBoxImage.Information : MessageBoxImage.None);
-            }
-            catch (OperationCanceledException)
-            {
-                SetDiagnosticsStatus("Derived intel rebuild cancelled.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.DatabaseError("Killmail derived intel rebuild failed.", ex);
-                SetDiagnosticsStatus("Derived intel rebuild failed.");
-                MessageBox.Show(
-                    $"Failed to rebuild killmail derived intel.\n\n{ex.Message}",
-                    "PMG Killmail Derived Intel Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            finally
-            {
-                RebuildKillmailDerivedIntelButton.IsEnabled = true;
-            }
-        }
-
-        private void RunCacheMaintenanceAction(string title, bool requiresConfirmation, Action action)
-        {
-            if (_boardPopulationEntryController.IsClipboardProcessing)
-            {
-                SetDiagnosticsStatus("Cache maintenance blocked while a lookup is active.");
-                MessageBox.Show(
-                    "A board lookup is currently running. Let it finish before changing the local cache.",
-                    "PMG Cache Maintenance",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            if (requiresConfirmation)
-            {
-                var result = MessageBox.Show(
-                    $"{title}?\n\nThis only affects PMG local cache tables and does not delete unrelated files.",
-                    "PMG Cache Maintenance",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-
-                if (result != MessageBoxResult.Yes)
-                {
-                    SetDiagnosticsStatus("Cache maintenance cancelled.");
-                    return;
-                }
-            }
-
-            try
-            {
-                action();
-                RefreshCacheStatsUi();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.DatabaseError($"Cache maintenance failed. action='{title}'", ex);
-                SetDiagnosticsStatus("Cache maintenance failed.");
-                MessageBox.Show(
-                    $"Cache maintenance failed.\n\n{ex.Message}",
-                    "PMG Cache Maintenance Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            await _intelMaintenanceActionsController.RunRebuildKillmailDerivedIntelAsync();
         }
 
         private void RefreshCacheStatsUi()
         {
-            if (CacheStatsText == null)
-            {
-                return;
-            }
-
-            try
-            {
-                CacheStatsText.Text = CacheMaintenanceService.FormatStats(_cacheMaintenanceService.GetStats());
-            }
-            catch (Exception ex)
-            {
-                AppLogger.DatabaseError("Cache stats refresh failed.", ex);
-                CacheStatsText.Text = $"Cache stats failed: {ex.Message}";
-            }
+            _diagnosticsCacheMaintenanceController.RefreshCacheStatsUi();
         }
 
 
@@ -2913,205 +2473,63 @@ namespace PitmastersGrill
         {
             _mainWindowAppearanceController.SaveMaxKillmailAge(
                 _appSettings,
-                MaxKillmailAgeDaysTextBox,
-                EffectiveMaxKillmailAgeText);
+                IntelSupportViewControl.MaxKillmailAgeDaysTextBoxControl,
+                IntelSupportViewControl.EffectiveMaxKillmailAgeTextBlock);
         }
 
         private void UseDefaultMaxKillmailAgeButton_Click(object sender, RoutedEventArgs e)
         {
             _mainWindowAppearanceController.ResetMaxKillmailAgeToDefault(
                 _appSettings,
-                MaxKillmailAgeDaysTextBox,
-                EffectiveMaxKillmailAgeText);
+                IntelSupportViewControl.MaxKillmailAgeDaysTextBoxControl,
+                IntelSupportViewControl.EffectiveMaxKillmailAgeTextBlock);
         }
 
         private void SaveKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
             _mainWindowAppearanceController.SaveKillmailPath(
                 _appSettings,
-                KillmailDataRootPathTextBox,
-                KillmailDataPathModeText,
-                EffectiveKillmailDataPathText);
+                IntelSupportViewControl.KillmailDataRootPathTextBoxControl,
+                IntelSupportViewControl.KillmailDataPathModeTextBlock,
+                IntelSupportViewControl.EffectiveKillmailDataPathTextBlock);
         }
 
         private void UseDefaultKillmailPathButton_Click(object sender, RoutedEventArgs e)
         {
             _mainWindowAppearanceController.ResetKillmailPathToDefault(
                 _appSettings,
-                KillmailDataRootPathTextBox,
-                KillmailDataPathModeText,
-                EffectiveKillmailDataPathText);
+                IntelSupportViewControl.KillmailDataRootPathTextBoxControl,
+                IntelSupportViewControl.KillmailDataPathModeTextBlock,
+                IntelSupportViewControl.EffectiveKillmailDataPathTextBlock);
         }
 
         private async void EnableLiveZkillFeedCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            var enabled = EnableLiveZkillFeedCheckBox.IsChecked == true;
-            _settingsTabController.SetLiveZkillFeedEnabled(_appSettings, enabled);
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Live zKill feed setting changed. enabled={enabled}");
-
-            try
-            {
-                await _backgroundIntelUpdateService.SetLiveFeedEnabledAsync(enabled, _windowShutdownCts.Token);
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Live zKill feed toggle cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Live zKill feed toggle failed.", ex);
-
-                MessageBox.Show(
-                    $"Failed to update the live zKill feed setting.\n\n{ex.Message}",
-                    "PMG Live Feed Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            var enabled = IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl.IsChecked == true;
+            await _intelActionsController.HandleLiveFeedToggleAsync(enabled);
         }
 
         private void BackgroundHistoricalRepairEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            var enabled = BackgroundHistoricalRepairEnabledCheckBox.IsChecked == true;
-            _settingsTabController.SetBackgroundHistoricalRepairEnabled(_appSettings, enabled);
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Background historical repair setting changed. enabled={enabled}");
+            _mainWindowSettingsCoordinator.HandleBackgroundHistoricalRepairChanged(
+                _isApplyingSettings,
+                _appSettings,
+                IntelSupportViewControl.BackgroundHistoricalRepairEnabledCheckBoxControl.IsChecked == true);
         }
 
         private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
-            if (visibleCharacterIds.Count == 0)
-            {
-                MessageBox.Show(
-                    "Today's Freshness needs at least one visible Grill pilot with a resolved character ID.",
-                    "PMG Today's Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            try
-            {
-                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
-                var result = await _backgroundIntelUpdateService.RunTodaysFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
-
-                if (!result.Success &&
-                    string.Equals(result.LastError, "Another freshness operation is already running.", StringComparison.Ordinal))
-                {
-                    MessageBox.Show(
-                        "Another freshness operation is already running.",
-                        "PMG Today's Freshness",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                if (!_isShuttingDown && result.NewKillmailsImported > 0)
-                {
-                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Today's Freshness");
-                }
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Today's Freshness cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Today's Freshness failed from the Intel UI.", ex);
-
-                MessageBox.Show(
-                    $"Today's Freshness failed.\n\n{ex.Message}",
-                    "PMG Today's Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            await _intelActionsController.RunTodaysFreshnessAsync();
         }
 
         private async void RunHistoricalFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            var visibleCharacterIds = GetVisibleCharacterIdsForTodaysFreshness();
-            if (visibleCharacterIds.Count == 0)
-            {
-                MessageBox.Show(
-                    "Historical Freshness needs at least one visible Grill pilot with a resolved character ID.",
-                    "PMG Historical Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            try
-            {
-                using var foregroundPriority = _backgroundIntelUpdateService.BeginForegroundPriority();
-                var result = await _backgroundIntelUpdateService.RunHistoricalFreshnessAsync(visibleCharacterIds, _windowShutdownCts.Token);
-
-                if (!result.Success &&
-                    string.Equals(result.LastError, "Another freshness operation is already running.", StringComparison.Ordinal))
-                {
-                    MessageBox.Show(
-                        "Another freshness operation is already running.",
-                        "PMG Historical Freshness",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                if (!result.Success &&
-                    string.Equals(result.LastError, "Historical Freshness already running.", StringComparison.Ordinal))
-                {
-                    MessageBox.Show(
-                        "Historical Freshness is already running.",
-                        "PMG Historical Freshness",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                if (!_isShuttingDown && result.MissingImportedCount > 0)
-                {
-                    await RefreshCurrentBoardRowsFromLocalIntelAsync("Historical Freshness");
-                }
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Historical Freshness cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Historical Freshness failed from the Intel UI.", ex);
-
-                MessageBox.Show(
-                    $"Historical Freshness failed.\n\n{ex.Message}",
-                    "PMG Historical Freshness",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            await _intelActionsController.RunHistoricalFreshnessAsync();
         }
 
         public List<long> GetVisibleCharacterIdsForBackgroundHistoricalRepair()
         {
-            return GetVisibleCharacterIdsForTodaysFreshness();
-        }
-
-        private List<long> GetVisibleCharacterIdsForTodaysFreshness()
-        {
-            return _currentRows
-                .Select(row => row.CharacterId)
-                .Where(characterId => long.TryParse(characterId, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
-                .Select(characterId => long.Parse(characterId!, CultureInfo.InvariantCulture))
-                .Distinct()
-                .ToList();
+            return _intelActionsController.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
         }
 
         private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
@@ -3413,6 +2831,16 @@ namespace PitmastersGrill
             if (_activePilotDetailWindow != null)
             {
                 _activePilotDetailWindow.SaveCurrentState();
+                return;
+            }
+
+            if (_detailPaneController == null
+                || NotesTagsBox == null
+                || KnownCynoOverrideCheckBox == null
+                || BaitOverrideCheckBox == null
+                || PilotBoard == null)
+            {
+                AppLogger.UiWarn("Skipping notes/tag save because detail pane state was not fully initialized.");
                 return;
             }
 
@@ -4461,7 +3889,13 @@ namespace PitmastersGrill
             }
         }
 
-        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; } private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); } private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult( _appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo( $"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo( $"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); } private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); } private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot( bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn( $"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo( $"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); } private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); } private Rect GetDefaultWindowBoundsForCurrentDisplay()
+        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; }
+        private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); }
+        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult(_appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo($"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo($"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); }
+        private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); }
+        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot(bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn($"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo($"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); }
+        private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); }
+        private Rect GetDefaultWindowBoundsForCurrentDisplay()
         {
             return _windowLayoutController.GetDefaultWindowBounds(
                 GetMonitorWorkAreasDip(),
@@ -4502,45 +3936,6 @@ namespace PitmastersGrill
         {
             return _windowLayoutController.BuildVirtualDesktopSummary(GetMonitorWorkAreasDip());
         }
-
-        private async Task RunEnableKillmailDbPullAsync()
-        {
-            try
-            {
-                EnableKillmailDbPullButton.IsEnabled = false;
-
-                var seedDays = _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings);
-
-                AppLogger.UiInfo(
-                    $"Enable KillMail DB Pull requested. seedDays={seedDays} displayKillmailPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
-
-                await _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, _windowShutdownCts.Token);
-
-                AppLogger.UiInfo($"Enable KillMail DB Pull completed successfully. seedDays={seedDays}");
-            }
-            catch (OperationCanceledException) when (_isShuttingDown || _windowShutdownCts.IsCancellationRequested)
-            {
-                AppLogger.UiInfo("Enable KillMail DB Pull cancelled during shutdown.");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Enable KillMail DB Pull failed.", ex);
-
-                MessageBox.Show(
-                    $"Failed to enable killmail DB pull.\n\n{ex.Message}",
-                    "PMG Killmail DB Pull Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            finally
-            {
-                if (!_isShuttingDown)
-                {
-                    EnableKillmailDbPullButton.IsEnabled = true;
-                }
-            }
-        }
-
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool AddClipboardFormatListener(IntPtr hwnd);
