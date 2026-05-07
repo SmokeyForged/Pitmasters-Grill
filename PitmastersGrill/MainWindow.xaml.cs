@@ -62,6 +62,7 @@ namespace PitmastersGrill
         private readonly MainWindowSettingsCoordinator _mainWindowSettingsCoordinator;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
+        private readonly BoardColumnSettingsController _boardColumnSettingsController;
         private readonly SettingsTabController _settingsTabController;
         private readonly AnalysisTabController _analysisTabController;
         private readonly WindowLayoutController _windowLayoutController;
@@ -139,6 +140,9 @@ namespace PitmastersGrill
             _mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
+            _boardColumnSettingsController = new BoardColumnSettingsController(
+                _boardColumnLayoutController,
+                settings => _mainWindowAppearanceController.SaveSettings(settings));
             _settingsTabController = new SettingsTabController();
             _mainWindowSettingsCoordinator = new MainWindowSettingsCoordinator(
                 _mainWindowAppearanceController,
@@ -935,7 +939,8 @@ namespace PitmastersGrill
 
         private void InitializeBoardColumnLayoutUi()
         {
-            _boardColumnLayoutController.InitializeColumns(
+            _boardColumnSettingsController.InitializeBoardColumnLayoutUi(
+                ApplyBoardColumnLayout,
                 ("SigColumn", SigColumn),
                 ("CharacterColumn", CharacterColumn),
                 ("AllianceColumn", AllianceColumn),
@@ -946,9 +951,6 @@ namespace PitmastersGrill
                 ("LastShipSeenColumn", LastShipSeenColumn),
                 ("LastSeenColumn", LastSeenColumn),
                 ("CynoHullSeenColumn", CynoHullSeenColumn));
-            _boardColumnLayoutController.ApplyColumnMinimumWidths();
-            _boardColumnLayoutController.BuildCanonicalBoardColumnLayout();
-            ApplyCanonicalBoardColumnLayout("Apply canonical default board layout");
         }
 
         private void ApplyBoardDisplaySettings()
@@ -987,60 +989,52 @@ namespace PitmastersGrill
 
         private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            SaveBoardColumnSettingsFromCheckBoxes();
-            ApplyBoardColumnVisibility();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo(
-                $"Board column visibility changed. sig={IsChecked(ShowSigColumnCheckBox)} alliance={IsChecked(ShowAllianceColumnCheckBox)} corp={IsChecked(ShowCorpColumnCheckBox)} kills={IsChecked(ShowKillsColumnCheckBox)} losses={IsChecked(ShowLossesColumnCheckBox)} avgFleet={IsChecked(ShowAvgFleetSizeColumnCheckBox)} lastShip={IsChecked(ShowLastShipSeenColumnCheckBox)} lastSeen={IsChecked(ShowLastSeenColumnCheckBox)} cynoHull={IsChecked(ShowCynoHullSeenColumnCheckBox)}");
+            _boardColumnSettingsController.HandleBoardColumnVisibilityChanged(
+                _isApplyingSettings,
+                _appSettings,
+                ShowSigColumnCheckBox,
+                ShowAllianceColumnCheckBox,
+                ShowCorpColumnCheckBox,
+                ShowKillsColumnCheckBox,
+                ShowLossesColumnCheckBox,
+                ShowAvgFleetSizeColumnCheckBox,
+                ShowLastShipSeenColumnCheckBox,
+                ShowLastSeenColumnCheckBox,
+                ShowCynoHullSeenColumnCheckBox,
+                ApplyBoardColumnVisibility);
         }
 
         private void ShowCorpAllianceCountsCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            if (_isApplyingSettings)
-            {
-                return;
-            }
-
-            _appSettings.ShowCorpAllianceCounts = ShowCorpAllianceCountsCheckBox.IsChecked == true;
-            RecomputeCorpAllianceCounts();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo($"Corp/alliance board counts changed. enabled={_appSettings.ShowCorpAllianceCounts}");
+            _boardColumnSettingsController.HandleShowCorpAllianceCountsChanged(
+                _isApplyingSettings,
+                _appSettings,
+                ShowCorpAllianceCountsCheckBox.IsChecked == true,
+                RecomputeCorpAllianceCounts);
         }
 
         private void ShowAllBoardColumnsButton_Click(object sender, RoutedEventArgs e)
         {
-            SetAllOptionalBoardColumnSettings(true);
-            ApplyBoardColumnSettingsToCheckBoxes();
-            ApplyBoardColumnVisibility();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo("Board column visibility reset to show all optional columns.");
+            _boardColumnSettingsController.HandleShowAllBoardColumns(
+                _appSettings,
+                ApplyBoardColumnSettingsToCheckBoxes,
+                ApplyBoardColumnVisibility);
         }
 
         private void ResetBoardColumnsButton_Click(object sender, RoutedEventArgs e)
         {
-            SetAllOptionalBoardColumnSettings(true);
-            ApplyBoardColumnSettingsToCheckBoxes();
-            ApplyBoardColumnVisibility();
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-
-            AppLogger.UiInfo("Board column visibility reset to defaults.");
+            _boardColumnSettingsController.HandleResetBoardColumns(
+                _appSettings,
+                ApplyBoardColumnSettingsToCheckBoxes,
+                ApplyBoardColumnVisibility);
         }
 
         private void ResetBoardLayoutButton_Click(object sender, RoutedEventArgs e)
         {
-            _appSettings.BoardColumnLayout.Clear();
-            ApplyCanonicalBoardColumnLayout("Reset board layout to canonical defaults");
-            SaveCurrentBoardColumnLayout("Reset layout");
-
-            AppLogger.UiInfo("Board column layout reset to canonical defaults.");
+            _boardColumnSettingsController.HandleResetBoardLayout(
+                _appSettings,
+                ApplyCanonicalBoardColumnLayout,
+                SaveCurrentBoardColumnLayout);
         }
 
         private void ApplyBoardColumnSettingsToCheckBoxes()
@@ -1055,7 +1049,7 @@ namespace PitmastersGrill
 
             try
             {
-                _boardColumnLayoutController.ApplyBoardColumnSettingsToCheckBoxes(
+                _boardColumnSettingsController.ApplyBoardColumnSettingsToCheckBoxes(
                     _appSettings,
                     ShowSigColumnCheckBox,
                     ShowAllianceColumnCheckBox,
@@ -1076,7 +1070,7 @@ namespace PitmastersGrill
 
         private void SaveBoardColumnSettingsFromCheckBoxes()
         {
-            _boardColumnLayoutController.SaveBoardColumnSettingsFromCheckBoxes(
+            _boardColumnSettingsController.SaveBoardColumnSettingsFromCheckBoxes(
                 _appSettings,
                 ShowSigColumnCheckBox,
                 ShowAllianceColumnCheckBox,
@@ -1095,7 +1089,7 @@ namespace PitmastersGrill
 
             try
             {
-                _boardColumnLayoutController.ApplyBoardColumnVisibility(_appSettings);
+                _boardColumnSettingsController.ApplyBoardColumnVisibility(_appSettings);
             }
             finally
             {
@@ -1443,16 +1437,6 @@ namespace PitmastersGrill
         }
 
         private sealed record BoardColumnFitPlan(DataGridColumn Column, double MinimumWidth, double CurrentWidth);
-
-        private void SetAllOptionalBoardColumnSettings(bool isVisible)
-        {
-            _boardColumnLayoutController.SetAllOptionalBoardColumnSettings(_appSettings, isVisible);
-        }
-
-        private static bool IsChecked(CheckBox checkBox)
-        {
-            return checkBox.IsChecked == true;
-        }
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
         {
