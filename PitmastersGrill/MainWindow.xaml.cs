@@ -63,6 +63,7 @@ namespace PitmastersGrill
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly BoardColumnSettingsController _boardColumnSettingsController;
+        private readonly BoardColumnLayoutPersistenceController _boardColumnLayoutPersistenceController;
         private readonly SettingsTabController _settingsTabController;
         private readonly AnalysisTabController _analysisTabController;
         private readonly WindowLayoutController _windowLayoutController;
@@ -116,12 +117,7 @@ namespace PitmastersGrill
         private Rect _lastKnownNormalBounds = Rect.Empty;
         private string? _activeBoardSortMemberPath;
         private ListSortDirection? _activeBoardSortDirection;
-        private string _pendingBoardColumnLayoutSaveReason = string.Empty;
-        private DependencyPropertyDescriptor? _boardColumnWidthDescriptor;
         private bool? _lastAppliedCompactMode;
-        private bool _isApplyingBoardColumnLayout;
-        private bool _isBoardColumnAutoFitPending;
-        private bool _isBoardColumnLayoutReadyForPersistence;
         private bool _globalResetWindowHotKeyRegistered;
         private bool _globalClearBoardHotKeyRegistered;
         private bool _globalToggleBoardModeHotKeyRegistered;
@@ -141,6 +137,9 @@ namespace PitmastersGrill
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
             _boardColumnSettingsController = new BoardColumnSettingsController(
+                _boardColumnLayoutController,
+                settings => _mainWindowAppearanceController.SaveSettings(settings));
+            _boardColumnLayoutPersistenceController = new BoardColumnLayoutPersistenceController(
                 _boardColumnLayoutController,
                 settings => _mainWindowAppearanceController.SaveSettings(settings));
             _settingsTabController = new SettingsTabController();
@@ -1085,60 +1084,17 @@ namespace PitmastersGrill
 
         private void ApplyBoardColumnVisibility()
         {
-            _isApplyingBoardColumnLayout = true;
-
-            try
-            {
-                _boardColumnSettingsController.ApplyBoardColumnVisibility(_appSettings);
-            }
-            finally
-            {
-                _isApplyingBoardColumnLayout = false;
-            }
-
+            _boardColumnLayoutPersistenceController.RunWhileApplyingBoardColumnLayout(
+                () => _boardColumnSettingsController.ApplyBoardColumnVisibility(_appSettings));
             ScheduleFitVisibleBoardColumnsToViewport(force: true);
-        }
-
-        private void HookBoardColumnWidthTracking()
-        {
-            if (_boardColumnWidthDescriptor != null)
-            {
-                return;
-            }
-
-            _boardColumnWidthDescriptor = DependencyPropertyDescriptor.FromProperty(
-                DataGridColumn.WidthProperty,
-                typeof(DataGridColumn));
-
-            if (_boardColumnWidthDescriptor == null)
-            {
-                AppLogger.UiWarn("Board column width tracking could not be initialized.");
-                return;
-            }
-
-            foreach (var column in _boardColumnLayoutController.BoardColumnsByKey.Values)
-            {
-                _boardColumnWidthDescriptor.AddValueChanged(column, BoardColumnWidth_ValueChanged);
-            }
         }
 
         private void ApplySavedBoardColumnLayout()
         {
-            if (_appSettings.BoardColumnLayout == null || _appSettings.BoardColumnLayout.Count == 0)
-            {
-                return;
-            }
-
-            if (!_boardColumnLayoutController.TryValidateSavedBoardColumnLayout(_appSettings.BoardColumnLayout, out var validSavedSettings, out var validationFailureReason))
-            {
-                AppLogger.UiWarn($"Saved board column layout discarded. reason='{validationFailureReason}'");
-                _appSettings.BoardColumnLayout.Clear();
-                _mainWindowAppearanceController.SaveSettings(_appSettings);
-                ApplyCanonicalBoardColumnLayout("Discard invalid saved board layout");
-                return;
-            }
-
-            ApplyBoardColumnLayout(validSavedSettings, "Restore saved board layout");
+            _boardColumnLayoutPersistenceController.ApplySavedBoardColumnLayout(
+                _appSettings,
+                ApplyBoardColumnLayout,
+                ApplyCanonicalBoardColumnLayout);
         }
 
         private void ApplyCanonicalBoardColumnLayout(string reason)
@@ -1148,24 +1104,10 @@ namespace PitmastersGrill
 
         private void ApplyBoardColumnLayout(IEnumerable<BoardColumnLayoutSetting> layoutSettings, string reason)
         {
-            if (layoutSettings == null)
-            {
-                return;
-            }
-
-            _isApplyingBoardColumnLayout = true;
-
-            try
-            {
-                _boardColumnLayoutController.ApplyBoardColumnLayout(layoutSettings);
-                ScheduleFitVisibleBoardColumnsToViewport();
-
-                AppLogger.UiInfo($"Board column layout applied. reason='{reason}'");
-            }
-            finally
-            {
-                _isApplyingBoardColumnLayout = false;
-            }
+            _boardColumnLayoutPersistenceController.ApplyBoardColumnLayout(
+                layoutSettings,
+                () => ScheduleFitVisibleBoardColumnsToViewport(),
+                reason);
         }
 
         private void PilotBoard_ColumnReordered(object sender, DataGridColumnEventArgs e)
@@ -1186,64 +1128,39 @@ namespace PitmastersGrill
 
         private void ScheduleBoardColumnLayoutSave(string reason)
         {
-            if (_isApplyingSettings || _isApplyingBoardColumnLayout || !CanPersistBoardColumnLayout())
+            if (!_boardColumnLayoutPersistenceController.TryQueueBoardColumnLayoutSave(
+                _isApplyingSettings,
+                IsBoardLayoutHostReady,
+                reason))
             {
                 return;
             }
 
             _boardColumnLayoutSaveTimer.Stop();
-            _pendingBoardColumnLayoutSaveReason = reason;
             _boardColumnLayoutSaveTimer.Start();
         }
 
         private void BoardColumnLayoutSaveTimer_Tick(object? sender, EventArgs e)
         {
             _boardColumnLayoutSaveTimer.Stop();
-            var reason = string.IsNullOrWhiteSpace(_pendingBoardColumnLayoutSaveReason)
-                ? "Board layout changed"
-                : _pendingBoardColumnLayoutSaveReason;
-            _pendingBoardColumnLayoutSaveReason = string.Empty;
-            SaveCurrentBoardColumnLayout(reason);
+            SaveCurrentBoardColumnLayout(_boardColumnLayoutPersistenceController.DequeuePendingBoardColumnLayoutSaveReason());
         }
 
         private void SaveCurrentBoardColumnLayout(string reason)
         {
-            if (!CanPersistBoardColumnLayout())
-            {
-                AppLogger.UiDebug($"Board column layout save skipped. reason='{reason}' hostReady=false");
-                return;
-            }
-
-            var currentLayout = _boardColumnLayoutController.CaptureCurrentBoardColumnLayout();
-
-            if (!_boardColumnLayoutController.TryValidateSavedBoardColumnLayout(currentLayout, out var sanitizedLayout, out var validationFailureReason))
-            {
-                AppLogger.UiWarn($"Board column layout save skipped. reason='{reason}' validationFailure='{validationFailureReason}'");
-                return;
-            }
-
-            if (_boardColumnLayoutController.BoardColumnLayoutsMatch(_appSettings.BoardColumnLayout, sanitizedLayout))
-            {
-                return;
-            }
-
-            _appSettings.BoardColumnLayout = sanitizedLayout;
-            _mainWindowAppearanceController.SaveSettings(_appSettings);
-            AppLogger.UiInfo($"Board column layout saved. reason='{reason}'");
+            _boardColumnLayoutPersistenceController.SaveCurrentBoardColumnLayout(
+                _appSettings,
+                IsBoardLayoutHostReady,
+                reason);
         }
 
         private void FinalizeBoardColumnLayoutInitialization()
         {
             ApplyCanonicalBoardColumnLayout("Finalize board layout after load");
             ApplySavedBoardColumnLayout();
-            HookBoardColumnWidthTracking();
-            _isBoardColumnLayoutReadyForPersistence = true;
+            _boardColumnLayoutPersistenceController.EnsureBoardColumnWidthTracking(BoardColumnWidth_ValueChanged);
+            _boardColumnLayoutPersistenceController.MarkBoardColumnLayoutReady();
             AppLogger.UiInfo($"Board column layout initialization complete. hostReady={IsBoardLayoutHostReady()} actualWidth={PilotBoard?.ActualWidth ?? 0:0.##}");
-        }
-
-        private bool CanPersistBoardColumnLayout()
-        {
-            return _isBoardColumnLayoutReadyForPersistence && IsBoardLayoutHostReady();
         }
 
         private bool IsBoardLayoutHostReady()
@@ -1256,187 +1173,23 @@ namespace PitmastersGrill
 
         private void ScheduleFitVisibleBoardColumnsToViewport(bool force = false)
         {
-            if (PilotBoard == null)
+            if (!_boardColumnLayoutPersistenceController.TryQueueFitVisibleBoardColumnsToViewport(PilotBoard, force))
             {
                 return;
             }
 
-            if (_isBoardColumnAutoFitPending && !force)
-            {
-                return;
-            }
-
-            _isBoardColumnAutoFitPending = true;
             Dispatcher.BeginInvoke(
                 new Action(() =>
                 {
-                    _isBoardColumnAutoFitPending = false;
-                    FitVisibleBoardColumnsToViewport();
+                    _boardColumnLayoutPersistenceController.CompleteQueuedFitVisibleBoardColumnsToViewport(PilotBoard);
                 }),
                 DispatcherPriority.ContextIdle);
         }
 
-        private double GetPilotBoardViewportWidth()
-        {
-            if (PilotBoard == null)
-            {
-                return 0d;
-            }
-
-            try
-            {
-                var scrollViewer = FindVisualDescendant<ScrollViewer>(PilotBoard);
-                if (scrollViewer != null && scrollViewer.ViewportWidth > 0d)
-                {
-                    // Subtract a single device-independent pixel as a safety margin so WPF
-                    // does not decide a horizontal scrollbar is required from rounding.
-                    return Math.Max(0d, scrollViewer.ViewportWidth - 1d);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // Visual tree may not be ready during early layout passes. Fall back below.
-            }
-
-            return Math.Max(0d, PilotBoard.ActualWidth - 1d);
-        }
-
         private void FitVisibleBoardColumnsToViewport()
         {
-            if (PilotBoard == null || _boardColumnLayoutController.BoardColumnsByKey.Count == 0 || PilotBoard.ActualWidth <= 0)
-            {
-                return;
-            }
-
-            PilotBoard.UpdateLayout();
-
-            var visibleColumns = _boardColumnLayoutController.BoardColumnsByKey.Values
-                .Where(column => column.Visibility == Visibility.Visible)
-                .OrderBy(column => column.DisplayIndex)
-                .ToList();
-
-            if (visibleColumns.Count == 0)
-            {
-                return;
-            }
-
-            var availableWidth = GetPilotBoardViewportWidth();
-            if (double.IsNaN(availableWidth) || double.IsInfinity(availableWidth) || availableWidth <= 40d)
-            {
-                return;
-            }
-
-            var columnPlans = visibleColumns
-                .Select(column =>
-                {
-                    var key = _boardColumnLayoutController.GetBoardColumnKey(column);
-                    var minimum = Math.Max(12d, _boardColumnLayoutController.GetBoardColumnMinimumWidth(key));
-                    var current = Math.Max(minimum, GetEffectiveBoardColumnWidth(column));
-                    return new BoardColumnFitPlan(column, minimum, current);
-                })
-                .ToList();
-
-            var minimumTotal = columnPlans.Sum(plan => plan.MinimumWidth);
-            var preferredTotal = columnPlans.Sum(plan => plan.CurrentWidth);
-
-            if (minimumTotal <= 0d || preferredTotal <= 0d)
-            {
-                return;
-            }
-
-            var wasApplyingLayout = _isApplyingBoardColumnLayout;
-            _isApplyingBoardColumnLayout = true;
-
-            try
-            {
-                if (minimumTotal >= availableWidth)
-                {
-                    var scale = Math.Max(0.6d, availableWidth / minimumTotal);
-                    foreach (var plan in columnPlans)
-                    {
-                        SetBoardColumnPixelWidth(plan.Column, Math.Max(18d, plan.MinimumWidth * scale));
-                    }
-
-                    return;
-                }
-
-                if (preferredTotal > availableWidth)
-                {
-                    var shortage = preferredTotal - availableWidth;
-                    var shrinkCapacity = columnPlans.Sum(plan => Math.Max(0d, plan.CurrentWidth - plan.MinimumWidth));
-
-                    foreach (var plan in columnPlans)
-                    {
-                        var targetWidth = plan.CurrentWidth;
-                        if (shrinkCapacity > 0d)
-                        {
-                            var share = Math.Max(0d, plan.CurrentWidth - plan.MinimumWidth) / shrinkCapacity;
-                            targetWidth = Math.Max(plan.MinimumWidth, plan.CurrentWidth - shortage * share);
-                        }
-
-                        SetBoardColumnPixelWidth(plan.Column, targetWidth);
-                    }
-
-                    return;
-                }
-
-                var extra = availableWidth - preferredTotal;
-                var expandableTotal = columnPlans.Sum(plan => Math.Max(plan.MinimumWidth, plan.CurrentWidth));
-                foreach (var plan in columnPlans)
-                {
-                    var share = expandableTotal > 0d
-                        ? Math.Max(plan.MinimumWidth, plan.CurrentWidth) / expandableTotal
-                        : 1d / columnPlans.Count;
-                    SetBoardColumnPixelWidth(plan.Column, plan.CurrentWidth + extra * share);
-                }
-            }
-            finally
-            {
-                _isApplyingBoardColumnLayout = wasApplyingLayout;
-            }
+            _boardColumnLayoutPersistenceController.FitVisibleBoardColumnsToViewport(PilotBoard);
         }
-
-        private static void SetBoardColumnPixelWidth(DataGridColumn column, double width)
-        {
-            if (column == null || double.IsNaN(width) || double.IsInfinity(width) || width <= 0d)
-            {
-                return;
-            }
-
-            var roundedWidth = Math.Round(width, 1);
-            if (Math.Abs(GetEffectiveBoardColumnWidth(column) - roundedWidth) < 0.5d &&
-                column.Width.UnitType == DataGridLengthUnitType.Pixel)
-            {
-                return;
-            }
-
-            column.Width = new DataGridLength(roundedWidth, DataGridLengthUnitType.Pixel);
-        }
-
-        private static double GetEffectiveBoardColumnWidth(DataGridColumn column)
-        {
-            if (column == null)
-            {
-                return 0d;
-            }
-
-            var width = column.ActualWidth;
-            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
-            {
-                width = column.Width.DisplayValue;
-            }
-
-            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0)
-            {
-                width = column.MinWidth;
-            }
-
-            return double.IsNaN(width) || double.IsInfinity(width) || width <= 0
-                ? 0d
-                : width;
-        }
-
-        private sealed record BoardColumnFitPlan(DataGridColumn Column, double MinimumWidth, double CurrentWidth);
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
         {
