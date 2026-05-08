@@ -1,6 +1,8 @@
-﻿using PitmastersGrill.Models;
+using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -22,6 +24,8 @@ namespace PitmastersGrill.Services
         }
 
         public bool IsApplyingState { get; private set; }
+        public bool HasActiveDetail => !string.IsNullOrWhiteSpace(_activeDetailCharacterName);
+        public string ActiveDetailCharacterName => _activeDetailCharacterName;
 
         public void RefreshDetailPaneIfSelected(
             PilotBoardRow row,
@@ -196,6 +200,53 @@ namespace PitmastersGrill.Services
 
             selectedRow.BaitOverride = baitOverride;
             return true;
+        }
+
+        public PilotBoardRow? GetSelectedOrDisplayedDetailRow(
+            PilotBoardRow? selectedRow,
+            Visibility detailPaneVisibility,
+            string? displayedCharacterName,
+            IReadOnlyCollection<PilotBoardRow> currentRows)
+        {
+            if (selectedRow != null)
+            {
+                return selectedRow;
+            }
+
+            if (detailPaneVisibility != Visibility.Visible ||
+                string.IsNullOrWhiteSpace(displayedCharacterName) ||
+                currentRows == null)
+            {
+                return null;
+            }
+
+            return currentRows.FirstOrDefault(row =>
+                string.Equals(
+                    row.CharacterName,
+                    displayedCharacterName.Trim(),
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        public bool IsRowDisplayedInDetailPane(
+            PilotBoardRow? row,
+            PilotBoardRow? selectedRow,
+            Visibility detailPaneVisibility,
+            string? displayedCharacterName)
+        {
+            if (row == null || detailPaneVisibility != Visibility.Visible)
+            {
+                return false;
+            }
+
+            if (selectedRow != null && ReferenceEquals(selectedRow, row))
+            {
+                return true;
+            }
+
+            return string.Equals(
+                displayedCharacterName,
+                row.CharacterName,
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private void ApplyDetailPaneText(
