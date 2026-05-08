@@ -23,10 +23,11 @@ namespace PitmastersGrill.Tests.Ui
         public void MainWindowCode_UsesPendingSessionContextAtStartup()
         {
             var code = ReadMainWindowCode();
+            var coordinatorCode = ReadRepoFile("PitmastersGrill", "Services", "EveSessionContextCoordinator.cs");
 
-            Assert.Contains("CreatePendingEveSessionContext", code);
-            Assert.Contains("Waiting for local session evidence", code);
-            Assert.Contains("Soft local read pending", code);
+            Assert.Contains("_eveSessionContextCoordinator.CreatePendingContext()", code);
+            Assert.Contains("Waiting for local session evidence", coordinatorCode);
+            Assert.Contains("Soft local read pending", coordinatorCode);
         }
 
         [Fact]

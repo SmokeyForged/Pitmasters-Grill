@@ -59,6 +59,7 @@ namespace PitmastersGrill
         private readonly DetailPaneController _detailPaneController;
         private readonly MainWindowAppearanceController _mainWindowAppearanceController;
         private readonly MainWindowSettingsCoordinator _mainWindowSettingsCoordinator;
+        private readonly EveSessionContextCoordinator _eveSessionContextCoordinator;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly BoardColumnSettingsController _boardColumnSettingsController;
@@ -67,6 +68,7 @@ namespace PitmastersGrill
         private readonly AnalysisTabController _analysisTabController;
         private readonly AnalysisTabPresenter _analysisTabPresenter = null!;
         private readonly MainWindowShellModeCoordinator _mainWindowShellModeCoordinator;
+        private readonly MainWindowInteropController _mainWindowInteropController;
         private readonly WindowLayoutController _windowLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
@@ -88,6 +90,8 @@ namespace PitmastersGrill
         private readonly ProviderHealthPresenter _providerHealthPresenter;
         private readonly DiagnosticsCacheStatsPresenter _diagnosticsCacheStatsPresenter;
         private readonly DiagnosticsCacheMaintenanceController _diagnosticsCacheMaintenanceController = null!;
+        private readonly PilotDetailActionsPresenter _pilotDetailActionsPresenter;
+        private readonly PilotDetailWindowPlacementController _pilotDetailWindowPlacementController;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -135,6 +139,7 @@ namespace PitmastersGrill
 
             var appSettingsService = new AppSettingsService();
             _mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
+            _eveSessionContextCoordinator = new EveSessionContextCoordinator();
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
             _boardColumnSettingsController = new BoardColumnSettingsController(
@@ -151,8 +156,11 @@ namespace PitmastersGrill
                 settings => _mainWindowAppearanceController.SaveSettings(settings));
             _analysisTabController = new AnalysisTabController();
             _mainWindowShellModeCoordinator = new MainWindowShellModeCoordinator();
+            _mainWindowInteropController = new MainWindowInteropController();
             _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
+            _pilotDetailActionsPresenter = new PilotDetailActionsPresenter();
+            _pilotDetailWindowPlacementController = new PilotDetailWindowPlacementController();
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
@@ -405,7 +413,7 @@ namespace PitmastersGrill
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
             ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
-            ApplyEveSessionContext(CreatePendingEveSessionContext());
+            ApplyEveSessionContext(_eveSessionContextCoordinator.CreatePendingContext());
             _isMainWindowInitialized = true;
 
             AppLogger.DatabaseInfo(
@@ -1354,42 +1362,35 @@ namespace PitmastersGrill
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg == WmClipboardUpdate)
+            var route = _mainWindowInteropController.RouteWindowMessage(
+                msg,
+                wParam,
+                IsActive,
+                WmClipboardUpdate,
+                WmHotKey,
+                GlobalResetWindowHotKeyId,
+                GlobalClearBoardHotKeyId,
+                GlobalToggleBoardModeHotKeyId);
+
+            handled = route.Handled;
+
+            switch (route.Action)
             {
-                ScheduleClipboardProcessing();
-                return IntPtr.Zero;
-            }
+                case MainWindowMessageAction.ScheduleClipboardProcessing:
+                    ScheduleClipboardProcessing();
+                    break;
 
-            if (msg == WmHotKey)
-            {
-                var hotKeyId = wParam.ToInt32();
+                case MainWindowMessageAction.RequestWindowLayoutReset:
+                    RequestWindowLayoutResetFromHotkey("global Ctrl+Home hotkey");
+                    break;
 
-                switch (hotKeyId)
-                {
-                    case GlobalResetWindowHotKeyId:
-                        handled = true;
+                case MainWindowMessageAction.ClearBoard:
+                    ClearBoard("global Delete hotkey");
+                    break;
 
-                        if (!IsActive)
-                        {
-                            RequestWindowLayoutResetFromHotkey("global Ctrl+Home hotkey");
-                        }
-
-                        break;
-
-                    case GlobalClearBoardHotKeyId:
-                        handled = true;
-                        ClearBoard("global Delete hotkey");
-                        break;
-
-                    case GlobalToggleBoardModeHotKeyId:
-                        handled = true;
-                        ToggleCompactModeFromHotkey();
-                        break;
-
-                    default:
-                        handled = false;
-                        break;
-                }
+                case MainWindowMessageAction.ToggleCompactMode:
+                    ToggleCompactModeFromHotkey();
+                    break;
             }
 
             return IntPtr.Zero;
@@ -2399,39 +2400,36 @@ namespace PitmastersGrill
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Home &&
-                (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
-            {
-                RequestWindowLayoutResetFromHotkey("Ctrl+Home hotkey");
-                e.Handled = true;
-                return;
-            }
+            var action = _mainWindowInteropController.RoutePreviewKey(
+                e.Key,
+                (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control,
+                IsTextEditingElement(e.OriginalSource as DependencyObject));
 
-            if (IsTextEditingElement(e.OriginalSource as DependencyObject))
+            switch (action)
             {
-                return;
-            }
+                case MainWindowKeyboardAction.RequestWindowLayoutReset:
+                    RequestWindowLayoutResetFromHotkey("Ctrl+Home hotkey");
+                    e.Handled = true;
+                    return;
 
-            switch (e.Key)
-            {
-                case Key.Insert:
+                case MainWindowKeyboardAction.ToggleCompactMode:
                     ToggleCompactModeFromHotkey();
                     e.Handled = true;
                     return;
 
-                case Key.Delete:
+                case MainWindowKeyboardAction.ClearBoard:
                     ClearBoard("Delete hotkey");
                     e.Handled = true;
                     return;
 
-                case Key.Home:
+                case MainWindowKeyboardAction.RefreshClipboard:
                     AppLogger.UiInfo("Manual clipboard refresh requested from Home hotkey.");
                     _boardPopulationEntryController.InvalidateLastProcessedClipboard();
                     _ = ProcessClipboardIfValidAsync();
                     e.Handled = true;
                     return;
 
-                case Key.Escape:
+                case MainWindowKeyboardAction.HandleEscape:
                     HandleEscapeHotkey();
                     e.Handled = true;
                     return;
@@ -2440,19 +2438,16 @@ namespace PitmastersGrill
 
         private void HandleEscapeHotkey()
         {
-            var now = DateTime.UtcNow;
-            if ((now - _lastEscapeTapUtc).TotalMilliseconds <= TripleEscapeWindowMilliseconds)
-            {
-                _escapeTapCount++;
-            }
-            else
-            {
-                _escapeTapCount = 1;
-            }
+            var result = _mainWindowInteropController.HandleEscapeTap(
+                DateTime.UtcNow,
+                _lastEscapeTapUtc,
+                _escapeTapCount,
+                TripleEscapeWindowMilliseconds);
 
-            _lastEscapeTapUtc = now;
+            _lastEscapeTapUtc = result.LastEscapeTapUtc;
+            _escapeTapCount = result.EscapeTapCount;
 
-            if (_escapeTapCount >= 3)
+            if (result.ShouldRequestShutdown)
             {
                 RequestApplicationShutdown("Triple Escape hotkey");
             }
@@ -2521,41 +2516,27 @@ namespace PitmastersGrill
             var workTop = workTopLeft.Y;
             var workRight = workBottomRight.X;
             var workBottom = workBottomRight.Y;
-
-            var rightX = ownerLeft + ownerWidth + DetailWindowGap;
-            var leftX = ownerLeft - detailWidth - DetailWindowGap;
-            var canRight = rightX + detailWidth <= workRight;
-            var canLeft = leftX >= workLeft;
-
             var preferLeft = _settingsTabController.GetPilotDetailPlacementPreference(_appSettings) == PilotDetailPlacementPreference.AutoPreferLeft;
-            var preferredSide = preferLeft ? "left" : "right";
-            var finalSide = preferredSide;
+            var placement = _pilotDetailWindowPlacementController.BuildPlacement(
+                detailWidth,
+                detailHeight,
+                ownerLeft,
+                ownerTop,
+                ownerWidth,
+                workLeft,
+                workTop,
+                workRight,
+                workBottom,
+                preferLeft,
+                DetailWindowGap);
 
-            if (preferLeft)
-            {
-                if (!canLeft && canRight)
-                {
-                    finalSide = "right";
-                }
-            }
-            else if (!canRight && canLeft)
-            {
-                finalSide = "left";
-            }
+            detailWindow.Left = placement.Left;
+            detailWindow.Top = placement.Top;
 
-            var targetLeft = finalSide == "left" ? leftX : rightX;
-            var targetTop = ownerTop;
-            var clampedLeft = Clamp(targetLeft, workLeft, Math.Max(workLeft, workRight - detailWidth));
-            var clampedTop = Clamp(targetTop, workTop, Math.Max(workTop, workBottom - detailHeight));
-            var wasClamped = !AreClose(clampedLeft, targetLeft) || !AreClose(clampedTop, targetTop);
-
-            detailWindow.Left = clampedLeft;
-            detailWindow.Top = clampedTop;
-
-            if (!string.Equals(finalSide, preferredSide, StringComparison.Ordinal) || wasClamped)
+            if (placement.WasAdjusted)
             {
                 AppLogger.UiInfo(
-                    $"Detail window placement adjusted. ownerBounds=({ownerLeft:0.##},{ownerTop:0.##},{ownerWidth:0.##},{ownerHeight:0.##}) workArea=({workLeft:0.##},{workTop:0.##},{workRight - workLeft:0.##},{workBottom - workTop:0.##}) preferredSide={preferredSide} finalSide={finalSide} finalBounds=({clampedLeft:0.##},{clampedTop:0.##},{detailWidth:0.##},{detailHeight:0.##})");
+                    $"Detail window placement adjusted. ownerBounds=({ownerLeft:0.##},{ownerTop:0.##},{ownerWidth:0.##},{ownerHeight:0.##}) workArea=({workLeft:0.##},{workTop:0.##},{workRight - workLeft:0.##},{workBottom - workTop:0.##}) preferredSide={placement.PreferredSide} finalSide={placement.FinalSide} finalBounds=({placement.Left:0.##},{placement.Top:0.##},{detailWidth:0.##},{detailHeight:0.##})");
             }
         }
 
@@ -2779,32 +2760,13 @@ namespace PitmastersGrill
                 return;
             }
 
-            if (row == null)
-            {
-                IgnoreAllianceButton.IsEnabled = false;
-                IgnoreAllianceButton.ToolTip = "Select a pilot to ignore their alliance.";
-                return;
-            }
+            var allianceId = _pilotDetailActionsPresenter.TryGetAllianceId(row?.AllianceId);
+            var state = _pilotDetailActionsPresenter.BuildIgnoreAllianceActionState(
+                row,
+                allianceId.HasValue && _ignoreAllianceCoordinator.ContainsAllianceId(allianceId.Value));
 
-            var allianceId = TryGetAllianceId(row.AllianceId);
-            if (!allianceId.HasValue)
-            {
-                IgnoreAllianceButton.IsEnabled = false;
-                IgnoreAllianceButton.ToolTip = "Selected pilot does not have a known alliance ID yet.";
-                return;
-            }
-
-            if (_ignoreAllianceCoordinator.ContainsAllianceId(allianceId.Value))
-            {
-                IgnoreAllianceButton.IsEnabled = false;
-                IgnoreAllianceButton.ToolTip = "This alliance is already on the ignore list.";
-                return;
-            }
-
-            IgnoreAllianceButton.IsEnabled = true;
-            IgnoreAllianceButton.ToolTip = string.IsNullOrWhiteSpace(row.AllianceName)
-                ? $"Ignore alliance ID {allianceId.Value}."
-                : $"Ignore alliance '{row.AllianceName}' ({allianceId.Value}).";
+            IgnoreAllianceButton.IsEnabled = state.IsEnabled;
+            IgnoreAllianceButton.ToolTip = state.ToolTip;
         }
 
         private void UpdateWatchPilotDetailActionState(PilotBoardRow? row)
@@ -2814,24 +2776,13 @@ namespace PitmastersGrill
                 return;
             }
 
-            if (row == null)
-            {
-                WatchPilotDetailAction.IsEnabled = false;
-                WatchPilotDetailAction.Content = "Watch";
-                WatchPilotDetailAction.ToolTip = "Select a resolved pilot to watch.";
-                WatchPilotDetailAction.SetResourceReference(Control.ForegroundProperty, "SuccessGreenBrush");
-                return;
-            }
-
-            var canWatch = TryGetPilotId(row.CharacterId).HasValue;
-            WatchPilotDetailAction.IsEnabled = canWatch;
-            WatchPilotDetailAction.Content = row.IsWatched ? "Unwatch" : "Watch";
-            WatchPilotDetailAction.ToolTip = canWatch
-                ? (row.IsWatched ? "Stop watching this pilot." : "Mark this pilot as watched.")
-                : "Selected pilot does not have a known character ID yet.";
+            var state = _pilotDetailActionsPresenter.BuildWatchPilotActionState(row);
+            WatchPilotDetailAction.IsEnabled = state.IsEnabled;
+            WatchPilotDetailAction.Content = state.Content;
+            WatchPilotDetailAction.ToolTip = state.ToolTip;
             WatchPilotDetailAction.SetResourceReference(
                 Control.ForegroundProperty,
-                row.IsWatched ? "WatchedPilotMarkerBrush" : "SuccessGreenBrush");
+                state.ForegroundResourceKey);
         }
 
         private void UpdateOpenDetailsButtonState()
@@ -2927,26 +2878,6 @@ namespace PitmastersGrill
             }
         }
 
-        private static double Clamp(double value, double min, double max)
-        {
-            if (value < min)
-            {
-                return min;
-            }
-
-            if (value > max)
-            {
-                return max;
-            }
-
-            return value;
-        }
-
-        private static bool AreClose(double left, double right)
-        {
-            return Math.Abs(left - right) < 0.5;
-        }
-
         private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
             try
@@ -2972,46 +2903,6 @@ namespace PitmastersGrill
             }
         }
 
-        private static long? TryGetAllianceId(string? allianceIdText)
-        {
-            if (string.IsNullOrWhiteSpace(allianceIdText))
-            {
-                return null;
-            }
-
-            if (!long.TryParse(allianceIdText.Trim(), out var allianceId))
-            {
-                return null;
-            }
-
-            if (allianceId <= 0)
-            {
-                return null;
-            }
-
-            return allianceId;
-        }
-
-        private static long? TryGetPilotId(string? characterIdText)
-        {
-            if (string.IsNullOrWhiteSpace(characterIdText))
-            {
-                return null;
-            }
-
-            if (!long.TryParse(characterIdText.Trim(), out var characterId))
-            {
-                return null;
-            }
-
-            if (characterId <= 0)
-            {
-                return null;
-            }
-
-            return characterId;
-        }
-
         private void ApplyWatchedState(PilotBoardRow row)
         {
             if (row == null)
@@ -3024,7 +2915,7 @@ namespace PitmastersGrill
 
         private void ToggleWatchForRow(PilotBoardRow row)
         {
-            var pilotId = TryGetPilotId(row.CharacterId);
+            var pilotId = _pilotDetailActionsPresenter.TryGetPilotId(row.CharacterId);
             if (!pilotId.HasValue)
             {
                 UpdateWatchPilotDetailActionState(row);
@@ -3246,13 +3137,13 @@ namespace PitmastersGrill
             return null;
         }
 
-        private static long? GetIgnoreId(PilotBoardRow row, IgnoreEntryType type)
+        private long? GetIgnoreId(PilotBoardRow row, IgnoreEntryType type)
         {
             return type switch
             {
-                IgnoreEntryType.Pilot => TryGetAllianceId(row.CharacterId),
-                IgnoreEntryType.Corporation => TryGetAllianceId(row.CorpId),
-                IgnoreEntryType.Alliance => TryGetAllianceId(row.AllianceId),
+                IgnoreEntryType.Pilot => _pilotDetailActionsPresenter.TryGetPilotId(row.CharacterId),
+                IgnoreEntryType.Corporation => _pilotDetailActionsPresenter.TryGetAllianceId(row.CorpId),
+                IgnoreEntryType.Alliance => _pilotDetailActionsPresenter.TryGetAllianceId(row.AllianceId),
                 _ => null
             };
         }
@@ -3324,23 +3215,21 @@ namespace PitmastersGrill
 
         private bool IsSessionContextStale()
         {
-            return _currentEveSessionContext == null ||
-                   (DateTime.UtcNow - _lastSessionContextRefreshUtc) > TimeSpan.FromMinutes(3);
+            return _eveSessionContextCoordinator.IsStale(
+                _currentEveSessionContext,
+                _lastSessionContextRefreshUtc,
+                DateTime.UtcNow);
         }
 
         private void TriggerSessionContextRefresh(string reason, bool force)
         {
-            if (_isShuttingDown)
-            {
-                return;
-            }
-
-            if (!force && !IsSessionContextStale())
-            {
-                return;
-            }
-
-            if (_isSessionContextRefreshInFlight)
+            if (!_eveSessionContextCoordinator.ShouldTriggerRefresh(
+                _isShuttingDown,
+                force,
+                _currentEveSessionContext,
+                _lastSessionContextRefreshUtc,
+                _isSessionContextRefreshInFlight,
+                DateTime.UtcNow))
             {
                 return;
             }
@@ -3372,15 +3261,7 @@ namespace PitmastersGrill
             catch (Exception ex)
             {
                 AppLogger.UiWarn($"EVE session context refresh failed. reason='{reason}' message={ex.Message}");
-                var fallback = new EveSessionContext
-                {
-                    CharacterName = "Not detected",
-                    SolarSystemName = "Not detected",
-                    EvidenceSource = "Unable to read local evidence",
-                    EvidenceTimestampUtc = null,
-                    Confidence = "None",
-                    StatusMessage = "Unable to infer EVE context"
-                };
+                var fallback = _eveSessionContextCoordinator.CreateFallbackContext();
 
                 _lastSessionContextRefreshUtc = DateTime.UtcNow;
                 _currentEveSessionContext = fallback;
@@ -3390,19 +3271,6 @@ namespace PitmastersGrill
             {
                 _isSessionContextRefreshInFlight = false;
             }
-        }
-
-        private static EveSessionContext CreatePendingEveSessionContext()
-        {
-            return new EveSessionContext
-            {
-                CharacterName = "Waiting for local context",
-                SolarSystemName = "Waiting for local context",
-                EvidenceSource = "Soft local read pending",
-                EvidenceTimestampUtc = null,
-                Confidence = "Pending",
-                StatusMessage = "Waiting for local session evidence"
-            };
         }
 
         private void ApplyEveSessionContext(EveSessionContext context)
@@ -3416,33 +3284,12 @@ namespace PitmastersGrill
                 return;
             }
 
-            AnalysisCurrentCharacterText.Text = string.IsNullOrWhiteSpace(context.CharacterName)
-                ? "Not detected"
-                : context.CharacterName;
-            AnalysisCurrentSystemText.Text = string.IsNullOrWhiteSpace(context.SolarSystemName)
-                ? "Not detected"
-                : context.SolarSystemName;
-            AnalysisEvidenceSourceText.Text = string.IsNullOrWhiteSpace(context.EvidenceSource)
-                ? "Not configured"
-                : context.EvidenceSource;
-            AnalysisObservedAtText.Text = context.EvidenceTimestampUtc.HasValue
-                ? context.EvidenceTimestampUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
-                : "Not detected";
-
-            var statusParts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(context.Confidence))
-            {
-                statusParts.Add(context.Confidence);
-            }
-
-            if (!string.IsNullOrWhiteSpace(context.StatusMessage))
-            {
-                statusParts.Add(context.StatusMessage);
-            }
-
-            AnalysisContextStatusText.Text = statusParts.Count > 0
-                ? string.Join(" | ", statusParts)
-                : "Unable to infer EVE context";
+            var projection = _eveSessionContextCoordinator.BuildProjection(context);
+            AnalysisCurrentCharacterText.Text = projection.CharacterText;
+            AnalysisCurrentSystemText.Text = projection.SystemText;
+            AnalysisEvidenceSourceText.Text = projection.EvidenceSourceText;
+            AnalysisObservedAtText.Text = projection.ObservedAtText;
+            AnalysisContextStatusText.Text = projection.StatusText;
         }
 
         private void AnalysisHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
