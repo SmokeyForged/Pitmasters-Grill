@@ -66,6 +66,7 @@ namespace PitmastersGrill
         private readonly SettingsTabController _settingsTabController;
         private readonly AnalysisTabController _analysisTabController;
         private readonly AnalysisTabPresenter _analysisTabPresenter = null!;
+        private readonly MainWindowShellModeCoordinator _mainWindowShellModeCoordinator;
         private readonly WindowLayoutController _windowLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
@@ -149,6 +150,7 @@ namespace PitmastersGrill
                 _boardDisplaySettingsController,
                 settings => _mainWindowAppearanceController.SaveSettings(settings));
             _analysisTabController = new AnalysisTabController();
+            _mainWindowShellModeCoordinator = new MainWindowShellModeCoordinator();
             _windowLayoutController = new WindowLayoutController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
 
@@ -504,7 +506,83 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
         }
 
-        private void ApplyCompactModeUi() { if (CompactModeToggleButton == null || MainContentGrid == null || TopCommandGrid == null || MainTabControl == null || BoardStatusFooter == null) { return; } var compact = CompactModeToggleButton.IsChecked == true; var previousCompactMode = _lastAppliedCompactMode; var displayModeChanged = !_isApplyingSettings && !_isRestoringWindowLayout && previousCompactMode.HasValue && previousCompactMode.Value != compact; if (displayModeChanged && previousCompactMode.HasValue) { var wasBoardMode = previousCompactMode.GetValueOrDefault(); var outgoingLayoutMode = wasBoardMode ? WindowLayoutMode.Board : WindowLayoutMode.Normal; SaveWindowLayoutToSettings($"Before display mode change to {(compact ? "Board" : "Normal")}", outgoingLayoutMode); } _lastAppliedCompactMode = compact; if (compact) { MainTabControl.SelectedIndex = 1; CloseActiveDetailWindow(); } TopCommandGrid.Visibility = compact ? Visibility.Collapsed : Visibility.Visible; TopCommandGrid.Margin = new Thickness(0, 0, 0, 6); BoardStatusFooter.Padding = new Thickness(8, 5, 8, 5); MainContentGrid.Margin = compact ? new Thickness(1) : new Thickness(12); MainTabControl.BorderThickness = compact ? new Thickness(0) : new Thickness(1); MainTabControl.Margin = compact ? new Thickness(0) : new Thickness(0); if (!_isApplyingSettings && _appSettings.CompactModeEnabled != compact) { _appSettings.CompactModeEnabled = compact; _mainWindowAppearanceController.SaveSettings(_appSettings); } if (!_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { AppLogger.UiInfo($"Display mode changed.\nboardMode={compact}"); } if (compact && !_isApplyingSettings && (!previousCompactMode.HasValue || previousCompactMode.Value != compact)) { ShowBoardModeHint(); } else if (!compact) { HideBoardModeHint(); } UpdateWindowMinimumSize(); if (displayModeChanged) { RestoreWindowLayoutFromSettings(compact ? WindowLayoutMode.Board : WindowLayoutMode.Normal); } UpdateBoardFooterVisibility(); UpdateBoardSummaryBanner(); UpdateAnalysisTab(); }
+        private void ApplyCompactModeUi()
+        {
+            if (CompactModeToggleButton == null ||
+                MainContentGrid == null ||
+                TopCommandGrid == null ||
+                MainTabControl == null ||
+                BoardStatusFooter == null)
+            {
+                return;
+            }
+
+            var transition = _mainWindowShellModeCoordinator.BuildCompactModeTransition(
+                CompactModeToggleButton.IsChecked == true,
+                _lastAppliedCompactMode,
+                _isApplyingSettings,
+                _isRestoringWindowLayout,
+                _appSettings.CompactModeEnabled,
+                MainTabControl.SelectedIndex);
+
+            if (transition.ShouldSaveOutgoingLayout)
+            {
+                var outgoingLayoutMode = transition.OutgoingLayoutMode;
+                SaveWindowLayoutToSettings(
+                    $"Before display mode change to {(transition.CompactMode ? "Board" : "Normal")}",
+                    outgoingLayoutMode);
+            }
+
+            _lastAppliedCompactMode = transition.CompactMode;
+
+            if (transition.ShouldSelectBoardTab)
+            {
+                MainTabControl.SelectedIndex = transition.TargetSelectedTabIndex;
+            }
+
+            if (transition.ShouldCloseActiveDetailWindow)
+            {
+                CloseActiveDetailWindow();
+            }
+
+            TopCommandGrid.Visibility = transition.TopCommandVisibility;
+            TopCommandGrid.Margin = new Thickness(0, 0, 0, 6);
+            BoardStatusFooter.Padding = transition.BoardStatusFooterPadding;
+            MainContentGrid.Margin = transition.MainContentMargin;
+            MainTabControl.BorderThickness = transition.MainTabBorderThickness;
+            MainTabControl.Margin = transition.MainTabMargin;
+
+            if (transition.ShouldPersistCompactModeSetting)
+            {
+                _appSettings.CompactModeEnabled = transition.CompactMode;
+                _mainWindowAppearanceController.SaveSettings(_appSettings);
+            }
+
+            if (transition.ShouldLogDisplayModeChanged)
+            {
+                AppLogger.UiInfo($"Display mode changed.\nboardMode={transition.CompactMode}");
+            }
+
+            if (transition.ShouldShowBoardModeHint)
+            {
+                ShowBoardModeHint();
+            }
+            else if (transition.ShouldHideBoardModeHint)
+            {
+                HideBoardModeHint();
+            }
+
+            UpdateWindowMinimumSize();
+
+            if (transition.ShouldRestoreIncomingLayout)
+            {
+                RestoreWindowLayoutFromSettings(transition.IncomingLayoutMode);
+            }
+
+            BoardStatusFooter.Visibility = transition.BoardStatusFooterVisibility;
+            UpdateBoardSummaryBanner();
+            UpdateAnalysisTab();
+        }
         private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!ReferenceEquals(sender, MainTabControl))
@@ -531,11 +609,9 @@ namespace PitmastersGrill
                 return;
             }
 
-            var boardMode = CompactModeToggleButton.IsChecked == true;
-            var analysisTabSelected = MainTabControl.SelectedIndex == 0;
-            BoardStatusFooter.Visibility = boardMode || analysisTabSelected
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            BoardStatusFooter.Visibility = _mainWindowShellModeCoordinator.BuildBoardStatusFooterVisibility(
+                CompactModeToggleButton.IsChecked == true,
+                MainTabControl.SelectedIndex);
         }
 
         private void ToggleCompactModeFromHotkey()
@@ -579,32 +655,25 @@ namespace PitmastersGrill
 
         private void UpdateWindowMinimumSize()
         {
-            if (CompactModeToggleButton?.IsChecked == true)
-            {
-                MinWidth = BoardModeMinimumWindowWidth;
-                MinHeight = GetBoardModeMinimumWindowHeight();
-                return;
-            }
+            var minimumSize = _mainWindowShellModeCoordinator.BuildMinimumWindowSize(
+                CompactModeToggleButton?.IsChecked == true,
+                NormalModeMinimumWindowWidth,
+                NormalModeMinimumWindowHeight,
+                BoardModeMinimumWindowWidth,
+                MainContentGrid?.Margin.Top + MainContentGrid?.Margin.Bottom ?? 0,
+                TopCommandGrid?.ActualHeight ?? 0,
+                GetTabHeaderHeight(),
+                GetBoardColumnHeaderHeight(),
+                GetBoardRowHeight(),
+                PilotBoard?.FontSize ?? 12,
+                BoardModeFallbackCommandStripHeight,
+                BoardModeFallbackTabHeaderHeight,
+                BoardModeFallbackColumnHeaderHeight,
+                BoardModeFallbackFooterPaddingHeight,
+                BoardModeFallbackRowVerticalPadding);
 
-            MinWidth = NormalModeMinimumWindowWidth;
-            MinHeight = NormalModeMinimumWindowHeight;
-        }
-
-        private double GetBoardModeMinimumWindowHeight()
-        {
-            var contentMarginHeight = MainContentGrid?.Margin.Top + MainContentGrid?.Margin.Bottom ?? 0;
-            var commandStripHeight = Math.Max(TopCommandGrid?.ActualHeight ?? 0, BoardModeFallbackCommandStripHeight);
-            var tabHeaderHeight = Math.Max(GetTabHeaderHeight(), BoardModeFallbackTabHeaderHeight);
-            var boardColumnHeaderHeight = Math.Max(GetBoardColumnHeaderHeight(), BoardModeFallbackColumnHeaderHeight);
-            var boardRowHeight = Math.Max(GetBoardRowHeight(), Math.Ceiling((PilotBoard?.FontSize ?? 12) + BoardModeFallbackRowVerticalPadding));
-
-            return Math.Ceiling(
-                contentMarginHeight +
-                commandStripHeight +
-                tabHeaderHeight +
-                boardColumnHeaderHeight +
-                boardRowHeight +
-                BoardModeFallbackFooterPaddingHeight);
+            MinWidth = minimumSize.MinWidth;
+            MinHeight = minimumSize.MinHeight;
         }
 
         private double GetTabHeaderHeight()
@@ -650,9 +719,9 @@ namespace PitmastersGrill
                 return;
             }
 
-            var isMaximized = WindowState == WindowState.Maximized;
-            MaximizeRestoreWindowButton.Content = isMaximized ? "O" : "[]";
-            MaximizeRestoreWindowButton.ToolTip = isMaximized ? "Restore PMG" : "Maximize PMG";
+            var buttonState = _mainWindowShellModeCoordinator.BuildMaximizeRestoreWindowButtonState(WindowState);
+            MaximizeRestoreWindowButton.Content = buttonState.Content;
+            MaximizeRestoreWindowButton.ToolTip = buttonState.ToolTip;
         }
 
         private void TrackCurrentNormalWindowBounds(string reason)
