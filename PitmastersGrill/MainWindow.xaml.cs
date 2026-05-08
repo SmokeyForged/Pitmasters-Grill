@@ -92,6 +92,7 @@ namespace PitmastersGrill
         private readonly DiagnosticsCacheMaintenanceController _diagnosticsCacheMaintenanceController = null!;
         private readonly PilotDetailActionsPresenter _pilotDetailActionsPresenter;
         private readonly PilotDetailWindowPlacementController _pilotDetailWindowPlacementController;
+        private readonly PilotDetailWindowLifecycleController _pilotDetailWindowLifecycleController;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -161,6 +162,7 @@ namespace PitmastersGrill
             _boardPopulationStatusController = new BoardPopulationStatusController();
             _pilotDetailActionsPresenter = new PilotDetailActionsPresenter();
             _pilotDetailWindowPlacementController = new PilotDetailWindowPlacementController();
+            _pilotDetailWindowLifecycleController = new PilotDetailWindowLifecycleController();
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
@@ -1841,7 +1843,7 @@ namespace PitmastersGrill
             RecomputeCorpAllianceCounts();
 
             if (_activePilotDetailWindow != null &&
-                string.Equals(_activePilotDetailWindow.CharacterName, row.CharacterName, StringComparison.OrdinalIgnoreCase))
+                _pilotDetailWindowLifecycleController.ShouldRefreshActiveWindow(row.CharacterName))
             {
                 _activePilotDetailWindow.RefreshRow();
             }
@@ -2455,14 +2457,15 @@ namespace PitmastersGrill
 
         private void OpenDetailsWindow(PilotBoardRow row)
         {
-            if (_activePilotDetailWindow != null)
+            var action = _pilotDetailWindowLifecycleController.DecideOpenAction(row.CharacterName);
+            if (action == PilotDetailWindowOpenAction.ActivateExisting)
             {
-                if (string.Equals(_activePilotDetailWindow.CharacterName, row.CharacterName, StringComparison.OrdinalIgnoreCase))
-                {
-                    _activePilotDetailWindow.Activate();
-                    return;
-                }
+                _activePilotDetailWindow?.Activate();
+                return;
+            }
 
+            if (action == PilotDetailWindowOpenAction.ReplaceExisting)
+            {
                 CloseActiveDetailWindow();
             }
 
@@ -2480,6 +2483,7 @@ namespace PitmastersGrill
             _activePilotDetailWindow.Topmost = Topmost;
             PositionDetailWindow(_activePilotDetailWindow);
             _activePilotDetailWindow.Closed += ActivePilotDetailWindow_Closed;
+            _pilotDetailWindowLifecycleController.MarkWindowOpened(row.CharacterName);
             _activePilotDetailWindow.Show();
             AppLogger.UiInfo($"Details window opened. character='{row.CharacterName}'");
         }
@@ -2547,6 +2551,8 @@ namespace PitmastersGrill
                 _activePilotDetailWindow.Closed -= ActivePilotDetailWindow_Closed;
                 _activePilotDetailWindow = null;
             }
+
+            _pilotDetailWindowLifecycleController.ClearActiveWindow();
         }
 
         private void CloseActiveDetailWindow()
@@ -2560,6 +2566,7 @@ namespace PitmastersGrill
             _activePilotDetailWindow = null;
             window.Closed -= ActivePilotDetailWindow_Closed;
             window.SaveCurrentState();
+            _pilotDetailWindowLifecycleController.ClearActiveWindow();
             window.Close();
         }
 
@@ -2711,46 +2718,20 @@ namespace PitmastersGrill
 
         private PilotBoardRow? GetSelectedOrDisplayedDetailRow()
         {
-            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow)
-            {
-                return selectedRow;
-            }
-
-            if (DetailPane.Visibility != Visibility.Visible)
-            {
-                return null;
-            }
-
-            var displayedCharacterName = SelectedCharacterText.Text;
-
-            if (string.IsNullOrWhiteSpace(displayedCharacterName))
-            {
-                return null;
-            }
-
-            return _currentRows.FirstOrDefault(row =>
-                string.Equals(
-                    row.CharacterName,
-                    displayedCharacterName.Trim(),
-                    StringComparison.OrdinalIgnoreCase));
+            return _detailPaneController.GetSelectedOrDisplayedDetailRow(
+                PilotBoard.SelectedItem as PilotBoardRow,
+                DetailPane.Visibility,
+                SelectedCharacterText.Text,
+                _currentRows);
         }
 
         private bool IsRowDisplayedInDetailPane(PilotBoardRow row)
         {
-            if (row == null || DetailPane.Visibility != Visibility.Visible)
-            {
-                return false;
-            }
-
-            if (PilotBoard.SelectedItem is PilotBoardRow selectedRow && ReferenceEquals(selectedRow, row))
-            {
-                return true;
-            }
-
-            return string.Equals(
-                SelectedCharacterText.Text,
-                row.CharacterName,
-                StringComparison.OrdinalIgnoreCase);
+            return _detailPaneController.IsRowDisplayedInDetailPane(
+                row,
+                PilotBoard.SelectedItem as PilotBoardRow,
+                DetailPane.Visibility,
+                SelectedCharacterText.Text);
         }
 
         private void UpdateIgnoreAllianceButtonState(PilotBoardRow? row)
