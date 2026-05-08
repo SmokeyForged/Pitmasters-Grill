@@ -12,7 +12,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -66,6 +65,7 @@ namespace PitmastersGrill
         private readonly BoardColumnLayoutPersistenceController _boardColumnLayoutPersistenceController;
         private readonly SettingsTabController _settingsTabController;
         private readonly AnalysisTabController _analysisTabController;
+        private readonly AnalysisTabPresenter _analysisTabPresenter = null!;
         private readonly WindowLayoutController _windowLayoutController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
@@ -257,6 +257,21 @@ namespace PitmastersGrill
             _ignoreAllianceBoardController = composed.IgnoreAllianceBoardController;
             _zkillUrlBuilder = composed.ZkillUrlBuilder;
             _browserLauncher = composed.BrowserLauncher;
+            _analysisTabPresenter = new AnalysisTabPresenter(
+                _analysisTabController,
+                _zkillUrlBuilder,
+                AnalysisHyperlink_RequestNavigate,
+                BoardSummaryText,
+                AnalysisEmptyStateText,
+                AnalysisDetailsPanel,
+                AnalysisVisibleCountsText,
+                AnalysisUniqueCountsText,
+                AnalysisAllianceTopText,
+                AnalysisCorpTopText,
+                AnalysisSignalsText,
+                AnalysisHighlightsText,
+                _analysisAllianceItems,
+                _analysisCorpItems);
             _eveSessionContextService = new EveSessionContextService();
 
             _ignoreAllianceListView = IgnoreAllianceListViewControl;
@@ -3191,12 +3206,7 @@ namespace PitmastersGrill
 
         private void UpdateBoardSummaryBanner()
         {
-            if (BoardSummaryText == null)
-            {
-                return;
-            }
-
-            BoardSummaryText.Text = BoardSummaryTextBuilder.Build(_currentRows);
+            _analysisTabPresenter.UpdateBoardSummary(_currentRows);
         }
 
         private void CurrentRows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -3240,52 +3250,7 @@ namespace PitmastersGrill
 
         private void UpdateAnalysisTab()
         {
-            if (AnalysisEmptyStateText == null ||
-                AnalysisDetailsPanel == null ||
-                AnalysisVisibleCountsText == null ||
-                AnalysisUniqueCountsText == null ||
-                AnalysisAllianceTopText == null ||
-                AnalysisCorpTopText == null ||
-                AnalysisSignalsText == null ||
-                AnalysisHighlightsText == null)
-            {
-                return;
-            }
-
-            var summary = _analysisTabController.BuildSummary(_currentRows);
-            if (!summary.HasVisibleRows)
-            {
-                AnalysisEmptyStateText.Visibility = Visibility.Visible;
-                AnalysisDetailsPanel.Visibility = Visibility.Collapsed;
-                AnalysisEmptyStateText.Text = summary.EmptyStateText;
-                return;
-            }
-
-            AnalysisEmptyStateText.Visibility = Visibility.Collapsed;
-            AnalysisDetailsPanel.Visibility = Visibility.Visible;
-            AnalysisVisibleCountsText.Text = summary.VisibleCountsText;
-            AnalysisUniqueCountsText.Text = summary.UniqueCountsText;
-            PopulateAnalysisAllianceTopText(summary.TopAlliances);
-            PopulateAnalysisCorpTopText(summary.TopCorps);
-            PopulateAnalysisAffiliationList(
-                _analysisAllianceItems,
-                _analysisTabController.BuildAffiliationListItems(summary.AllAlliances, "alliance"));
-            PopulateAnalysisAffiliationList(
-                _analysisCorpItems,
-                _analysisTabController.BuildAffiliationListItems(summary.AllCorps, "corporation"));
-            AnalysisSignalsText.Text = string.Empty;
-            PopulateAnalysisHighlightsText(summary.Highlights);
-        }
-
-        private static void PopulateAnalysisAffiliationList(
-            ObservableCollection<AnalysisAffiliationListItem> target,
-            IReadOnlyList<AnalysisAffiliationListItem> items)
-        {
-            target.Clear();
-            foreach (var item in items)
-            {
-                target.Add(item);
-            }
+            _analysisTabPresenter.UpdateAnalysisTab(_currentRows);
         }
 
         private bool IsSessionContextStale()
@@ -3411,165 +3376,6 @@ namespace PitmastersGrill
                 : "Unable to infer EVE context";
         }
 
-        private void PopulateAnalysisAllianceTopText(IReadOnlyList<AnalysisAffiliationSummary> alliances)
-        {
-            AnalysisAllianceTopText.Inlines.Clear();
-            AnalysisAllianceTopText.Inlines.Add(new Run("Top alliances: "));
-
-            if (alliances.Count == 0)
-            {
-                AnalysisAllianceTopText.Inlines.Add(new Run("none visible"));
-                return;
-            }
-
-            for (var index = 0; index < alliances.Count; index++)
-            {
-                if (index > 0)
-                {
-                    AnalysisAllianceTopText.Inlines.Add(new Run(" | "));
-                }
-
-                var alliance = alliances[index];
-                if (!string.IsNullOrWhiteSpace(alliance.Id) &&
-                    long.TryParse(alliance.Id, out _))
-                {
-                    AddHyperlinkInline(
-                        AnalysisAllianceTopText,
-                        alliance.Name,
-                        BuildAllianceZkillUrl(alliance.Id),
-                        $"Open {alliance.Name} on zKill");
-                }
-                else
-                {
-                    AnalysisAllianceTopText.Inlines.Add(new Run(alliance.Name));
-                }
-
-                AnalysisAllianceTopText.Inlines.Add(new Run($" [{alliance.Count}]"));
-            }
-        }
-
-        private void PopulateAnalysisCorpTopText(IReadOnlyList<AnalysisAffiliationSummary> corps)
-        {
-            AnalysisCorpTopText.Inlines.Clear();
-            AnalysisCorpTopText.Inlines.Add(new Run("Top corps: "));
-
-            if (corps.Count == 0)
-            {
-                AnalysisCorpTopText.Inlines.Add(new Run("none visible"));
-                return;
-            }
-
-            for (var index = 0; index < corps.Count; index++)
-            {
-                if (index > 0)
-                {
-                    AnalysisCorpTopText.Inlines.Add(new Run(" | "));
-                }
-
-                var corp = corps[index];
-                if (!string.IsNullOrWhiteSpace(corp.Id) &&
-                    long.TryParse(corp.Id, out _))
-                {
-                    AddHyperlinkInline(
-                        AnalysisCorpTopText,
-                        corp.Name,
-                        BuildCorporationZkillUrl(corp.Id),
-                        $"Open {corp.Name} on zKill");
-                }
-                else
-                {
-                    AnalysisCorpTopText.Inlines.Add(new Run(corp.Name));
-                }
-
-                AnalysisCorpTopText.Inlines.Add(new Run($" [{corp.Count}]"));
-            }
-        }
-
-        private void PopulateAnalysisHighlightsText(IReadOnlyList<AnalysisHighlightSummary> highlights)
-        {
-            AnalysisHighlightsText.Inlines.Clear();
-            AnalysisHighlightsText.Inlines.Add(new Run("Highlights: "));
-
-            var addedAny = false;
-            for (var index = 0; index < highlights.Count; index++)
-            {
-                var highlight = highlights[index];
-                AddHighlightCharacterLink(
-                    AnalysisHighlightsText,
-                    highlight.Label,
-                    highlight.CharacterName,
-                    highlight.CharacterId,
-                    highlight.ValueText,
-                    ref addedAny);
-            }
-
-            if (!addedAny)
-            {
-                AnalysisHighlightsText.Inlines.Add(new Run("none visible"));
-            }
-        }
-
-        private void AddHighlightCharacterLink(
-            TextBlock target,
-            string label,
-            string characterName,
-            string characterId,
-            string valueText,
-            ref bool addedAny)
-        {
-            if (addedAny)
-            {
-                target.Inlines.Add(new Run(" | "));
-            }
-
-            if (!string.IsNullOrWhiteSpace(label))
-            {
-                target.Inlines.Add(new Run($"{label}: "));
-            }
-
-            var hasCharacterId = !string.IsNullOrWhiteSpace(characterId) && long.TryParse(characterId, out _);
-            if (hasCharacterId)
-            {
-                AddHyperlinkInline(
-                    target,
-                    characterName,
-                    _zkillUrlBuilder.BuildCharacterUrl(characterId),
-                    $"Open {characterName} on zKill");
-            }
-            else
-            {
-                target.Inlines.Add(new Run(characterName));
-            }
-
-            target.Inlines.Add(new Run($" [{valueText}]"));
-            addedAny = true;
-        }
-
-        private void AddHyperlinkInline(TextBlock target, string text, string url, string toolTip)
-        {
-            var hyperlink = new Hyperlink(new Run(text))
-            {
-                NavigateUri = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri : null,
-                ToolTip = toolTip
-            };
-            hyperlink.RequestNavigate += AnalysisHyperlink_RequestNavigate;
-            target.Inlines.Add(hyperlink);
-        }
-
-        private string BuildAllianceZkillUrl(string allianceId)
-        {
-            return string.IsNullOrWhiteSpace(allianceId)
-                ? string.Empty
-                : $"https://zkillboard.com/alliance/{Uri.EscapeDataString(allianceId.Trim())}/";
-        }
-
-        private string BuildCorporationZkillUrl(string corporationId)
-        {
-            return string.IsNullOrWhiteSpace(corporationId)
-                ? string.Empty
-                : $"https://zkillboard.com/corporation/{Uri.EscapeDataString(corporationId.Trim())}/";
-        }
-
         private void AnalysisHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
             e.Handled = true;
@@ -3608,8 +3414,8 @@ namespace PitmastersGrill
             }
 
             var url = string.Equals(item.EntityType, "alliance", StringComparison.OrdinalIgnoreCase)
-                ? BuildAllianceZkillUrl(item.Id)
-                : BuildCorporationZkillUrl(item.Id);
+                ? _analysisTabPresenter.BuildAllianceZkillUrl(item.Id)
+                : _analysisTabPresenter.BuildCorporationZkillUrl(item.Id);
 
             if (string.IsNullOrWhiteSpace(url))
             {
