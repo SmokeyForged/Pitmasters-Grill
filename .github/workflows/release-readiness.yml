@@ -1,0 +1,165 @@
+name: PMG Release Readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to validate, for example 1.4.0"
+        required: true
+        type: string
+      release_kind:
+        description: "Release kind for audit context. This does not calculate the version."
+        required: true
+        default: "minor"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - hotfix
+
+permissions:
+  contents: read
+
+jobs:
+  release-readiness:
+    name: Validate release readiness
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate release metadata and docs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $version = "${{ github.event.inputs.version }}".Trim()
+          $releaseKind = "${{ github.event.inputs.release_kind }}".Trim()
+
+          if ($releaseKind -notin @("patch", "minor", "major", "hotfix")) {
+            throw "release_kind must be one of: patch, minor, major, hotfix. Got '$releaseKind'."
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version input must be semantic version major.minor.patch. Got '$version'."
+          }
+
+          $tag = "v$version"
+          $title = "Pitmasters Grill $version"
+          $zipName = "PMG_General-Release_v$version.zip"
+          $notesPath = Join-Path "Patch Notes" ("General-Release_{0}.md" -f $version.Replace(".", "-"))
+
+          $projectPath = "PitmastersGrill/PitmastersGrill.csproj"
+          if (-not (Test-Path $projectPath -PathType Leaf)) {
+            throw "Project file missing: $projectPath"
+          }
+
+          $projectText = Get-Content $projectPath -Raw
+          if ($projectText -notmatch '<PmgReleaseVersion>(?<version>[^<]+)</PmgReleaseVersion>') {
+            throw "PmgReleaseVersion was not found in $projectPath."
+          }
+
+          $projectVersion = $Matches["version"].Trim()
+          if ($projectVersion -ne $version) {
+            throw "Version input '$version' does not match PmgReleaseVersion '$projectVersion'."
+          }
+
+          if ($projectText -notmatch '<Version>\$\(PmgReleaseVersion\)</Version>') {
+            throw "Project Version does not derive from PmgReleaseVersion."
+          }
+
+          if ($projectText -notmatch '<InformationalVersion>\$\(PmgReleaseVersion\)</InformationalVersion>') {
+            throw "Project InformationalVersion does not derive from PmgReleaseVersion."
+          }
+
+          if (-not (Test-Path $notesPath -PathType Leaf)) {
+            throw "Release notes file missing: $notesPath"
+          }
+
+          $notesText = Get-Content $notesPath -Raw
+          if ($notesText -notmatch [regex]::Escape($version)) {
+            throw "Release notes file does not reference version $version."
+          }
+
+          $readmePath = "README.md"
+          if (-not (Test-Path $readmePath -PathType Leaf)) {
+            throw "README.md is missing."
+          }
+
+          $readme = Get-Content $readmePath -Raw
+          if ($readme -notmatch [regex]::Escape($tag)) {
+            throw "README.md does not reference current release tag $tag."
+          }
+
+          $patchNotesIndexPath = Join-Path "Patch Notes" "readme.md"
+          if (-not (Test-Path $patchNotesIndexPath -PathType Leaf)) {
+            throw "Patch Notes/readme.md is missing."
+          }
+
+          $patchNotesIndex = Get-Content $patchNotesIndexPath -Raw
+          if ($patchNotesIndex -notmatch [regex]::Escape($tag)) {
+            throw "Patch Notes/readme.md does not reference current release tag $tag."
+          }
+
+          $featuresPath = "PMG-FEATURES.md"
+          if (Test-Path $featuresPath -PathType Leaf) {
+            $features = Get-Content $featuresPath -Raw
+            if ($features -notmatch [regex]::Escape($tag)) {
+              throw "PMG-FEATURES.md does not reference current release tag $tag."
+            }
+          }
+
+          $releaseDesignPath = "docs/RELEASE-AUTOMATION-DESIGN.md"
+          if (-not (Test-Path $releaseDesignPath -PathType Leaf)) {
+            throw "Release automation design doc is missing: $releaseDesignPath"
+          }
+
+          $releaseDesign = Get-Content $releaseDesignPath -Raw
+          if ($releaseDesign -notmatch 'PMG_General-Release_v<major>\.<minor>\.<patch>\.zip') {
+            throw "Canonical release ZIP naming pattern was not found in docs/RELEASE-AUTOMATION-DESIGN.md."
+          }
+
+          Write-Host "Release readiness metadata validated."
+          Write-Host "Release version: $version"
+          Write-Host "Release kind: $releaseKind"
+          Write-Host "Release title: $title"
+          Write-Host "Release tag: $tag"
+          Write-Host "Expected ZIP: $zipName"
+          Write-Host "Release notes: $notesPath"
+
+      - name: Check repository diff hygiene
+        shell: pwsh
+        run: git --no-pager diff --check
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore PitmastersGrill/PitmastersGrill.slnx
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build PitmastersGrill/PitmastersGrill.slnx --configuration Release --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: dotnet test PitmastersGrill.Tests/PitmastersGrill.Tests.csproj --configuration Release --no-build
+
+      - name: Check dependency vulnerabilities
+        shell: pwsh
+        run: ./tools/dependencies/check-dotnet-vulnerabilities.ps1
+
+      - name: Confirm readiness-only boundary
+        shell: pwsh
+        run: |
+          Write-Host "Release readiness validation passed."
+          Write-Host "No package was created."
+          Write-Host "No GitHub release was created."
+          Write-Host "No tag was created."
+          Write-Host "No release assets were uploaded."
+          Write-Host "Run the draft-release workflow only after readiness is accepted."
