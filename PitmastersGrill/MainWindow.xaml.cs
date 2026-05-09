@@ -71,11 +71,14 @@ namespace PitmastersGrill
         private readonly MainWindowShellModeCoordinator _mainWindowShellModeCoordinator;
         private readonly MainWindowInteropController _mainWindowInteropController;
         private readonly WindowLayoutController _windowLayoutController;
+        private readonly WindowLayoutSurface _windowLayoutSurface;
+        private readonly MainWindowNativeInputController _mainWindowNativeInputController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
         private readonly BoardPopulationPassController _boardPopulationPassController;
         private readonly BoardPopulationRetryController _boardPopulationRetryController;
         private readonly BoardPopulationEntryController _boardPopulationEntryController;
+        private readonly BoardPopulationSurface _boardPopulationSurface;
         private readonly NotesRepository _notesRepository;
         private readonly WatchedPilotRepository _watchedPilotRepository;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
@@ -105,19 +108,14 @@ namespace PitmastersGrill
         private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisCorpItems = new();
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
-        private bool _isApplyingSettings; private bool _isRestoringWindowLayout;
+        private bool _isApplyingSettings;
         private bool _isShuttingDown;
         private bool _compactDragPending;
         private Point _compactDragStartPoint;
         private DateTime _lastEscapeTapUtc = DateTime.MinValue;
         private int _escapeTapCount;
         private int _processingGeneration;
-        private WindowState _lastNonMinimizedWindowState = WindowState.Normal;
-        private Rect _lastKnownNormalBounds = Rect.Empty;
         private bool? _lastAppliedCompactMode;
-        private bool _globalResetWindowHotKeyRegistered;
-        private bool _globalClearBoardHotKeyRegistered;
-        private bool _globalToggleBoardModeHotKeyRegistered;
         private bool _isMainWindowInitialized;
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
@@ -147,6 +145,7 @@ namespace PitmastersGrill
             _mainWindowShellModeCoordinator = new MainWindowShellModeCoordinator();
             _mainWindowInteropController = new MainWindowInteropController();
             _windowLayoutController = new WindowLayoutController();
+            _mainWindowNativeInputController = new MainWindowNativeInputController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
             _pilotDetailActionsPresenter = new PilotDetailActionsPresenter();
 
@@ -184,6 +183,10 @@ namespace PitmastersGrill
             };
             _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
+            _windowLayoutSurface = new WindowLayoutSurface(
+                _windowLayoutController,
+                settings => _mainWindowAppearanceController.SaveSettings(settings),
+                GetMonitorWorkAreasDip);
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
 
@@ -203,6 +206,11 @@ namespace PitmastersGrill
             _boardPopulationPassController = composed.BoardPopulationPassController;
             _boardPopulationRetryController = composed.BoardPopulationRetryController;
             _boardPopulationEntryController = composed.BoardPopulationEntryController;
+            _boardPopulationSurface = new BoardPopulationSurface(
+                _boardPopulationEntryController,
+                _boardPopulationPassController,
+                _boardPopulationRetryController,
+                _diagnostics);
             _ignoreAllianceCoordinator = composed.IgnoreAllianceCoordinator;
             _ignoreAllianceBoardController = composed.IgnoreAllianceBoardController;
             _zkillUrlBuilder = composed.ZkillUrlBuilder;
@@ -412,15 +420,22 @@ namespace PitmastersGrill
             base.OnSourceInitialized(e);
 
             var hwnd = new WindowInteropHelper(this).Handle;
-            AddClipboardFormatListener(hwnd);
-
             var source = HwndSource.FromHwnd(hwnd);
             source?.AddHook(WndProc);
 
             _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
             RestoreWindowLayoutFromSettings();
-            TryRegisterGlobalResetWindowHotKey(hwnd);
-            TryRegisterGlobalBoardActionHotKeys(hwnd);
+            _mainWindowNativeInputController.Attach(
+                hwnd,
+                AddClipboardFormatListener,
+                RegisterHotKey,
+                ModControl,
+                GlobalResetWindowHotKeyId,
+                GlobalClearBoardHotKeyId,
+                GlobalToggleBoardModeHotKeyId,
+                AppLogger.UiInfo,
+                AppLogger.UiWarn,
+                Marshal.GetLastWin32Error);
             UpdateWindowStateUi();
             _eveSessionContextSurface.TriggerRefresh("startup", force: false);
 
@@ -477,9 +492,16 @@ namespace PitmastersGrill
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
-            TryUnregisterGlobalBoardActionHotKeys(hwnd);
-            TryUnregisterGlobalResetWindowHotKey(hwnd);
-            RemoveClipboardFormatListener(hwnd);
+            _mainWindowNativeInputController.Detach(
+                hwnd,
+                RemoveClipboardFormatListener,
+                UnregisterHotKey,
+                GlobalResetWindowHotKeyId,
+                GlobalClearBoardHotKeyId,
+                GlobalToggleBoardModeHotKeyId,
+                AppLogger.UiInfo,
+                AppLogger.UiWarn,
+                Marshal.GetLastWin32Error);
 
             AppLogger.UiInfo("MainWindow closed. Clipboard listener removed, retry state cancelled, and background work stop requested.");
 
@@ -512,7 +534,7 @@ namespace PitmastersGrill
                 CompactModeToggleButton.IsChecked == true,
                 _lastAppliedCompactMode,
                 _isApplyingSettings,
-                _isRestoringWindowLayout,
+                _windowLayoutSurface.IsRestoringWindowLayout,
                 _appSettings.CompactModeEnabled,
                 MainTabControl.SelectedIndex);
 
@@ -715,20 +737,11 @@ namespace PitmastersGrill
             MaximizeRestoreWindowButton.ToolTip = buttonState.ToolTip;
         }
 
-        private void TrackCurrentNormalWindowBounds(string reason)
+        private void TrackCurrentNormalWindowBounds()
         {
-            if (WindowState != WindowState.Normal)
-            {
-                return;
-            }
-
-            var currentBounds = new Rect(Left, Top, Width, Height);
-            if (!_windowLayoutController.IsUsableWindowBounds(currentBounds))
-            {
-                return;
-            }
-
-            _lastKnownNormalBounds = currentBounds;
+            _windowLayoutSurface.TrackCurrentNormalWindowBounds(
+                WindowState,
+                new Rect(Left, Top, Width, Height));
         }
 
         private void RequestApplicationShutdown(string reason)
@@ -825,31 +838,21 @@ namespace PitmastersGrill
 
         private void Window_StateChanged(object? sender, EventArgs e)
         {
-            if (WindowState != WindowState.Minimized)
-            {
-                _lastNonMinimizedWindowState = WindowState;
-            }
-
-            if (WindowState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds))
-            {
-                _lastKnownNormalBounds = RestoreBounds;
-            }
-            else if (WindowState == WindowState.Normal)
-            {
-                TrackCurrentNormalWindowBounds("StateChanged");
-            }
-
+            _windowLayoutSurface.HandleWindowStateChanged(
+                WindowState,
+                RestoreBounds,
+                new Rect(Left, Top, Width, Height));
             UpdateWindowStateUi();
         }
 
         private void Window_LocationChanged(object sender, EventArgs e)
         {
-            TrackCurrentNormalWindowBounds("LocationChanged");
+            TrackCurrentNormalWindowBounds();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            TrackCurrentNormalWindowBounds("SizeChanged");
+            TrackCurrentNormalWindowBounds();
             UpdateWindowMinimumSize();
         }
 
@@ -912,8 +915,7 @@ namespace PitmastersGrill
             Top = resetBounds.Top;
             Width = resetBounds.Width;
             Height = resetBounds.Height;
-            _lastKnownNormalBounds = resetBounds;
-            _lastNonMinimizedWindowState = WindowState.Normal;
+            _windowLayoutSurface.HandleWindowStateChanged(WindowState.Normal, Rect.Empty, resetBounds);
 
             SaveWindowLayoutToSettings(reason);
 
@@ -1344,123 +1346,11 @@ namespace PitmastersGrill
 
             return IntPtr.Zero;
         }
-
-        private void TryRegisterGlobalBoardActionHotKeys(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            _globalClearBoardHotKeyRegistered = RegisterHotKey(
-                hwnd,
-                GlobalClearBoardHotKeyId,
-                0,
-                (uint)KeyInterop.VirtualKeyFromKey(Key.Delete));
-
-            if (_globalClearBoardHotKeyRegistered)
-            {
-                AppLogger.UiInfo("Global Delete clear-board hotkey registered.");
-            }
-            else
-            {
-                AppLogger.UiWarn($"Global Delete clear-board hotkey registration failed. error={Marshal.GetLastWin32Error()}");
-            }
-
-            _globalToggleBoardModeHotKeyRegistered = RegisterHotKey(
-                hwnd,
-                GlobalToggleBoardModeHotKeyId,
-                0,
-                (uint)KeyInterop.VirtualKeyFromKey(Key.Insert));
-
-            if (_globalToggleBoardModeHotKeyRegistered)
-            {
-                AppLogger.UiInfo("Global Insert board-mode hotkey registered.");
-            }
-            else
-            {
-                AppLogger.UiWarn($"Global Insert board-mode hotkey registration failed. error={Marshal.GetLastWin32Error()}");
-            }
-        }
-
-        private void TryRegisterGlobalResetWindowHotKey(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            _globalResetWindowHotKeyRegistered = RegisterHotKey(
-                hwnd,
-                GlobalResetWindowHotKeyId,
-                ModControl,
-                (uint)KeyInterop.VirtualKeyFromKey(Key.Home));
-
-            if (_globalResetWindowHotKeyRegistered)
-            {
-                AppLogger.UiInfo("Global Ctrl+Home reset-window hotkey registered.");
-                return;
-            }
-
-            AppLogger.UiWarn($"Global Ctrl+Home hotkey registration failed. win32Error={Marshal.GetLastWin32Error()}");
-        }
-
-        private void TryUnregisterGlobalBoardActionHotKeys(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            if (_globalClearBoardHotKeyRegistered)
-            {
-                if (UnregisterHotKey(hwnd, GlobalClearBoardHotKeyId))
-                {
-                    AppLogger.UiInfo("Global Delete clear-board hotkey unregistered.");
-                }
-                else
-                {
-                    AppLogger.UiWarn($"Global Delete clear-board hotkey unregister failed. error={Marshal.GetLastWin32Error()}");
-                }
-
-                _globalClearBoardHotKeyRegistered = false;
-            }
-
-            if (_globalToggleBoardModeHotKeyRegistered)
-            {
-                if (UnregisterHotKey(hwnd, GlobalToggleBoardModeHotKeyId))
-                {
-                    AppLogger.UiInfo("Global Insert board-mode hotkey unregistered.");
-                }
-                else
-                {
-                    AppLogger.UiWarn($"Global Insert board-mode hotkey unregister failed. error={Marshal.GetLastWin32Error()}");
-                }
-
-                _globalToggleBoardModeHotKeyRegistered = false;
-            }
-        }
-
-        private void TryUnregisterGlobalResetWindowHotKey(IntPtr hwnd)
-        {
-            if (!_globalResetWindowHotKeyRegistered || hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            if (!UnregisterHotKey(hwnd, GlobalResetWindowHotKeyId))
-            {
-                AppLogger.UiWarn($"Global Ctrl+Home hotkey unregistration failed. win32Error={Marshal.GetLastWin32Error()}");
-            }
-
-            _globalResetWindowHotKeyRegistered = false;
-        }
-
         private void ScheduleClipboardProcessing()
         {
-            _clipboardDebounceTimer.Stop();
-            _clipboardDebounceTimer.Start();
-            _diagnostics.ClipboardChangeDebounced(ClipboardDebounceMilliseconds);
+            _boardPopulationSurface.ScheduleClipboardProcessing(
+                _clipboardDebounceTimer,
+                ClipboardDebounceMilliseconds);
         }
 
         private void ClipboardDebounceTimer_Tick(object? sender, EventArgs e)
@@ -1472,7 +1362,7 @@ namespace PitmastersGrill
 
         private Task ProcessClipboardIfValidAsync()
         {
-            return _boardPopulationEntryController.ProcessClipboardIfValidAsync(
+            return _boardPopulationSurface.ProcessClipboardIfValidAsync(
                 clipboardContainsText: () => Clipboard.ContainsText(),
                 clipboardGetText: () => Clipboard.GetText(),
                 setBoardButtonsEnabled: enabled =>
@@ -1489,13 +1379,10 @@ namespace PitmastersGrill
 
         private Task ProcessNamesAsync(List<string> characterNames, bool isRetryPass)
         {
-            _eveSessionContextSurface.TriggerRefresh(
-                isRetryPass ? "board retry pass" : "accepted local clipboard",
-                force: !isRetryPass);
-
-            return _boardPopulationEntryController.ProcessNamesAsync(
+            return _boardPopulationSurface.ProcessNamesAsync(
                 characterNames,
                 isRetryPass,
+                (reason, force) => _eveSessionContextSurface.TriggerRefresh(reason, force),
                 SaveCurrentNotesAndTags,
                 BuildInitialBoard,
                 beginProcessingGeneration: () => ++_processingGeneration,
@@ -1517,63 +1404,18 @@ namespace PitmastersGrill
 
         private void FinalizeBoardPopulationPass(int generation)
         {
-            if (generation != _processingGeneration)
-            {
-                _diagnostics.FinalizeSkipped(generation, _processingGeneration);
-                return;
-            }
-
-            var decision = _boardPopulationPassController.BuildFinalizeDecision(
-                _currentRows,
-                _boardPopulationRetryController.RetryAttempt,
-                MaxBoardPopulationRetryAttempts);
-
-            if (decision.IsComplete)
-            {
-                _boardPopulationRetryController.MarkComplete();
-
-                _diagnostics.BoardProcessFinalizedComplete(
-                    generation,
-                    decision.CompleteCount,
-                    decision.PartialCount,
-                    decision.RetryableCount);
-
-                UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
-                return;
-            }
-
-            _boardPopulationRetryController.MarkIncomplete();
-            _boardPopulationEntryController.InvalidateLastProcessedClipboard();
-
-            if (decision.RetryLimitReached)
-            {
-                _diagnostics.BoardProcessRetryLimitReached(
-                    generation,
-                    decision.RetryableCount,
-                    decision.PartialCount,
-                    _boardPopulationRetryController.RetryAttempt);
-
-                UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
-                return;
-            }
-
-            _diagnostics.BoardProcessRequiresRetry(
+            _boardPopulationSurface.FinalizeBoardPopulationPass(
                 generation,
-                decision.RetryableCount,
-                decision.PartialCount,
-                _boardPopulationRetryController.RetryAttempt);
-
-            UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
-
-            if (decision.ShouldScheduleRetry)
-            {
-                ScheduleBoardPopulationRetry();
-            }
+                _processingGeneration,
+                _currentRows,
+                MaxBoardPopulationRetryAttempts,
+                UpdateBoardPopulationStatus,
+                ScheduleBoardPopulationRetry);
         }
 
         private void ScheduleBoardPopulationRetry()
         {
-            _boardPopulationRetryController.ScheduleRetry(
+            _boardPopulationSurface.ScheduleBoardPopulationRetry(
                 _currentRows,
                 Dispatcher,
                 UpdateBoardPopulationStatus,
@@ -1582,7 +1424,7 @@ namespace PitmastersGrill
 
         private Task ProcessRetryPassAsync()
         {
-            return _boardPopulationRetryController.ProcessRetryPassAsync(
+            return _boardPopulationSurface.ProcessRetryPassAsync(
                 _currentRows,
                 () => _backgroundIntelUpdateService.BeginForegroundPriority(),
                 (rows, generation) => ProcessRowBatchAsync(rows.ToList(), generation),
@@ -1593,7 +1435,7 @@ namespace PitmastersGrill
 
         private void CancelBoardPopulationRetry()
         {
-            _boardPopulationRetryController.CancelRetry();
+            _boardPopulationSurface.CancelBoardPopulationRetry();
         }
 
         private void ResetBoardPopulationTracking(bool preserveLastProcessedClipboardText = false)
@@ -1604,8 +1446,7 @@ namespace PitmastersGrill
 
         private void ResetEntryAndRetryTracking(bool preserveLastProcessedClipboardText = false)
         {
-            _boardPopulationEntryController.ResetTracking(preserveLastProcessedClipboardText);
-            _boardPopulationRetryController.ResetTracking();
+            _boardPopulationSurface.ResetBoardPopulationTracking(preserveLastProcessedClipboardText);
         }
 
         private void UpdateBoardPopulationStatus(string statusText, BoardPopulationStatusKind kind)
@@ -2105,28 +1946,21 @@ namespace PitmastersGrill
 
         private void ClearBoard(string reason)
         {
-            var clearedRowCount = _currentRows.Count;
-
-            _diagnostics.ClearBoardStart(clearedRowCount);
-
-            SaveCurrentNotesAndTags();
-            CancelBoardPopulationRetry();
-            _processingGeneration++;
-            ResetEntryAndRetryTracking();
-            ResetManualBoardSort();
-            UnsubscribeFromAllBoardRows();
-
             PilotBoard.SelectedItem = null;
-            _currentRows.Clear();
-            RecomputeCorpAllianceCounts();
-            CloseActiveDetailWindow();
-            UpdateOpenDetailsButtonState();
-
-            UpdateLastRefreshed();
-            UpdateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
-
-            AppLogger.UiInfo($"Board cleared. reason='{reason}' removedRows={clearedRowCount}");
-            _diagnostics.ClearBoardComplete();
+            _boardPopulationSurface.ClearBoard(
+                reason,
+                _currentRows,
+                SaveCurrentNotesAndTags,
+                CancelBoardPopulationRetry,
+                () => ResetEntryAndRetryTracking(),
+                ResetManualBoardSort,
+                UnsubscribeFromAllBoardRows,
+                RecomputeCorpAllianceCounts,
+                CloseActiveDetailWindow,
+                UpdateOpenDetailsButtonState,
+                UpdateLastRefreshed,
+                UpdateBoardPopulationStatus,
+                () => _processingGeneration++);
         }
 
         private void OpenZkillButton_Click(object sender, RoutedEventArgs e)
@@ -2755,16 +2589,57 @@ namespace PitmastersGrill
             }
         }
 
-        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; }
-        private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); }
-        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult(_appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo($"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo($"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); }
-        private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); }
-        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot(bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn($"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo($"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); }
-        private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); }
+        private WindowLayoutMode GetCurrentWindowLayoutMode() => CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal;
+
+        private void RestoreWindowLayoutFromSettings() => RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode());
+
+        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode)
+        {
+            _windowLayoutSurface.RestoreFromSettings(
+                _appSettings,
+                mode,
+                MinWidth,
+                MinHeight,
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                MinimumVisibleWindowEdge,
+                DefaultWindowWidth,
+                DefaultWindowHeight,
+                bounds =>
+                {
+                    Left = bounds.Left;
+                    Top = bounds.Top;
+                    Width = bounds.Width;
+                    Height = bounds.Height;
+                },
+                state => WindowState = state,
+                AppLogger.UiInfo);
+        }
+
+        private void SaveWindowLayoutToSettings(string reason) => SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode());
+
+        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode)
+        {
+            _windowLayoutSurface.SaveToSettings(
+                _appSettings,
+                reason,
+                mode,
+                WindowState,
+                RestoreBounds,
+                new Rect(Left, Top, Width, Height),
+                MinWidth,
+                MinHeight,
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                MinimumVisibleWindowEdge,
+                AppLogger.UiInfo,
+                AppLogger.UiWarn);
+        }
+
+        private void ClearSavedWindowLayoutSettings() => _windowLayoutSurface.ClearSavedLayouts(_appSettings);
         private Rect GetDefaultWindowBoundsForCurrentDisplay()
         {
-            return _windowLayoutController.GetDefaultWindowBounds(
-                GetMonitorWorkAreasDip(),
+            return _windowLayoutSurface.GetDefaultWindowBounds(
                 MinimumSavedWindowWidth,
                 MinimumSavedWindowHeight,
                 DefaultWindowWidth,

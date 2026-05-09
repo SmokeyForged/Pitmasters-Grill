@@ -10,13 +10,14 @@ namespace PitmastersGrill.Tests.Ui
         public void MainWindowCode_RegistersGlobalDeleteAndInsertHotkeys()
         {
             var code = ReadMainWindowCode();
+            var nativeInputControllerCode = ReadRepoFile("PitmastersGrill", "Services", "MainWindowNativeInputController.cs");
 
             Assert.Contains("GlobalClearBoardHotKeyId", code);
             Assert.Contains("GlobalToggleBoardModeHotKeyId", code);
-            Assert.Contains("Key.Delete", code);
-            Assert.Contains("Key.Insert", code);
-            Assert.Contains("TryRegisterGlobalBoardActionHotKeys", code);
-            Assert.Contains("TryUnregisterGlobalBoardActionHotKeys", code);
+            Assert.Contains("_mainWindowNativeInputController.Attach", code);
+            Assert.Contains("_mainWindowNativeInputController.Detach", code);
+            Assert.Contains("Key.Delete", nativeInputControllerCode);
+            Assert.Contains("Key.Insert", nativeInputControllerCode);
         }
 
         [Fact]
