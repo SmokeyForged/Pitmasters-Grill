@@ -64,6 +64,7 @@ namespace PitmastersGrill
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly BoardColumnSettingsController _boardColumnSettingsController;
         private readonly BoardColumnLayoutPersistenceController _boardColumnLayoutPersistenceController;
+        private readonly BoardLayoutSurface _boardLayoutSurface = null!;
         private readonly BoardSortController _boardSortController;
         private readonly SettingsTabController _settingsTabController;
         private readonly AnalysisTabController _analysisTabController;
@@ -177,6 +178,46 @@ namespace PitmastersGrill
                 Interval = TimeSpan.FromMilliseconds(500)
             };
             _boardColumnLayoutSaveTimer.Tick += BoardColumnLayoutSaveTimer_Tick;
+            _boardLayoutSurface = new BoardLayoutSurface(
+                _boardDisplaySettingsController,
+                _boardColumnLayoutController,
+                _boardColumnSettingsController,
+                _boardColumnLayoutPersistenceController,
+                _mainWindowSettingsCoordinator,
+                _boardColumnLayoutSaveTimer,
+                Dispatcher,
+                () => _appSettings,
+                () => _isApplyingSettings,
+                value => _isApplyingSettings = value,
+                () => IsLoaded,
+                UpdateWindowMinimumSize,
+                RecomputeCorpAllianceCounts,
+                PilotBoard,
+                Resources,
+                ShowBoardGridLinesCheckBox,
+                BoardTextSizeComboBox,
+                BoardFontFamilyComboBox,
+                ShowSigColumnCheckBox,
+                ShowAllianceColumnCheckBox,
+                ShowCorpColumnCheckBox,
+                ShowKillsColumnCheckBox,
+                ShowLossesColumnCheckBox,
+                ShowAvgFleetSizeColumnCheckBox,
+                ShowLastShipSeenColumnCheckBox,
+                ShowLastSeenColumnCheckBox,
+                ShowCynoHullSeenColumnCheckBox,
+                ShowCorpAllianceCountsCheckBox,
+                SigColumn,
+                CharacterColumn,
+                AllianceColumn,
+                CorpColumn,
+                KillsColumn,
+                LossesColumn,
+                AvgFleetSizeColumn,
+                LastShipSeenColumn,
+                LastSeenColumn,
+                CynoHullSeenColumn,
+                MinimumBoardLayoutHostWidth);
             _boardModeHintTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
             {
                 Interval = TimeSpan.FromMilliseconds(BoardModeHintMilliseconds)
@@ -1007,266 +1048,59 @@ namespace PitmastersGrill
                 IntelSupportViewControl?.PilotDetailPlacementComboBoxControl);
         }
 
-        private void InitializeBoardColumnVisibilityUi()
-        {
-            ApplyBoardColumnSettingsToCheckBoxes();
-            ApplyBoardColumnVisibility();
-        }
+        private void InitializeBoardColumnVisibilityUi() => _boardLayoutSurface.InitializeBoardColumnVisibilityUi();
 
-        private void InitializeBoardColumnLayoutUi()
-        {
-            _boardColumnSettingsController.InitializeBoardColumnLayoutUi(
-                ApplyBoardColumnLayout,
-                ("SigColumn", SigColumn),
-                ("CharacterColumn", CharacterColumn),
-                ("AllianceColumn", AllianceColumn),
-                ("CorpColumn", CorpColumn),
-                ("KillsColumn", KillsColumn),
-                ("LossesColumn", LossesColumn),
-                ("AvgFleetSizeColumn", AvgFleetSizeColumn),
-                ("LastShipSeenColumn", LastShipSeenColumn),
-                ("LastSeenColumn", LastSeenColumn),
-                ("CynoHullSeenColumn", CynoHullSeenColumn));
-        }
+        private void InitializeBoardColumnLayoutUi() => _boardLayoutSurface.InitializeBoardColumnLayoutUi();
 
-        private void ApplyBoardDisplaySettings()
-        {
-            _boardDisplaySettingsController.ApplySettingsToBoard(_appSettings, PilotBoard, Resources);
-        }
+        private void ApplyBoardDisplaySettings() => _boardLayoutSurface.ApplyBoardDisplaySettings();
 
-        private void ShowBoardGridLinesCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            _mainWindowSettingsCoordinator.HandleShowBoardGridLinesChanged(
-                _isApplyingSettings,
-                _appSettings,
-                ShowBoardGridLinesCheckBox,
-                ApplyBoardDisplaySettings);
-        }
+        private void ShowBoardGridLinesCheckBox_Changed(object sender, RoutedEventArgs e) => _boardLayoutSurface.HandleShowBoardGridLinesChanged();
 
-        private void BoardTextSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            _mainWindowSettingsCoordinator.HandleBoardTextSizeChanged(
-                _isApplyingSettings,
-                _appSettings,
-                BoardTextSizeComboBox,
-                ApplyBoardDisplaySettings,
-                UpdateWindowMinimumSize);
-        }
+        private void BoardTextSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => _boardLayoutSurface.HandleBoardTextSizeChanged();
 
-        private void BoardFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            _mainWindowSettingsCoordinator.HandleBoardFontFamilyChanged(
-                _isApplyingSettings,
-                _appSettings,
-                BoardFontFamilyComboBox,
-                ApplyBoardDisplaySettings,
-                UpdateWindowMinimumSize);
-        }
+        private void BoardFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => _boardLayoutSurface.HandleBoardFontFamilyChanged();
 
-        private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            _boardColumnSettingsController.HandleBoardColumnVisibilityChanged(
-                _isApplyingSettings,
-                _appSettings,
-                ShowSigColumnCheckBox,
-                ShowAllianceColumnCheckBox,
-                ShowCorpColumnCheckBox,
-                ShowKillsColumnCheckBox,
-                ShowLossesColumnCheckBox,
-                ShowAvgFleetSizeColumnCheckBox,
-                ShowLastShipSeenColumnCheckBox,
-                ShowLastSeenColumnCheckBox,
-                ShowCynoHullSeenColumnCheckBox,
-                ApplyBoardColumnVisibility);
-        }
+        private void BoardColumnVisibilityCheckBox_Changed(object sender, RoutedEventArgs e) => _boardLayoutSurface.HandleBoardColumnVisibilityChanged();
 
-        private void ShowCorpAllianceCountsCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            _boardColumnSettingsController.HandleShowCorpAllianceCountsChanged(
-                _isApplyingSettings,
-                _appSettings,
-                ShowCorpAllianceCountsCheckBox.IsChecked == true,
-                RecomputeCorpAllianceCounts);
-        }
+        private void ShowCorpAllianceCountsCheckBox_Changed(object sender, RoutedEventArgs e) => _boardLayoutSurface.HandleShowCorpAllianceCountsChanged();
 
-        private void ShowAllBoardColumnsButton_Click(object sender, RoutedEventArgs e)
-        {
-            _boardColumnSettingsController.HandleShowAllBoardColumns(
-                _appSettings,
-                ApplyBoardColumnSettingsToCheckBoxes,
-                ApplyBoardColumnVisibility);
-        }
+        private void ShowAllBoardColumnsButton_Click(object sender, RoutedEventArgs e) => _boardLayoutSurface.HandleShowAllBoardColumns();
 
-        private void ResetBoardColumnsButton_Click(object sender, RoutedEventArgs e)
-        {
-            _boardColumnSettingsController.HandleResetBoardColumns(
-                _appSettings,
-                ApplyBoardColumnSettingsToCheckBoxes,
-                ApplyBoardColumnVisibility);
-        }
+        private void ResetBoardColumnsButton_Click(object sender, RoutedEventArgs e) => _boardLayoutSurface.HandleResetBoardColumns();
 
-        private void ResetBoardLayoutButton_Click(object sender, RoutedEventArgs e)
-        {
-            _boardColumnSettingsController.HandleResetBoardLayout(
-                _appSettings,
-                ApplyCanonicalBoardColumnLayout,
-                SaveCurrentBoardColumnLayout);
-        }
+        private void ResetBoardLayoutButton_Click(object sender, RoutedEventArgs e) => _boardLayoutSurface.HandleResetBoardLayout();
 
-        private void ApplyBoardColumnSettingsToCheckBoxes()
-        {
-            if (ShowSigColumnCheckBox == null)
-            {
-                return;
-            }
+        private void ApplyBoardColumnSettingsToCheckBoxes() => _boardLayoutSurface.ApplyBoardColumnSettingsToCheckBoxes();
 
-            var wasApplyingSettings = _isApplyingSettings;
-            _isApplyingSettings = true;
+        private void SaveBoardColumnSettingsFromCheckBoxes() => _boardLayoutSurface.SaveBoardColumnSettingsFromCheckBoxes();
 
-            try
-            {
-                _boardColumnSettingsController.ApplyBoardColumnSettingsToCheckBoxes(
-                    _appSettings,
-                    ShowSigColumnCheckBox,
-                    ShowAllianceColumnCheckBox,
-                    ShowCorpColumnCheckBox,
-                    ShowKillsColumnCheckBox,
-                    ShowLossesColumnCheckBox,
-                    ShowAvgFleetSizeColumnCheckBox,
-                    ShowLastShipSeenColumnCheckBox,
-                    ShowLastSeenColumnCheckBox,
-                    ShowCynoHullSeenColumnCheckBox,
-                    ShowCorpAllianceCountsCheckBox);
-            }
-            finally
-            {
-                _isApplyingSettings = wasApplyingSettings;
-            }
-        }
+        private void ApplyBoardColumnVisibility() => _boardLayoutSurface.ApplyBoardColumnVisibility();
 
-        private void SaveBoardColumnSettingsFromCheckBoxes()
-        {
-            _boardColumnSettingsController.SaveBoardColumnSettingsFromCheckBoxes(
-                _appSettings,
-                ShowSigColumnCheckBox,
-                ShowAllianceColumnCheckBox,
-                ShowCorpColumnCheckBox,
-                ShowKillsColumnCheckBox,
-                ShowLossesColumnCheckBox,
-                ShowAvgFleetSizeColumnCheckBox,
-                ShowLastShipSeenColumnCheckBox,
-                ShowLastSeenColumnCheckBox,
-                ShowCynoHullSeenColumnCheckBox);
-        }
+        private void ApplySavedBoardColumnLayout() => _boardLayoutSurface.ApplySavedBoardColumnLayout();
 
-        private void ApplyBoardColumnVisibility()
-        {
-            _boardColumnLayoutPersistenceController.RunWhileApplyingBoardColumnLayout(
-                () => _boardColumnSettingsController.ApplyBoardColumnVisibility(_appSettings));
-            ScheduleFitVisibleBoardColumnsToViewport(force: true);
-        }
+        private void ApplyCanonicalBoardColumnLayout(string reason) => _boardLayoutSurface.ApplyCanonicalBoardColumnLayout(reason);
 
-        private void ApplySavedBoardColumnLayout()
-        {
-            _boardColumnLayoutPersistenceController.ApplySavedBoardColumnLayout(
-                _appSettings,
-                ApplyBoardColumnLayout,
-                ApplyCanonicalBoardColumnLayout);
-        }
+        private void ApplyBoardColumnLayout(IEnumerable<BoardColumnLayoutSetting> layoutSettings, string reason) => _boardLayoutSurface.ApplyBoardColumnLayout(layoutSettings, reason);
 
-        private void ApplyCanonicalBoardColumnLayout(string reason)
-        {
-            ApplyBoardColumnLayout(_boardColumnLayoutController.GetCanonicalBoardColumnLayout(), reason);
-        }
+        private void PilotBoard_ColumnReordered(object sender, DataGridColumnEventArgs e) => _boardLayoutSurface.HandlePilotBoardColumnReordered();
 
-        private void ApplyBoardColumnLayout(IEnumerable<BoardColumnLayoutSetting> layoutSettings, string reason)
-        {
-            _boardColumnLayoutPersistenceController.ApplyBoardColumnLayout(
-                layoutSettings,
-                () => ScheduleFitVisibleBoardColumnsToViewport(),
-                reason);
-        }
+        private void PilotBoard_SizeChanged(object sender, SizeChangedEventArgs e) => _boardLayoutSurface.HandlePilotBoardSizeChanged();
 
-        private void PilotBoard_ColumnReordered(object sender, DataGridColumnEventArgs e)
-        {
-            ScheduleFitVisibleBoardColumnsToViewport();
-            ScheduleBoardColumnLayoutSave("Column reordered");
-        }
+        private void BoardColumnWidth_ValueChanged(object? sender, EventArgs e) => _boardLayoutSurface.HandleBoardColumnWidthChanged();
 
-        private void PilotBoard_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            ScheduleFitVisibleBoardColumnsToViewport();
-        }
+        private void ScheduleBoardColumnLayoutSave(string reason) => _boardLayoutSurface.ScheduleBoardColumnLayoutSave(reason);
 
-        private void BoardColumnWidth_ValueChanged(object? sender, EventArgs e)
-        {
-            ScheduleBoardColumnLayoutSave("Column width changed");
-        }
+        private void BoardColumnLayoutSaveTimer_Tick(object? sender, EventArgs e) => _boardLayoutSurface.HandleBoardColumnLayoutSaveTimerTick();
 
-        private void ScheduleBoardColumnLayoutSave(string reason)
-        {
-            if (!_boardColumnLayoutPersistenceController.TryQueueBoardColumnLayoutSave(
-                _isApplyingSettings,
-                IsBoardLayoutHostReady,
-                reason))
-            {
-                return;
-            }
+        private void SaveCurrentBoardColumnLayout(string reason) => _boardLayoutSurface.SaveCurrentBoardColumnLayout(reason);
 
-            _boardColumnLayoutSaveTimer.Stop();
-            _boardColumnLayoutSaveTimer.Start();
-        }
+        private void FinalizeBoardColumnLayoutInitialization() => _boardLayoutSurface.FinalizeBoardColumnLayoutInitialization();
 
-        private void BoardColumnLayoutSaveTimer_Tick(object? sender, EventArgs e)
-        {
-            _boardColumnLayoutSaveTimer.Stop();
-            SaveCurrentBoardColumnLayout(_boardColumnLayoutPersistenceController.DequeuePendingBoardColumnLayoutSaveReason());
-        }
+        private bool IsBoardLayoutHostReady() => _boardLayoutSurface.IsBoardLayoutHostReady();
 
-        private void SaveCurrentBoardColumnLayout(string reason)
-        {
-            _boardColumnLayoutPersistenceController.SaveCurrentBoardColumnLayout(
-                _appSettings,
-                IsBoardLayoutHostReady,
-                reason);
-        }
+        private void ScheduleFitVisibleBoardColumnsToViewport(bool force = false) => _boardLayoutSurface.ScheduleFitVisibleBoardColumnsToViewport(force);
 
-        private void FinalizeBoardColumnLayoutInitialization()
-        {
-            ApplyCanonicalBoardColumnLayout("Finalize board layout after load");
-            ApplySavedBoardColumnLayout();
-            _boardColumnLayoutPersistenceController.EnsureBoardColumnWidthTracking(BoardColumnWidth_ValueChanged);
-            _boardColumnLayoutPersistenceController.MarkBoardColumnLayoutReady();
-            AppLogger.UiInfo($"Board column layout initialization complete. hostReady={IsBoardLayoutHostReady()} actualWidth={PilotBoard?.ActualWidth ?? 0:0.##}");
-        }
-
-        private bool IsBoardLayoutHostReady()
-        {
-            return PilotBoard != null &&
-                   IsLoaded &&
-                   PilotBoard.IsLoaded &&
-                   PilotBoard.ActualWidth >= MinimumBoardLayoutHostWidth;
-        }
-
-        private void ScheduleFitVisibleBoardColumnsToViewport(bool force = false)
-        {
-            if (!_boardColumnLayoutPersistenceController.TryQueueFitVisibleBoardColumnsToViewport(PilotBoard, force))
-            {
-                return;
-            }
-
-            Dispatcher.BeginInvoke(
-                new Action(() =>
-                {
-                    _boardColumnLayoutPersistenceController.CompleteQueuedFitVisibleBoardColumnsToViewport(PilotBoard);
-                }),
-                DispatcherPriority.ContextIdle);
-        }
-
-        private void FitVisibleBoardColumnsToViewport()
-        {
-            _boardColumnLayoutPersistenceController.FitVisibleBoardColumnsToViewport(PilotBoard);
-        }
+        private void FitVisibleBoardColumnsToViewport() => _boardLayoutSurface.FitVisibleBoardColumnsToViewport();
 
         private void KnownCynoOverrideCheckBox_Changed(object sender, RoutedEventArgs e)
         {
