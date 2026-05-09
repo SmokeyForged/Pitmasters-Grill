@@ -211,7 +211,7 @@ jobs:
           Write-Host "SHA256: $($hash.Hash)"
 
       - name: Upload release artifacts to workflow run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PMG-General-Release-${{ env.RELEASE_VERSION }}
           path: |
