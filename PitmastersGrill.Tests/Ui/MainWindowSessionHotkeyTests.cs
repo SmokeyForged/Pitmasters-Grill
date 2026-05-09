@@ -24,8 +24,10 @@ namespace PitmastersGrill.Tests.Ui
         {
             var code = ReadMainWindowCode();
             var coordinatorCode = ReadRepoFile("PitmastersGrill", "Services", "EveSessionContextCoordinator.cs");
+            var surfaceCode = ReadRepoFile("PitmastersGrill", "Services", "EveSessionContextSurface.cs");
 
-            Assert.Contains("_eveSessionContextCoordinator.CreatePendingContext()", code);
+            Assert.Contains("_eveSessionContextSurface.ApplyPendingContext()", code);
+            Assert.Contains("CreatePendingContext()", surfaceCode);
             Assert.Contains("Waiting for local session evidence", coordinatorCode);
             Assert.Contains("Soft local read pending", coordinatorCode);
         }
