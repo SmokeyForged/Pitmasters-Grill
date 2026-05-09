@@ -1,8 +1,3 @@
-# `.github/workflows/draft-release.yml`
-
-Full replacement YAML for the PMG draft-release workflow.
-
-```yaml
 name: Draft PMG Release
 
 on:
@@ -243,5 +238,3 @@ jobs:
 
           Write-Host "Draft release created for $env:RELEASE_TAG."
           Write-Host "Review the draft in GitHub before publishing."
-
-```
