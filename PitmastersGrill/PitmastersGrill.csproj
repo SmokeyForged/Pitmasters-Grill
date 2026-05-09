@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <PmgReleaseVersion>1.3.0</PmgReleaseVersion>
+    <PmgReleaseVersion>1.4.0</PmgReleaseVersion>
 
     <Version>$(PmgReleaseVersion)</Version>
 
