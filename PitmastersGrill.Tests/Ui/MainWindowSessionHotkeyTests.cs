@@ -37,9 +37,10 @@ namespace PitmastersGrill.Tests.Ui
         public void MainWindowCode_DoesNotUseNullableCompactModeValueInDeferredSave()
         {
             var code = ReadMainWindowCode();
+            var shellSurfaceCode = ReadRepoFile("PitmastersGrill", "Services", "MainWindowShellSurface.cs");
 
             Assert.DoesNotContain("previousCompactMode.Value ? WindowLayoutMode.Board", code);
-            Assert.Contains("outgoingLayoutMode", code);
+            Assert.Contains("transition.OutgoingLayoutMode", shellSurfaceCode);
         }
 
         [Fact]
