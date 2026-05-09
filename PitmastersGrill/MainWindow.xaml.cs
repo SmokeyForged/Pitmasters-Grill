@@ -80,16 +80,10 @@ namespace PitmastersGrill
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
         private ManualUpdateCheckController? _manualUpdateCheckController;
-        private DiagnosticsActionController? _diagnosticsActionController;
+        private readonly DiagnosticsSupportSurface _diagnosticsSupportSurface = null!;
         private readonly EveSessionContextService _eveSessionContextService;
         private readonly MainWindowDiagnostics _diagnostics;
-        private readonly IntelUpdateBannerController _intelUpdateBannerController;
-        private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
-        private readonly IntelActionsController _intelActionsController = null!;
-        private readonly IntelMaintenanceActionsController _intelMaintenanceActionsController = null!;
-        private readonly ProviderHealthPresenter _providerHealthPresenter;
-        private readonly DiagnosticsCacheStatsPresenter _diagnosticsCacheStatsPresenter;
-        private readonly DiagnosticsCacheMaintenanceController _diagnosticsCacheMaintenanceController = null!;
+        private readonly IntelSupportSurface _intelSupportSurface = null!;
         private readonly PilotDetailActionsPresenter _pilotDetailActionsPresenter;
         private readonly PilotDetailWindowPlacementController _pilotDetailWindowPlacementController;
         private readonly PilotDetailWindowLifecycleController _pilotDetailWindowLifecycleController;
@@ -197,54 +191,6 @@ namespace PitmastersGrill
                 Interval = TimeSpan.FromMilliseconds(BoardModeHintMilliseconds)
             };
             _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
-            _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
-            _providerHealthPresenter = new ProviderHealthPresenter();
-            _diagnosticsCacheStatsPresenter = new DiagnosticsCacheStatsPresenter();
-            _intelStatusDetailsPresenter = new IntelStatusDetailsPresenter(
-                IntelSupportViewControl.IntelLastUpdatedTextBlock,
-                IntelSupportViewControl.IntelOldestKillmailDayTextBlock,
-                IntelSupportViewControl.IntelNewestKillmailDayTextBlock,
-                IntelSupportViewControl.IntelCurrentUpdateStatusTextBlock,
-                IntelSupportViewControl.IntelTotalProgressBarControl,
-                IntelSupportViewControl.IntelTotalProgressTextBlock,
-                IntelSupportViewControl.IntelCurrentDayProgressBarControl,
-                IntelSupportViewControl.IntelCurrentDayProgressTextBlock,
-                IntelSupportViewControl.IntelLiveFeedSourceTextBlock,
-                IntelSupportViewControl.IntelLiveFeedStatusTextBlock,
-                IntelSupportViewControl.IntelLiveFeedEnabledTextBlock,
-                IntelSupportViewControl.IntelLiveFeedRecentImportsTextBlock,
-                IntelSupportViewControl.IntelLiveFeedNextSequenceTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastProcessedSequenceTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastSuccessTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastCaughtUpTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastErrorTextBlock,
-                IntelSupportViewControl.TodaysFreshnessStatusTextBlock,
-                IntelSupportViewControl.TodaysFreshnessVisiblePilotsTextBlock,
-                IntelSupportViewControl.TodaysFreshnessEntitiesQueriedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessResultsFoundTextBlock,
-                IntelSupportViewControl.TodaysFreshnessKnownSkippedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessImportedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessFailedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessLastRunTextBlock,
-                IntelSupportViewControl.TodaysFreshnessDetailTextBlock,
-                IntelSupportViewControl.TodaysFreshnessLastErrorTextBlock,
-                IntelSupportViewControl.RunTodaysFreshnessButtonControl,
-                IntelSupportViewControl.HistoricalFreshnessStatusTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessModeTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessVisiblePilotsTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessCandidatesConsideredTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessCandidatesSkippedCooldownTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessPilotsCheckedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessDaysCheckedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessEntitiesQueriedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessResultsFoundTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessKnownSkippedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessImportedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessFailedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessLastRunTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessDetailTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessLastErrorTextBlock,
-                IntelSupportViewControl.RunHistoricalFreshnessButtonControl);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
@@ -321,12 +267,22 @@ namespace PitmastersGrill
                 _appSettings,
                 _windowShutdownCts.Token,
                 () => _isShuttingDown);
-            _diagnosticsActionController = new DiagnosticsActionController(
+            _diagnosticsSupportSurface = DiagnosticsSupportSurface.Create(
                 this,
-                DiagnosticsSupportViewControl.DiagnosticsStatusTextBlock,
-                _browserLauncher);
-            _intelActionsController = new IntelActionsController(
+                DiagnosticsSupportViewControl,
+                _browserLauncher,
+                _providerHealthRows,
+                () => _boardPopulationEntryController.IsClipboardProcessing,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
+                DiagnosticTelemetry.GetProviderHealthSnapshots,
+                _cacheMaintenanceService.GetStats,
+                _cacheMaintenanceService.ClearExpired,
+                _cacheMaintenanceService.Vacuum,
+                _cacheMaintenanceService.ClearAll);
+            _intelSupportSurface = IntelSupportSurface.Create(
                 this,
+                Dispatcher,
+                IntelSupportViewControl,
                 _backgroundIntelUpdateService,
                 _settingsTabController,
                 () => _appSettings,
@@ -335,32 +291,16 @@ namespace PitmastersGrill
                 () => _isShuttingDown,
                 _windowShutdownCts.Token,
                 () => _currentRows.ToList(),
-                RefreshCurrentBoardRowsFromLocalIntelAsync);
-            _intelMaintenanceActionsController = new IntelMaintenanceActionsController(
+                RefreshCurrentBoardRowsFromLocalIntelAsync,
                 () => _boardPopulationEntryController.IsClipboardProcessing,
                 SetDiagnosticsStatus,
                 enabled => DiagnosticsSupportViewControl.SetRebuildKillmailDerivedIntelEnabled(enabled),
-                enabled => IntelSupportViewControl.EnableKillmailDbPullButtonControl.IsEnabled = enabled,
                 () => _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings),
-                () => _isShuttingDown,
-                _windowShutdownCts.Token,
                 cancellationToken => _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(cancellationToken),
                 (seedDays, cancellationToken) => _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, cancellationToken),
                 RefreshCacheStatsUi,
                 RefreshConfirmedCynoModuleStateForCurrentRows,
                 (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image));
-            _diagnosticsCacheMaintenanceController = new DiagnosticsCacheMaintenanceController(
-                () => _boardPopulationEntryController.IsClipboardProcessing,
-                SetDiagnosticsStatus,
-                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
-                () => DiagnosticTelemetry.GetProviderHealthSnapshots(),
-                snapshots => _providerHealthPresenter.ApplySnapshots(_providerHealthRows, snapshots),
-                () => _cacheMaintenanceService.GetStats(),
-                () => _cacheMaintenanceService.ClearExpired(),
-                () => _cacheMaintenanceService.Vacuum(),
-                () => _cacheMaintenanceService.ClearAll(),
-                _diagnosticsCacheStatsPresenter,
-                text => DiagnosticsSupportViewControl.SetCacheStatsText(text));
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -414,7 +354,7 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
-            ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
+            _intelSupportSurface.ApplySnapshot(_backgroundIntelUpdateService.GetSnapshot(), _isShuttingDown);
             ApplyEveSessionContext(_eveSessionContextCoordinator.CreatePendingContext());
             _isMainWindowInitialized = true;
 
@@ -1325,41 +1265,7 @@ namespace PitmastersGrill
 
         private void OnIntelUpdateStatusChanged(IntelUpdateStatusSnapshot snapshot)
         {
-            _intelUpdateBannerController.HandleStatusChanged(
-                snapshot,
-                IntelSupportViewControl.IntelUpdateBannerControl,
-                IntelSupportViewControl.IntelUpdateStatusTextBlock,
-                IntelSupportViewControl.IntelUpdateDetailTextBlock);
-
-            if (Dispatcher.CheckAccess())
-            {
-                ApplyIntelStatusDetails(snapshot);
-            }
-            else
-            {
-                Dispatcher.Invoke(() => ApplyIntelStatusDetails(snapshot));
-            }
-        }
-
-        private void ApplyIntelUpdateSnapshot(IntelUpdateStatusSnapshot snapshot)
-        {
-            _intelUpdateBannerController.ApplySnapshot(
-                snapshot,
-                IntelSupportViewControl.IntelUpdateBannerControl,
-                IntelSupportViewControl.IntelUpdateStatusTextBlock,
-                IntelSupportViewControl.IntelUpdateDetailTextBlock);
-
-            ApplyIntelStatusDetails(snapshot);
-        }
-
-        private void ApplyIntelStatusDetails(IntelUpdateStatusSnapshot snapshot)
-        {
-            if (snapshot == null)
-            {
-                return;
-            }
-            var projection = IntelStatusDetailsProjection.Create(snapshot, _isShuttingDown);
-            _intelStatusDetailsPresenter.Apply(projection);
+            _intelSupportSurface.HandleStatusChanged(snapshot, _isShuttingDown);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -2218,7 +2124,7 @@ namespace PitmastersGrill
 
         private async void EnableKillmailDbPullButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelMaintenanceActionsController.RunEnableKillmailDbPullAsync();
+            await _intelSupportSurface.RunEnableKillmailDbPullAsync();
         }
 
 
@@ -2234,62 +2140,62 @@ namespace PitmastersGrill
 
         private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsActionController?.OpenLogs();
+            _diagnosticsSupportSurface.OpenLogs();
         }
 
         private void PackageDiagnosticsButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsActionController?.PackageDiagnostics();
+            _diagnosticsSupportSurface.PackageDiagnostics();
         }
 
         private void OpenDiagnosticsFolderButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsActionController?.OpenDiagnosticsFolder();
+            _diagnosticsSupportSurface.OpenDiagnosticsFolder();
         }
 
         private void SetDiagnosticsStatus(string message)
         {
-            _diagnosticsActionController?.SetStatus(message);
+            _diagnosticsSupportSurface.SetStatus(message);
         }
 
         private void RefreshProviderHealthButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.RefreshProviderHealth();
+            _diagnosticsSupportSurface.RefreshProviderHealth();
         }
 
         private void RefreshProviderHealthUi()
         {
-            _diagnosticsCacheMaintenanceController.RefreshProviderHealthUi();
+            _diagnosticsSupportSurface.RefreshProviderHealthUi();
         }
 
         private void RefreshCacheStatsButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.RefreshCacheStats();
+            _diagnosticsSupportSurface.RefreshCacheStats();
         }
 
         private void ClearExpiredCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.ClearExpiredCache();
+            _diagnosticsSupportSurface.ClearExpiredCache();
         }
 
         private void VacuumCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.VacuumCache();
+            _diagnosticsSupportSurface.VacuumCache();
         }
 
         private void ClearAllCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.ClearAllCache();
+            _diagnosticsSupportSurface.ClearAllCache();
         }
 
         private async void RebuildKillmailDerivedIntelButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelMaintenanceActionsController.RunRebuildKillmailDerivedIntelAsync();
+            await _intelSupportSurface.RunRebuildKillmailDerivedIntelAsync();
         }
 
         private void RefreshCacheStatsUi()
         {
-            _diagnosticsCacheMaintenanceController.RefreshCacheStatsUi();
+            _diagnosticsSupportSurface.RefreshCacheStatsUi();
         }
 
 
@@ -2330,7 +2236,7 @@ namespace PitmastersGrill
         private async void EnableLiveZkillFeedCheckBox_Checked(object sender, RoutedEventArgs e)
         {
             var enabled = IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl.IsChecked == true;
-            await _intelActionsController.HandleLiveFeedToggleAsync(enabled);
+            await _intelSupportSurface.HandleLiveFeedToggleAsync(enabled);
         }
 
         private void BackgroundHistoricalRepairEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -2343,17 +2249,17 @@ namespace PitmastersGrill
 
         private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelActionsController.RunTodaysFreshnessAsync();
+            await _intelSupportSurface.RunTodaysFreshnessAsync();
         }
 
         private async void RunHistoricalFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelActionsController.RunHistoricalFreshnessAsync();
+            await _intelSupportSurface.RunHistoricalFreshnessAsync();
         }
 
         public List<long> GetVisibleCharacterIdsForBackgroundHistoricalRepair()
         {
-            return _intelActionsController.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
+            return _intelSupportSurface.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
         }
 
         private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
