@@ -443,7 +443,7 @@ PMG is in General Release.
 
 Current release:
 
-- **Pitmasters Grill v1.3.0**
+- **Pitmasters Grill v1.4.0**
 - General Release
 - Windows desktop application
 

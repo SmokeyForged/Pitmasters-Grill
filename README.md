@@ -29,10 +29,10 @@ PMG is now in **General Release**.
 
 ---
 
-Current release: **[Pitmasters Grill v1.3.0](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.3.0)**
+Current release: **[Pitmasters Grill v1.4.0](https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.4.0)**
 Full release history: **[GitHub Releases](https://github.com/SmokeyForged/Pitmasters-Grill/releases)**
 
-Repository status on `main`: **1.3.0 general release clarity, supportability, UI polish, and update-awareness improvements are present**. This release improves signal/public-data explanation, release readiness, and safe update awareness. It does **not** add new EVE intel sources, private data access, gameplay automation, or automatic self-install behavior.
+Repository status on `main`: **1.4.0 general release MainWindow cleanup, supportability, shell/layout extraction, and release-hardening improvements are present**. This release completes the staged MainWindow responsibility extraction, brings `MainWindow.xaml.cs` under the 2,000-line gate, and improves maintainability without changing PMG into a different tool. It does **not** add new EVE intel sources, private data access, gameplay automation, or automatic self-install behavior.
 
 ---
 
@@ -123,8 +123,8 @@ New here? Start with:
 - **[Patch Notes](./Patch%20Notes/)**  
   Full release history and version notes.
 
-- **[1.3.0 General Release Notes](./Patch%20Notes/General-Release_1-3-0.md)**
-  Summary of the 1.3.0 clarity, supportability, UI polish, release-readiness, and update-awareness work.
+- **[1.4.0 General Release Notes](./Patch%20Notes/General-Release_1-4-0.md)**
+  Summary of the 1.4.0 MainWindow cleanup, shell/layout extraction, dependency hardening, and release validation work.
 
 - **[Current Feature Snapshot](./PMG-FEATURES.md)**  
   A deeper overview of PMG's current feature set and limitations.

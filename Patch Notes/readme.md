@@ -11,19 +11,19 @@ Use patch notes for version-by-version release history. Keep the main `README.md
 Current General Release:
 
 ```text
-Pitmasters Grill v1.3.0
+Pitmasters Grill v1.4.0
 ```
 
 Release page:
 
 ```text
-https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.3.0
+https://github.com/SmokeyForged/Pitmasters-Grill/releases/tag/v1.4.0
 ```
 
 Current release notes:
 
 ```text
-General-Release_1-3-0.md
+General-Release_1-4-0.md
 ```
 
 ---
