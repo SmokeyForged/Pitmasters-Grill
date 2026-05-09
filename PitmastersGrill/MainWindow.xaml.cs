@@ -71,6 +71,7 @@ namespace PitmastersGrill
         private readonly AnalysisTabPresenter _analysisTabPresenter = null!;
         private readonly MainWindowShellModeCoordinator _mainWindowShellModeCoordinator;
         private readonly MainWindowInteropController _mainWindowInteropController;
+        private readonly MainWindowShellSurface _mainWindowShellSurface = null!;
         private readonly WindowLayoutController _windowLayoutController;
         private readonly WindowLayoutSurface _windowLayoutSurface;
         private readonly MainWindowNativeInputController _mainWindowNativeInputController;
@@ -113,10 +114,7 @@ namespace PitmastersGrill
         private bool _isShuttingDown;
         private bool _compactDragPending;
         private Point _compactDragStartPoint;
-        private DateTime _lastEscapeTapUtc = DateTime.MinValue;
-        private int _escapeTapCount;
         private int _processingGeneration;
-        private bool? _lastAppliedCompactMode;
         private bool _isMainWindowInitialized;
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
@@ -190,7 +188,7 @@ namespace PitmastersGrill
                 () => _isApplyingSettings,
                 value => _isApplyingSettings = value,
                 () => IsLoaded,
-                UpdateWindowMinimumSize,
+                () => _mainWindowShellSurface.UpdateWindowMinimumSize(),
                 RecomputeCorpAllianceCounts,
                 PilotBoard,
                 Resources,
@@ -228,6 +226,63 @@ namespace PitmastersGrill
                 _windowLayoutController,
                 settings => _mainWindowAppearanceController.SaveSettings(settings),
                 GetMonitorWorkAreasDip);
+            _mainWindowShellSurface = new MainWindowShellSurface(
+                _mainWindowShellModeCoordinator,
+                _mainWindowInteropController,
+                _windowLayoutSurface,
+                CompactModeToggleButton,
+                MainContentGrid,
+                TopCommandGrid,
+                MainTabControl,
+                BoardModeHintOverlay,
+                BoardStatusFooter,
+                MaximizeRestoreWindowButton,
+                PilotBoard,
+                _boardModeHintTimer,
+                () => _appSettings,
+                settings => _mainWindowAppearanceController.SaveSettings(settings),
+                () => _isApplyingSettings,
+                () => WindowState,
+                state => WindowState = state,
+                () => RestoreBounds,
+                () => new Rect(Left, Top, Width, Height),
+                bounds =>
+                {
+                    Left = bounds.Left;
+                    Top = bounds.Top;
+                    Width = bounds.Width;
+                    Height = bounds.Height;
+                },
+                (minWidth, minHeight) =>
+                {
+                    MinWidth = minWidth;
+                    MinHeight = minHeight;
+                },
+                CloseActiveDetailWindow,
+                UpdateBoardSummaryBanner,
+                UpdateAnalysisTab,
+                (reason, force) => _eveSessionContextSurface.TriggerRefresh(reason, force),
+                nowUtc => _eveSessionContextSurface.IsStale(nowUtc),
+                force => ScheduleFitVisibleBoardColumnsToViewport(force),
+                () => _boardPopulationEntryController!.InvalidateLastProcessedClipboard(),
+                ProcessClipboardIfValidAsync,
+                ClearBoard,
+                RequestApplicationShutdown,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
+                NormalModeMinimumWindowWidth,
+                NormalModeMinimumWindowHeight,
+                BoardModeMinimumWindowWidth,
+                BoardModeFallbackCommandStripHeight,
+                BoardModeFallbackTabHeaderHeight,
+                BoardModeFallbackColumnHeaderHeight,
+                BoardModeFallbackFooterPaddingHeight,
+                BoardModeFallbackRowVerticalPadding,
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                MinimumVisibleWindowEdge,
+                DefaultWindowWidth,
+                DefaultWindowHeight,
+                TripleEscapeWindowMilliseconds);
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
 
@@ -427,7 +482,7 @@ namespace PitmastersGrill
 
             _mainWindowAppearanceController.ApplyTheme(Resources, _appSettings, this, ApplyBoardPopulationStatusVisual);
             _mainWindowAppearanceController.ApplyWindowSettings(this, _appSettings, WindowOpacityValueText, Resources);
-            UpdateWindowMinimumSize();
+            _mainWindowShellSurface.UpdateWindowMinimumSize();
 
             PilotBoard.ItemsSource = _currentRows;
             _currentRows.CollectionChanged += CurrentRows_CollectionChanged;
@@ -441,7 +496,7 @@ namespace PitmastersGrill
             HideDetailPane();
             UpdateOpenDetailsButtonState();
             MainTabControl.SelectedIndex = 1;
-            ApplyCompactModeUi();
+            _mainWindowShellSurface.ApplyCompactModeUi();
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
             _intelSupportSurface.ApplySnapshot(_backgroundIntelUpdateService.GetSnapshot(), _isShuttingDown);
@@ -465,7 +520,7 @@ namespace PitmastersGrill
             source?.AddHook(WndProc);
 
             _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
-            RestoreWindowLayoutFromSettings();
+            _mainWindowShellSurface.RestoreWindowLayoutFromSettings();
             _mainWindowNativeInputController.Attach(
                 hwnd,
                 AddClipboardFormatListener,
@@ -477,7 +532,7 @@ namespace PitmastersGrill
                 AppLogger.UiInfo,
                 AppLogger.UiWarn,
                 Marshal.GetLastWin32Error);
-            UpdateWindowStateUi();
+            _mainWindowShellSurface.UpdateWindowStateUi();
             _eveSessionContextSurface.TriggerRefresh("startup", force: false);
 
             AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
@@ -487,13 +542,13 @@ namespace PitmastersGrill
         {
             Loaded -= MainWindow_Loaded;
             AppLogger.UiInfo("MainWindow loaded.");
-            UpdateWindowMinimumSize();
+            _mainWindowShellSurface.UpdateWindowMinimumSize();
             Dispatcher.BeginInvoke(new Action(FinalizeBoardColumnLayoutInitialization), DispatcherPriority.Loaded);
         }
 
         protected override void OnClosing(CancelEventArgs e)
         {
-            SaveWindowLayoutToSettings("Window closing");
+            _mainWindowShellSurface.SaveWindowLayoutToSettings("Window closing");
             base.OnClosing(e);
         }
 
@@ -557,85 +612,7 @@ namespace PitmastersGrill
 
         private void CompactModeToggleButton_Changed(object sender, RoutedEventArgs e)
         {
-            ApplyCompactModeUi();
-        }
-
-        private void ApplyCompactModeUi()
-        {
-            if (CompactModeToggleButton == null ||
-                MainContentGrid == null ||
-                TopCommandGrid == null ||
-                MainTabControl == null ||
-                BoardStatusFooter == null)
-            {
-                return;
-            }
-
-            var transition = _mainWindowShellModeCoordinator.BuildCompactModeTransition(
-                CompactModeToggleButton.IsChecked == true,
-                _lastAppliedCompactMode,
-                _isApplyingSettings,
-                _windowLayoutSurface.IsRestoringWindowLayout,
-                _appSettings.CompactModeEnabled,
-                MainTabControl.SelectedIndex);
-
-            if (transition.ShouldSaveOutgoingLayout)
-            {
-                var outgoingLayoutMode = transition.OutgoingLayoutMode;
-                SaveWindowLayoutToSettings(
-                    $"Before display mode change to {(transition.CompactMode ? "Board" : "Normal")}",
-                    outgoingLayoutMode);
-            }
-
-            _lastAppliedCompactMode = transition.CompactMode;
-
-            if (transition.ShouldSelectBoardTab)
-            {
-                MainTabControl.SelectedIndex = transition.TargetSelectedTabIndex;
-            }
-
-            if (transition.ShouldCloseActiveDetailWindow)
-            {
-                CloseActiveDetailWindow();
-            }
-
-            TopCommandGrid.Visibility = transition.TopCommandVisibility;
-            TopCommandGrid.Margin = new Thickness(0, 0, 0, 6);
-            BoardStatusFooter.Padding = transition.BoardStatusFooterPadding;
-            MainContentGrid.Margin = transition.MainContentMargin;
-            MainTabControl.BorderThickness = transition.MainTabBorderThickness;
-            MainTabControl.Margin = transition.MainTabMargin;
-
-            if (transition.ShouldPersistCompactModeSetting)
-            {
-                _appSettings.CompactModeEnabled = transition.CompactMode;
-                _mainWindowAppearanceController.SaveSettings(_appSettings);
-            }
-
-            if (transition.ShouldLogDisplayModeChanged)
-            {
-                AppLogger.UiInfo($"Display mode changed.\nboardMode={transition.CompactMode}");
-            }
-
-            if (transition.ShouldShowBoardModeHint)
-            {
-                ShowBoardModeHint();
-            }
-            else if (transition.ShouldHideBoardModeHint)
-            {
-                HideBoardModeHint();
-            }
-
-            UpdateWindowMinimumSize();
-
-            if (transition.ShouldRestoreIncomingLayout)
-            {
-                RestoreWindowLayoutFromSettings(transition.IncomingLayoutMode);
-            }
-
-            BoardStatusFooter.Visibility = transition.BoardStatusFooterVisibility;
-            UpdateBoardSummaryBanner();
-            UpdateAnalysisTab();
+            _mainWindowShellSurface.ApplyCompactModeUi();
         }
         private void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -644,146 +621,10 @@ namespace PitmastersGrill
                 return;
             }
 
-            UpdateBoardFooterVisibility();
-
-            if (MainTabControl.SelectedIndex == 0)
-            {
-                _eveSessionContextSurface.TriggerRefresh("analysis tab selection", force: _eveSessionContextSurface.IsStale(DateTime.UtcNow));
-            }
-            else if (MainTabControl.SelectedIndex == 1)
-            {
-                ScheduleFitVisibleBoardColumnsToViewport(force: true);
-            }
+            _mainWindowShellSurface.HandleMainTabSelectionChanged();
         }
 
-        private void UpdateBoardFooterVisibility()
-        {
-            if (CompactModeToggleButton == null || MainTabControl == null || BoardStatusFooter == null)
-            {
-                return;
-            }
-
-            BoardStatusFooter.Visibility = _mainWindowShellModeCoordinator.BuildBoardStatusFooterVisibility(
-                CompactModeToggleButton.IsChecked == true,
-                MainTabControl.SelectedIndex);
-        }
-
-        private void ToggleCompactModeFromHotkey()
-        {
-            if (CompactModeToggleButton == null)
-            {
-                return;
-            }
-
-            CompactModeToggleButton.IsChecked = CompactModeToggleButton.IsChecked != true;
-            ApplyCompactModeUi();
-        }
-
-        private void ShowBoardModeHint()
-        {
-            if (BoardModeHintOverlay == null)
-            {
-                return;
-            }
-
-            BoardModeHintOverlay.Visibility = Visibility.Visible;
-            _boardModeHintTimer.Stop();
-            _boardModeHintTimer.Start();
-        }
-
-        private void HideBoardModeHint()
-        {
-            if (BoardModeHintOverlay == null)
-            {
-                return;
-            }
-
-            _boardModeHintTimer.Stop();
-            BoardModeHintOverlay.Visibility = Visibility.Collapsed;
-        }
-
-        private void BoardModeHintTimer_Tick(object? sender, EventArgs e)
-        {
-            HideBoardModeHint();
-        }
-
-        private void UpdateWindowMinimumSize()
-        {
-            var minimumSize = _mainWindowShellModeCoordinator.BuildMinimumWindowSize(
-                CompactModeToggleButton?.IsChecked == true,
-                NormalModeMinimumWindowWidth,
-                NormalModeMinimumWindowHeight,
-                BoardModeMinimumWindowWidth,
-                MainContentGrid?.Margin.Top + MainContentGrid?.Margin.Bottom ?? 0,
-                TopCommandGrid?.ActualHeight ?? 0,
-                GetTabHeaderHeight(),
-                GetBoardColumnHeaderHeight(),
-                GetBoardRowHeight(),
-                PilotBoard?.FontSize ?? 12,
-                BoardModeFallbackCommandStripHeight,
-                BoardModeFallbackTabHeaderHeight,
-                BoardModeFallbackColumnHeaderHeight,
-                BoardModeFallbackFooterPaddingHeight,
-                BoardModeFallbackRowVerticalPadding);
-
-            MinWidth = minimumSize.MinWidth;
-            MinHeight = minimumSize.MinHeight;
-        }
-
-        private double GetTabHeaderHeight()
-        {
-            return FindVisualDescendant<TabPanel>(MainTabControl)?.ActualHeight ?? 0;
-        }
-
-        private double GetBoardColumnHeaderHeight()
-        {
-            return FindVisualDescendant<DataGridColumnHeadersPresenter>(PilotBoard)?.ActualHeight ?? 0;
-        }
-
-        private double GetBoardRowHeight()
-        {
-            if (PilotBoard == null)
-            {
-                return 0;
-            }
-
-            for (var index = 0; index < Math.Min(PilotBoard.Items.Count, 3); index++)
-            {
-                if (PilotBoard.ItemContainerGenerator.ContainerFromIndex(index) is DataGridRow row &&
-                    row.ActualHeight > 0)
-                {
-                    return row.ActualHeight;
-                }
-            }
-
-            return 0;
-        }
-
-        private void ToggleMaximizeRestore()
-        {
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-        }
-
-        private void UpdateWindowStateUi()
-        {
-            if (MaximizeRestoreWindowButton == null)
-            {
-                return;
-            }
-
-            var buttonState = _mainWindowShellModeCoordinator.BuildMaximizeRestoreWindowButtonState(WindowState);
-            MaximizeRestoreWindowButton.Content = buttonState.Content;
-            MaximizeRestoreWindowButton.ToolTip = buttonState.ToolTip;
-        }
-
-        private void TrackCurrentNormalWindowBounds()
-        {
-            _windowLayoutSurface.TrackCurrentNormalWindowBounds(
-                WindowState,
-                new Rect(Left, Top, Width, Height));
-        }
+        private void BoardModeHintTimer_Tick(object? sender, EventArgs e) => _mainWindowShellSurface.HandleBoardModeHintTimerTick();
 
         private void RequestApplicationShutdown(string reason)
         {
@@ -864,37 +705,32 @@ namespace PitmastersGrill
 
         private void MinimizeWindowButton_Click(object sender, RoutedEventArgs e)
         {
-            WindowState = WindowState.Minimized;
+            _mainWindowShellSurface.HandleMinimizeWindow();
         }
 
         private void MaximizeRestoreWindowButton_Click(object sender, RoutedEventArgs e)
         {
-            ToggleMaximizeRestore();
+            _mainWindowShellSurface.HandleMaximizeRestoreWindow();
         }
 
         private void CloseWindowButton_Click(object sender, RoutedEventArgs e)
         {
-            RequestApplicationShutdown("Window close button");
+            _mainWindowShellSurface.HandleCloseWindow();
         }
 
         private void Window_StateChanged(object? sender, EventArgs e)
         {
-            _windowLayoutSurface.HandleWindowStateChanged(
-                WindowState,
-                RestoreBounds,
-                new Rect(Left, Top, Width, Height));
-            UpdateWindowStateUi();
+            _mainWindowShellSurface.HandleWindowStateChanged();
         }
 
         private void Window_LocationChanged(object sender, EventArgs e)
         {
-            TrackCurrentNormalWindowBounds();
+            _mainWindowShellSurface.HandleWindowLocationChanged();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            TrackCurrentNormalWindowBounds();
-            UpdateWindowMinimumSize();
+            _mainWindowShellSurface.HandleWindowSizeChanged();
         }
 
         private void DarkModeCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -943,40 +779,12 @@ namespace PitmastersGrill
 
         private void ResetWindowLayoutButton_Click(object sender, RoutedEventArgs e)
         {
-            ResetWindowLayout(showConfirmation: true, reason: "Reset window layout button");
-        }
-
-        private void ResetWindowLayout(bool showConfirmation, string reason)
-        {
-            ClearSavedWindowLayoutSettings();
-
-            var resetBounds = GetDefaultWindowBoundsForCurrentDisplay();
-            WindowState = WindowState.Normal;
-            Left = resetBounds.Left;
-            Top = resetBounds.Top;
-            Width = resetBounds.Width;
-            Height = resetBounds.Height;
-            _windowLayoutSurface.HandleWindowStateChanged(WindowState.Normal, Rect.Empty, resetBounds);
-
-            SaveWindowLayoutToSettings(reason);
-
-            AppLogger.UiInfo(
-                $"Window layout reset. reason='{reason}' left={Left:0.##} top={Top:0.##} width={Width:0.##} height={Height:0.##}");
-
-            if (showConfirmation)
-            {
-                MessageBox.Show(
-                    "Window layout reset to a safe default position and size.",
-                    "PMG Window Layout",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
+            _mainWindowShellSurface.HandleResetWindowLayoutButton();
         }
 
         private void RequestWindowLayoutResetFromHotkey(string source)
         {
-            AppLogger.UiInfo($"Window layout reset requested from {source}.");
-            ResetWindowLayout(showConfirmation: false, reason: source);
+            _mainWindowShellSurface.HandleRequestWindowLayoutResetFromHotkey(source);
         }
 
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1174,7 +982,7 @@ namespace PitmastersGrill
                     break;
 
                 case MainWindowMessageAction.ToggleCompactMode:
-                    ToggleCompactModeFromHotkey();
+                    _mainWindowShellSurface.ToggleCompactModeFromHotkey();
                     break;
             }
 
@@ -1994,56 +1802,12 @@ namespace PitmastersGrill
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            var action = _mainWindowInteropController.RoutePreviewKey(
+            if (_mainWindowShellSurface.HandlePreviewKey(
                 e.Key,
                 (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control,
-                IsTextEditingElement(e.OriginalSource as DependencyObject));
-
-            switch (action)
+                IsTextEditingElement(e.OriginalSource as DependencyObject)))
             {
-                case MainWindowKeyboardAction.RequestWindowLayoutReset:
-                    RequestWindowLayoutResetFromHotkey("Ctrl+Home hotkey");
-                    e.Handled = true;
-                    return;
-
-                case MainWindowKeyboardAction.ToggleCompactMode:
-                    ToggleCompactModeFromHotkey();
-                    e.Handled = true;
-                    return;
-
-                case MainWindowKeyboardAction.ClearBoard:
-                    ClearBoard("Delete hotkey");
-                    e.Handled = true;
-                    return;
-
-                case MainWindowKeyboardAction.RefreshClipboard:
-                    AppLogger.UiInfo("Manual clipboard refresh requested from Home hotkey.");
-                    _boardPopulationEntryController.InvalidateLastProcessedClipboard();
-                    _ = ProcessClipboardIfValidAsync();
-                    e.Handled = true;
-                    return;
-
-                case MainWindowKeyboardAction.HandleEscape:
-                    HandleEscapeHotkey();
-                    e.Handled = true;
-                    return;
-            }
-        }
-
-        private void HandleEscapeHotkey()
-        {
-            var result = _mainWindowInteropController.HandleEscapeTap(
-                DateTime.UtcNow,
-                _lastEscapeTapUtc,
-                _escapeTapCount,
-                TripleEscapeWindowMilliseconds);
-
-            _lastEscapeTapUtc = result.LastEscapeTapUtc;
-            _escapeTapCount = result.EscapeTapCount;
-
-            if (result.ShouldRequestShutdown)
-            {
-                RequestApplicationShutdown("Triple Escape hotkey");
+                e.Handled = true;
             }
         }
 
@@ -2423,63 +2187,6 @@ namespace PitmastersGrill
             }
         }
 
-        private WindowLayoutMode GetCurrentWindowLayoutMode() => CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal;
-
-        private void RestoreWindowLayoutFromSettings() => RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode());
-
-        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode)
-        {
-            _windowLayoutSurface.RestoreFromSettings(
-                _appSettings,
-                mode,
-                MinWidth,
-                MinHeight,
-                MinimumSavedWindowWidth,
-                MinimumSavedWindowHeight,
-                MinimumVisibleWindowEdge,
-                DefaultWindowWidth,
-                DefaultWindowHeight,
-                bounds =>
-                {
-                    Left = bounds.Left;
-                    Top = bounds.Top;
-                    Width = bounds.Width;
-                    Height = bounds.Height;
-                },
-                state => WindowState = state,
-                AppLogger.UiInfo);
-        }
-
-        private void SaveWindowLayoutToSettings(string reason) => SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode());
-
-        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode)
-        {
-            _windowLayoutSurface.SaveToSettings(
-                _appSettings,
-                reason,
-                mode,
-                WindowState,
-                RestoreBounds,
-                new Rect(Left, Top, Width, Height),
-                MinWidth,
-                MinHeight,
-                MinimumSavedWindowWidth,
-                MinimumSavedWindowHeight,
-                MinimumVisibleWindowEdge,
-                AppLogger.UiInfo,
-                AppLogger.UiWarn);
-        }
-
-        private void ClearSavedWindowLayoutSettings() => _windowLayoutSurface.ClearSavedLayouts(_appSettings);
-        private Rect GetDefaultWindowBoundsForCurrentDisplay()
-        {
-            return _windowLayoutSurface.GetDefaultWindowBounds(
-                MinimumSavedWindowWidth,
-                MinimumSavedWindowHeight,
-                DefaultWindowWidth,
-                DefaultWindowHeight);
-        }
-
         private IReadOnlyList<Rect> GetMonitorWorkAreasDip()
         {
             return FormsScreen.AllScreens
@@ -2505,11 +2212,6 @@ namespace PitmastersGrill
             }
 
             return devicePoint;
-        }
-
-        private string BuildVirtualDesktopSummary()
-        {
-            return _windowLayoutController.BuildVirtualDesktopSummary(GetMonitorWorkAreasDip());
         }
 
         [DllImport("user32.dll", SetLastError = true)]
