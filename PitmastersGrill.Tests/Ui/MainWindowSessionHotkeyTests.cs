@@ -10,13 +10,14 @@ namespace PitmastersGrill.Tests.Ui
         public void MainWindowCode_RegistersGlobalDeleteAndInsertHotkeys()
         {
             var code = ReadMainWindowCode();
+            var nativeInputControllerCode = ReadRepoFile("PitmastersGrill", "Services", "MainWindowNativeInputController.cs");
 
             Assert.Contains("GlobalClearBoardHotKeyId", code);
             Assert.Contains("GlobalToggleBoardModeHotKeyId", code);
-            Assert.Contains("Key.Delete", code);
-            Assert.Contains("Key.Insert", code);
-            Assert.Contains("TryRegisterGlobalBoardActionHotKeys", code);
-            Assert.Contains("TryUnregisterGlobalBoardActionHotKeys", code);
+            Assert.Contains("_mainWindowNativeInputController.Attach", code);
+            Assert.Contains("_mainWindowNativeInputController.Detach", code);
+            Assert.Contains("Key.Delete", nativeInputControllerCode);
+            Assert.Contains("Key.Insert", nativeInputControllerCode);
         }
 
         [Fact]
@@ -24,8 +25,10 @@ namespace PitmastersGrill.Tests.Ui
         {
             var code = ReadMainWindowCode();
             var coordinatorCode = ReadRepoFile("PitmastersGrill", "Services", "EveSessionContextCoordinator.cs");
+            var surfaceCode = ReadRepoFile("PitmastersGrill", "Services", "EveSessionContextSurface.cs");
 
-            Assert.Contains("_eveSessionContextCoordinator.CreatePendingContext()", code);
+            Assert.Contains("_eveSessionContextSurface.ApplyPendingContext()", code);
+            Assert.Contains("CreatePendingContext()", surfaceCode);
             Assert.Contains("Waiting for local session evidence", coordinatorCode);
             Assert.Contains("Soft local read pending", coordinatorCode);
         }

@@ -64,35 +64,32 @@ namespace PitmastersGrill
         private readonly BoardColumnLayoutController _boardColumnLayoutController;
         private readonly BoardColumnSettingsController _boardColumnSettingsController;
         private readonly BoardColumnLayoutPersistenceController _boardColumnLayoutPersistenceController;
+        private readonly BoardSortController _boardSortController;
         private readonly SettingsTabController _settingsTabController;
         private readonly AnalysisTabController _analysisTabController;
         private readonly AnalysisTabPresenter _analysisTabPresenter = null!;
         private readonly MainWindowShellModeCoordinator _mainWindowShellModeCoordinator;
         private readonly MainWindowInteropController _mainWindowInteropController;
         private readonly WindowLayoutController _windowLayoutController;
+        private readonly WindowLayoutSurface _windowLayoutSurface;
+        private readonly MainWindowNativeInputController _mainWindowNativeInputController;
         private readonly BoardPopulationStatusController _boardPopulationStatusController;
         private readonly BoardPopulationRowProcessor _boardPopulationRowProcessor;
         private readonly BoardPopulationPassController _boardPopulationPassController;
         private readonly BoardPopulationRetryController _boardPopulationRetryController;
         private readonly BoardPopulationEntryController _boardPopulationEntryController;
+        private readonly BoardPopulationSurface _boardPopulationSurface;
         private readonly NotesRepository _notesRepository;
         private readonly WatchedPilotRepository _watchedPilotRepository;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly BrowserLauncher _browserLauncher;
         private ManualUpdateCheckController? _manualUpdateCheckController;
-        private DiagnosticsActionController? _diagnosticsActionController;
-        private readonly EveSessionContextService _eveSessionContextService;
+        private readonly DiagnosticsSupportSurface _diagnosticsSupportSurface = null!;
         private readonly MainWindowDiagnostics _diagnostics;
-        private readonly IntelUpdateBannerController _intelUpdateBannerController;
-        private readonly IntelStatusDetailsPresenter _intelStatusDetailsPresenter;
-        private readonly IntelActionsController _intelActionsController = null!;
-        private readonly IntelMaintenanceActionsController _intelMaintenanceActionsController = null!;
-        private readonly ProviderHealthPresenter _providerHealthPresenter;
-        private readonly DiagnosticsCacheStatsPresenter _diagnosticsCacheStatsPresenter;
-        private readonly DiagnosticsCacheMaintenanceController _diagnosticsCacheMaintenanceController = null!;
+        private readonly IntelSupportSurface _intelSupportSurface = null!;
         private readonly PilotDetailActionsPresenter _pilotDetailActionsPresenter;
-        private readonly PilotDetailWindowPlacementController _pilotDetailWindowPlacementController;
-        private readonly PilotDetailWindowLifecycleController _pilotDetailWindowLifecycleController;
+        private readonly PilotDetailSurface _pilotDetailSurface = null!;
+        private readonly EveSessionContextSurface _eveSessionContextSurface = null!;
         private readonly BoardPopulationTimingMarkerTracker _boardPopulationTimingMarkerTracker;
         private readonly IgnoreAllianceCoordinator _ignoreAllianceCoordinator;
         private readonly IgnoreAllianceBoardController _ignoreAllianceBoardController;
@@ -111,27 +108,15 @@ namespace PitmastersGrill
         private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisCorpItems = new();
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
-        private PilotDetailWindow? _activePilotDetailWindow;
-        private bool _isApplyingSettings; private bool _isRestoringWindowLayout;
+        private bool _isApplyingSettings;
         private bool _isShuttingDown;
         private bool _compactDragPending;
         private Point _compactDragStartPoint;
         private DateTime _lastEscapeTapUtc = DateTime.MinValue;
         private int _escapeTapCount;
         private int _processingGeneration;
-        private WindowState _lastNonMinimizedWindowState = WindowState.Normal;
-        private Rect _lastKnownNormalBounds = Rect.Empty;
-        private string? _activeBoardSortMemberPath;
-        private ListSortDirection? _activeBoardSortDirection;
         private bool? _lastAppliedCompactMode;
-        private bool _globalResetWindowHotKeyRegistered;
-        private bool _globalClearBoardHotKeyRegistered;
-        private bool _globalToggleBoardModeHotKeyRegistered;
         private bool _isMainWindowInitialized;
-        private EveSessionContext? _currentEveSessionContext;
-        private DateTime _lastSessionContextRefreshUtc = DateTime.MinValue;
-        private bool _isSessionContextRefreshInFlight;
-
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
             AppLogger.UiInfo("MainWindow constructor begin.");
@@ -143,6 +128,7 @@ namespace PitmastersGrill
             _eveSessionContextCoordinator = new EveSessionContextCoordinator();
             _boardDisplaySettingsController = new BoardDisplaySettingsController();
             _boardColumnLayoutController = new BoardColumnLayoutController();
+            _boardSortController = new BoardSortController();
             _boardColumnSettingsController = new BoardColumnSettingsController(
                 _boardColumnLayoutController,
                 settings => _mainWindowAppearanceController.SaveSettings(settings));
@@ -159,10 +145,9 @@ namespace PitmastersGrill
             _mainWindowShellModeCoordinator = new MainWindowShellModeCoordinator();
             _mainWindowInteropController = new MainWindowInteropController();
             _windowLayoutController = new WindowLayoutController();
+            _mainWindowNativeInputController = new MainWindowNativeInputController();
             _boardPopulationStatusController = new BoardPopulationStatusController();
             _pilotDetailActionsPresenter = new PilotDetailActionsPresenter();
-            _pilotDetailWindowPlacementController = new PilotDetailWindowPlacementController();
-            _pilotDetailWindowLifecycleController = new PilotDetailWindowLifecycleController();
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
@@ -197,55 +182,11 @@ namespace PitmastersGrill
                 Interval = TimeSpan.FromMilliseconds(BoardModeHintMilliseconds)
             };
             _boardModeHintTimer.Tick += BoardModeHintTimer_Tick;
-            _intelUpdateBannerController = new IntelUpdateBannerController(Dispatcher);
-            _providerHealthPresenter = new ProviderHealthPresenter();
-            _diagnosticsCacheStatsPresenter = new DiagnosticsCacheStatsPresenter();
-            _intelStatusDetailsPresenter = new IntelStatusDetailsPresenter(
-                IntelSupportViewControl.IntelLastUpdatedTextBlock,
-                IntelSupportViewControl.IntelOldestKillmailDayTextBlock,
-                IntelSupportViewControl.IntelNewestKillmailDayTextBlock,
-                IntelSupportViewControl.IntelCurrentUpdateStatusTextBlock,
-                IntelSupportViewControl.IntelTotalProgressBarControl,
-                IntelSupportViewControl.IntelTotalProgressTextBlock,
-                IntelSupportViewControl.IntelCurrentDayProgressBarControl,
-                IntelSupportViewControl.IntelCurrentDayProgressTextBlock,
-                IntelSupportViewControl.IntelLiveFeedSourceTextBlock,
-                IntelSupportViewControl.IntelLiveFeedStatusTextBlock,
-                IntelSupportViewControl.IntelLiveFeedEnabledTextBlock,
-                IntelSupportViewControl.IntelLiveFeedRecentImportsTextBlock,
-                IntelSupportViewControl.IntelLiveFeedNextSequenceTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastProcessedSequenceTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastSuccessTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastCaughtUpTextBlock,
-                IntelSupportViewControl.IntelLiveFeedLastErrorTextBlock,
-                IntelSupportViewControl.TodaysFreshnessStatusTextBlock,
-                IntelSupportViewControl.TodaysFreshnessVisiblePilotsTextBlock,
-                IntelSupportViewControl.TodaysFreshnessEntitiesQueriedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessResultsFoundTextBlock,
-                IntelSupportViewControl.TodaysFreshnessKnownSkippedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessImportedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessFailedTextBlock,
-                IntelSupportViewControl.TodaysFreshnessLastRunTextBlock,
-                IntelSupportViewControl.TodaysFreshnessDetailTextBlock,
-                IntelSupportViewControl.TodaysFreshnessLastErrorTextBlock,
-                IntelSupportViewControl.RunTodaysFreshnessButtonControl,
-                IntelSupportViewControl.HistoricalFreshnessStatusTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessModeTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessVisiblePilotsTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessCandidatesConsideredTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessCandidatesSkippedCooldownTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessPilotsCheckedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessDaysCheckedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessEntitiesQueriedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessResultsFoundTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessKnownSkippedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessImportedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessFailedTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessLastRunTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessDetailTextBlock,
-                IntelSupportViewControl.HistoricalFreshnessLastErrorTextBlock,
-                IntelSupportViewControl.RunHistoricalFreshnessButtonControl);
             _boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
+            _windowLayoutSurface = new WindowLayoutSurface(
+                _windowLayoutController,
+                settings => _mainWindowAppearanceController.SaveSettings(settings),
+                GetMonitorWorkAreasDip);
 
             AppLogger.UiInfo("MainWindow InitializeComponent complete.");
 
@@ -265,6 +206,11 @@ namespace PitmastersGrill
             _boardPopulationPassController = composed.BoardPopulationPassController;
             _boardPopulationRetryController = composed.BoardPopulationRetryController;
             _boardPopulationEntryController = composed.BoardPopulationEntryController;
+            _boardPopulationSurface = new BoardPopulationSurface(
+                _boardPopulationEntryController,
+                _boardPopulationPassController,
+                _boardPopulationRetryController,
+                _diagnostics);
             _ignoreAllianceCoordinator = composed.IgnoreAllianceCoordinator;
             _ignoreAllianceBoardController = composed.IgnoreAllianceBoardController;
             _zkillUrlBuilder = composed.ZkillUrlBuilder;
@@ -284,7 +230,7 @@ namespace PitmastersGrill
                 AnalysisHighlightsText,
                 _analysisAllianceItems,
                 _analysisCorpItems);
-            _eveSessionContextService = new EveSessionContextService();
+            var eveSessionContextService = new EveSessionContextService();
 
             _ignoreAllianceListView = IgnoreAllianceListViewControl;
             _ignoreAllianceListView.Initialize(_ignoreAllianceCoordinator);
@@ -321,12 +267,22 @@ namespace PitmastersGrill
                 _appSettings,
                 _windowShutdownCts.Token,
                 () => _isShuttingDown);
-            _diagnosticsActionController = new DiagnosticsActionController(
+            _diagnosticsSupportSurface = DiagnosticsSupportSurface.Create(
                 this,
-                DiagnosticsSupportViewControl.DiagnosticsStatusTextBlock,
-                _browserLauncher);
-            _intelActionsController = new IntelActionsController(
+                DiagnosticsSupportViewControl,
+                _browserLauncher,
+                _providerHealthRows,
+                () => _boardPopulationEntryController.IsClipboardProcessing,
+                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
+                DiagnosticTelemetry.GetProviderHealthSnapshots,
+                _cacheMaintenanceService.GetStats,
+                _cacheMaintenanceService.ClearExpired,
+                _cacheMaintenanceService.Vacuum,
+                _cacheMaintenanceService.ClearAll);
+            _intelSupportSurface = IntelSupportSurface.Create(
                 this,
+                Dispatcher,
+                IntelSupportViewControl,
                 _backgroundIntelUpdateService,
                 _settingsTabController,
                 () => _appSettings,
@@ -335,32 +291,65 @@ namespace PitmastersGrill
                 () => _isShuttingDown,
                 _windowShutdownCts.Token,
                 () => _currentRows.ToList(),
-                RefreshCurrentBoardRowsFromLocalIntelAsync);
-            _intelMaintenanceActionsController = new IntelMaintenanceActionsController(
+                RefreshCurrentBoardRowsFromLocalIntelAsync,
                 () => _boardPopulationEntryController.IsClipboardProcessing,
                 SetDiagnosticsStatus,
                 enabled => DiagnosticsSupportViewControl.SetRebuildKillmailDerivedIntelEnabled(enabled),
-                enabled => IntelSupportViewControl.EnableKillmailDbPullButtonControl.IsEnabled = enabled,
                 () => _mainWindowAppearanceController.GetMaxKillmailAgeDaysSettingValue(_appSettings),
-                () => _isShuttingDown,
-                _windowShutdownCts.Token,
                 cancellationToken => _killmailDerivedIntelRebuildService.RebuildConfirmedCynoModuleObservationsAsync(cancellationToken),
                 (seedDays, cancellationToken) => _backgroundIntelUpdateService.EnableKillmailDbPullAsync(seedDays, cancellationToken),
                 RefreshCacheStatsUi,
                 RefreshConfirmedCynoModuleStateForCurrentRows,
                 (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image));
-            _diagnosticsCacheMaintenanceController = new DiagnosticsCacheMaintenanceController(
-                () => _boardPopulationEntryController.IsClipboardProcessing,
-                SetDiagnosticsStatus,
-                (message, title, buttons, image) => MessageBox.Show(this, message, title, buttons, image),
-                () => DiagnosticTelemetry.GetProviderHealthSnapshots(),
-                snapshots => _providerHealthPresenter.ApplySnapshots(_providerHealthRows, snapshots),
-                () => _cacheMaintenanceService.GetStats(),
-                () => _cacheMaintenanceService.ClearExpired(),
-                () => _cacheMaintenanceService.Vacuum(),
-                () => _cacheMaintenanceService.ClearAll(),
-                _diagnosticsCacheStatsPresenter,
-                text => DiagnosticsSupportViewControl.SetCacheStatsText(text));
+            _pilotDetailSurface = new PilotDetailSurface(
+                this,
+                DetailPane,
+                SelectedCharacterText,
+                FullCorpText,
+                FullAllianceText,
+                FreshnessText,
+                RecentPublicActivityText,
+                CynoSignalText,
+                CynoConfidenceBar,
+                CynoEvidenceText,
+                CynoLimitationsText,
+                ExplainabilityText,
+                NotesTagsBox,
+                KnownCynoOverrideCheckBox,
+                BaitOverrideCheckBox,
+                IgnoreAllianceButton,
+                WatchPilotDetailAction,
+                _detailPaneController,
+                new PilotDetailWindowLifecycleController(),
+                new PilotDetailWindowPlacementController(),
+                _pilotBoardRowDetailFormatter,
+                _pilotDetailActionsPresenter,
+                _watchedPilotRepository,
+                _notesRepository,
+                _settingsTabController,
+                () => _appSettings,
+                allianceId => _ignoreAllianceCoordinator.ContainsAllianceId(allianceId),
+                (selectedRow, currentRows) => _detailPaneController.GetSelectedOrDisplayedDetailRow(
+                    selectedRow,
+                    DetailPane.Visibility,
+                    SelectedCharacterText.Text,
+                    currentRows),
+                TryIgnoreForRow,
+                OpenZkillForRow,
+                ApplyCurrentBoardOrdering,
+                RefreshDetailWindowIfSelected,
+                DetailWindowGap);
+            _eveSessionContextSurface = new EveSessionContextSurface(
+                Dispatcher,
+                _eveSessionContextCoordinator,
+                eveSessionContextService.CaptureAsync,
+                () => _isShuttingDown,
+                _windowShutdownCts.Token,
+                AnalysisCurrentCharacterText,
+                AnalysisCurrentSystemText,
+                AnalysisEvidenceSourceText,
+                AnalysisObservedAtText,
+                AnalysisContextStatusText);
             _mainWindowAppearanceController.ApplyPanelModeShell(this, _appSettings, Resources);
             CompactModeToggleButton.IsChecked = _appSettings.CompactModeEnabled;
 
@@ -414,8 +403,8 @@ namespace PitmastersGrill
             ApplyCompactModeUi();
             UpdateBoardSummaryBanner();
             UpdateAnalysisTab();
-            ApplyIntelUpdateSnapshot(_backgroundIntelUpdateService.GetSnapshot());
-            ApplyEveSessionContext(_eveSessionContextCoordinator.CreatePendingContext());
+            _intelSupportSurface.ApplySnapshot(_backgroundIntelUpdateService.GetSnapshot(), _isShuttingDown);
+            _eveSessionContextSurface.ApplyPendingContext();
             _isMainWindowInitialized = true;
 
             AppLogger.DatabaseInfo(
@@ -431,17 +420,24 @@ namespace PitmastersGrill
             base.OnSourceInitialized(e);
 
             var hwnd = new WindowInteropHelper(this).Handle;
-            AddClipboardFormatListener(hwnd);
-
             var source = HwndSource.FromHwnd(hwnd);
             source?.AddHook(WndProc);
 
             _mainWindowAppearanceController.ApplyTitleBarTheme(this, _appSettings.DarkModeEnabled);
             RestoreWindowLayoutFromSettings();
-            TryRegisterGlobalResetWindowHotKey(hwnd);
-            TryRegisterGlobalBoardActionHotKeys(hwnd);
+            _mainWindowNativeInputController.Attach(
+                hwnd,
+                AddClipboardFormatListener,
+                RegisterHotKey,
+                ModControl,
+                GlobalResetWindowHotKeyId,
+                GlobalClearBoardHotKeyId,
+                GlobalToggleBoardModeHotKeyId,
+                AppLogger.UiInfo,
+                AppLogger.UiWarn,
+                Marshal.GetLastWin32Error);
             UpdateWindowStateUi();
-            TriggerSessionContextRefresh("startup", force: false);
+            _eveSessionContextSurface.TriggerRefresh("startup", force: false);
 
             AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
         }
@@ -496,9 +492,16 @@ namespace PitmastersGrill
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
-            TryUnregisterGlobalBoardActionHotKeys(hwnd);
-            TryUnregisterGlobalResetWindowHotKey(hwnd);
-            RemoveClipboardFormatListener(hwnd);
+            _mainWindowNativeInputController.Detach(
+                hwnd,
+                RemoveClipboardFormatListener,
+                UnregisterHotKey,
+                GlobalResetWindowHotKeyId,
+                GlobalClearBoardHotKeyId,
+                GlobalToggleBoardModeHotKeyId,
+                AppLogger.UiInfo,
+                AppLogger.UiWarn,
+                Marshal.GetLastWin32Error);
 
             AppLogger.UiInfo("MainWindow closed. Clipboard listener removed, retry state cancelled, and background work stop requested.");
 
@@ -531,7 +534,7 @@ namespace PitmastersGrill
                 CompactModeToggleButton.IsChecked == true,
                 _lastAppliedCompactMode,
                 _isApplyingSettings,
-                _isRestoringWindowLayout,
+                _windowLayoutSurface.IsRestoringWindowLayout,
                 _appSettings.CompactModeEnabled,
                 MainTabControl.SelectedIndex);
 
@@ -604,7 +607,7 @@ namespace PitmastersGrill
 
             if (MainTabControl.SelectedIndex == 0)
             {
-                TriggerSessionContextRefresh("analysis tab selection", force: IsSessionContextStale());
+                _eveSessionContextSurface.TriggerRefresh("analysis tab selection", force: _eveSessionContextSurface.IsStale(DateTime.UtcNow));
             }
             else if (MainTabControl.SelectedIndex == 1)
             {
@@ -734,20 +737,11 @@ namespace PitmastersGrill
             MaximizeRestoreWindowButton.ToolTip = buttonState.ToolTip;
         }
 
-        private void TrackCurrentNormalWindowBounds(string reason)
+        private void TrackCurrentNormalWindowBounds()
         {
-            if (WindowState != WindowState.Normal)
-            {
-                return;
-            }
-
-            var currentBounds = new Rect(Left, Top, Width, Height);
-            if (!_windowLayoutController.IsUsableWindowBounds(currentBounds))
-            {
-                return;
-            }
-
-            _lastKnownNormalBounds = currentBounds;
+            _windowLayoutSurface.TrackCurrentNormalWindowBounds(
+                WindowState,
+                new Rect(Left, Top, Width, Height));
         }
 
         private void RequestApplicationShutdown(string reason)
@@ -844,31 +838,21 @@ namespace PitmastersGrill
 
         private void Window_StateChanged(object? sender, EventArgs e)
         {
-            if (WindowState != WindowState.Minimized)
-            {
-                _lastNonMinimizedWindowState = WindowState;
-            }
-
-            if (WindowState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds))
-            {
-                _lastKnownNormalBounds = RestoreBounds;
-            }
-            else if (WindowState == WindowState.Normal)
-            {
-                TrackCurrentNormalWindowBounds("StateChanged");
-            }
-
+            _windowLayoutSurface.HandleWindowStateChanged(
+                WindowState,
+                RestoreBounds,
+                new Rect(Left, Top, Width, Height));
             UpdateWindowStateUi();
         }
 
         private void Window_LocationChanged(object sender, EventArgs e)
         {
-            TrackCurrentNormalWindowBounds("LocationChanged");
+            TrackCurrentNormalWindowBounds();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            TrackCurrentNormalWindowBounds("SizeChanged");
+            TrackCurrentNormalWindowBounds();
             UpdateWindowMinimumSize();
         }
 
@@ -881,7 +865,7 @@ namespace PitmastersGrill
                 Resources,
                 this,
                 ApplyBoardPopulationStatusVisual,
-                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
+                () => _pilotDetailSurface.ApplyThemeToActiveWindow(Resources));
         }
 
         private void AlwaysOnTopCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -913,7 +897,7 @@ namespace PitmastersGrill
                 this,
                 WindowOpacityValueText,
                 Resources,
-                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
+                () => _pilotDetailSurface.ApplyThemeToActiveWindow(Resources));
         }
 
         private void ResetWindowLayoutButton_Click(object sender, RoutedEventArgs e)
@@ -931,8 +915,7 @@ namespace PitmastersGrill
             Top = resetBounds.Top;
             Width = resetBounds.Width;
             Height = resetBounds.Height;
-            _lastKnownNormalBounds = resetBounds;
-            _lastNonMinimizedWindowState = WindowState.Normal;
+            _windowLayoutSurface.HandleWindowStateChanged(WindowState.Normal, Rect.Empty, resetBounds);
 
             SaveWindowLayoutToSettings(reason);
 
@@ -1000,7 +983,7 @@ namespace PitmastersGrill
                 Resources,
                 this,
                 ApplyBoardPopulationStatusVisual,
-                () => _activePilotDetailWindow?.ApplyThemeResources(Resources));
+                () => _pilotDetailSurface.ApplyThemeToActiveWindow(Resources));
         }
 
         private void ColorBlindModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1012,7 +995,7 @@ namespace PitmastersGrill
                 Resources,
                 this,
                 ApplyBoardPopulationStatusVisual,
-                () => _activePilotDetailWindow?.ApplyThemeResources(Resources),
+                () => _pilotDetailSurface.ApplyThemeToActiveWindow(Resources),
                 () => PilotBoard?.Items.Refresh());
         }
 
@@ -1325,41 +1308,7 @@ namespace PitmastersGrill
 
         private void OnIntelUpdateStatusChanged(IntelUpdateStatusSnapshot snapshot)
         {
-            _intelUpdateBannerController.HandleStatusChanged(
-                snapshot,
-                IntelSupportViewControl.IntelUpdateBannerControl,
-                IntelSupportViewControl.IntelUpdateStatusTextBlock,
-                IntelSupportViewControl.IntelUpdateDetailTextBlock);
-
-            if (Dispatcher.CheckAccess())
-            {
-                ApplyIntelStatusDetails(snapshot);
-            }
-            else
-            {
-                Dispatcher.Invoke(() => ApplyIntelStatusDetails(snapshot));
-            }
-        }
-
-        private void ApplyIntelUpdateSnapshot(IntelUpdateStatusSnapshot snapshot)
-        {
-            _intelUpdateBannerController.ApplySnapshot(
-                snapshot,
-                IntelSupportViewControl.IntelUpdateBannerControl,
-                IntelSupportViewControl.IntelUpdateStatusTextBlock,
-                IntelSupportViewControl.IntelUpdateDetailTextBlock);
-
-            ApplyIntelStatusDetails(snapshot);
-        }
-
-        private void ApplyIntelStatusDetails(IntelUpdateStatusSnapshot snapshot)
-        {
-            if (snapshot == null)
-            {
-                return;
-            }
-            var projection = IntelStatusDetailsProjection.Create(snapshot, _isShuttingDown);
-            _intelStatusDetailsPresenter.Apply(projection);
+            _intelSupportSurface.HandleStatusChanged(snapshot, _isShuttingDown);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -1397,123 +1346,11 @@ namespace PitmastersGrill
 
             return IntPtr.Zero;
         }
-
-        private void TryRegisterGlobalBoardActionHotKeys(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            _globalClearBoardHotKeyRegistered = RegisterHotKey(
-                hwnd,
-                GlobalClearBoardHotKeyId,
-                0,
-                (uint)KeyInterop.VirtualKeyFromKey(Key.Delete));
-
-            if (_globalClearBoardHotKeyRegistered)
-            {
-                AppLogger.UiInfo("Global Delete clear-board hotkey registered.");
-            }
-            else
-            {
-                AppLogger.UiWarn($"Global Delete clear-board hotkey registration failed. error={Marshal.GetLastWin32Error()}");
-            }
-
-            _globalToggleBoardModeHotKeyRegistered = RegisterHotKey(
-                hwnd,
-                GlobalToggleBoardModeHotKeyId,
-                0,
-                (uint)KeyInterop.VirtualKeyFromKey(Key.Insert));
-
-            if (_globalToggleBoardModeHotKeyRegistered)
-            {
-                AppLogger.UiInfo("Global Insert board-mode hotkey registered.");
-            }
-            else
-            {
-                AppLogger.UiWarn($"Global Insert board-mode hotkey registration failed. error={Marshal.GetLastWin32Error()}");
-            }
-        }
-
-        private void TryRegisterGlobalResetWindowHotKey(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            _globalResetWindowHotKeyRegistered = RegisterHotKey(
-                hwnd,
-                GlobalResetWindowHotKeyId,
-                ModControl,
-                (uint)KeyInterop.VirtualKeyFromKey(Key.Home));
-
-            if (_globalResetWindowHotKeyRegistered)
-            {
-                AppLogger.UiInfo("Global Ctrl+Home reset-window hotkey registered.");
-                return;
-            }
-
-            AppLogger.UiWarn($"Global Ctrl+Home hotkey registration failed. win32Error={Marshal.GetLastWin32Error()}");
-        }
-
-        private void TryUnregisterGlobalBoardActionHotKeys(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            if (_globalClearBoardHotKeyRegistered)
-            {
-                if (UnregisterHotKey(hwnd, GlobalClearBoardHotKeyId))
-                {
-                    AppLogger.UiInfo("Global Delete clear-board hotkey unregistered.");
-                }
-                else
-                {
-                    AppLogger.UiWarn($"Global Delete clear-board hotkey unregister failed. error={Marshal.GetLastWin32Error()}");
-                }
-
-                _globalClearBoardHotKeyRegistered = false;
-            }
-
-            if (_globalToggleBoardModeHotKeyRegistered)
-            {
-                if (UnregisterHotKey(hwnd, GlobalToggleBoardModeHotKeyId))
-                {
-                    AppLogger.UiInfo("Global Insert board-mode hotkey unregistered.");
-                }
-                else
-                {
-                    AppLogger.UiWarn($"Global Insert board-mode hotkey unregister failed. error={Marshal.GetLastWin32Error()}");
-                }
-
-                _globalToggleBoardModeHotKeyRegistered = false;
-            }
-        }
-
-        private void TryUnregisterGlobalResetWindowHotKey(IntPtr hwnd)
-        {
-            if (!_globalResetWindowHotKeyRegistered || hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            if (!UnregisterHotKey(hwnd, GlobalResetWindowHotKeyId))
-            {
-                AppLogger.UiWarn($"Global Ctrl+Home hotkey unregistration failed. win32Error={Marshal.GetLastWin32Error()}");
-            }
-
-            _globalResetWindowHotKeyRegistered = false;
-        }
-
         private void ScheduleClipboardProcessing()
         {
-            _clipboardDebounceTimer.Stop();
-            _clipboardDebounceTimer.Start();
-            _diagnostics.ClipboardChangeDebounced(ClipboardDebounceMilliseconds);
+            _boardPopulationSurface.ScheduleClipboardProcessing(
+                _clipboardDebounceTimer,
+                ClipboardDebounceMilliseconds);
         }
 
         private void ClipboardDebounceTimer_Tick(object? sender, EventArgs e)
@@ -1525,7 +1362,7 @@ namespace PitmastersGrill
 
         private Task ProcessClipboardIfValidAsync()
         {
-            return _boardPopulationEntryController.ProcessClipboardIfValidAsync(
+            return _boardPopulationSurface.ProcessClipboardIfValidAsync(
                 clipboardContainsText: () => Clipboard.ContainsText(),
                 clipboardGetText: () => Clipboard.GetText(),
                 setBoardButtonsEnabled: enabled =>
@@ -1542,13 +1379,10 @@ namespace PitmastersGrill
 
         private Task ProcessNamesAsync(List<string> characterNames, bool isRetryPass)
         {
-            TriggerSessionContextRefresh(
-                isRetryPass ? "board retry pass" : "accepted local clipboard",
-                force: !isRetryPass);
-
-            return _boardPopulationEntryController.ProcessNamesAsync(
+            return _boardPopulationSurface.ProcessNamesAsync(
                 characterNames,
                 isRetryPass,
+                (reason, force) => _eveSessionContextSurface.TriggerRefresh(reason, force),
                 SaveCurrentNotesAndTags,
                 BuildInitialBoard,
                 beginProcessingGeneration: () => ++_processingGeneration,
@@ -1570,63 +1404,18 @@ namespace PitmastersGrill
 
         private void FinalizeBoardPopulationPass(int generation)
         {
-            if (generation != _processingGeneration)
-            {
-                _diagnostics.FinalizeSkipped(generation, _processingGeneration);
-                return;
-            }
-
-            var decision = _boardPopulationPassController.BuildFinalizeDecision(
-                _currentRows,
-                _boardPopulationRetryController.RetryAttempt,
-                MaxBoardPopulationRetryAttempts);
-
-            if (decision.IsComplete)
-            {
-                _boardPopulationRetryController.MarkComplete();
-
-                _diagnostics.BoardProcessFinalizedComplete(
-                    generation,
-                    decision.CompleteCount,
-                    decision.PartialCount,
-                    decision.RetryableCount);
-
-                UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
-                return;
-            }
-
-            _boardPopulationRetryController.MarkIncomplete();
-            _boardPopulationEntryController.InvalidateLastProcessedClipboard();
-
-            if (decision.RetryLimitReached)
-            {
-                _diagnostics.BoardProcessRetryLimitReached(
-                    generation,
-                    decision.RetryableCount,
-                    decision.PartialCount,
-                    _boardPopulationRetryController.RetryAttempt);
-
-                UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
-                return;
-            }
-
-            _diagnostics.BoardProcessRequiresRetry(
+            _boardPopulationSurface.FinalizeBoardPopulationPass(
                 generation,
-                decision.RetryableCount,
-                decision.PartialCount,
-                _boardPopulationRetryController.RetryAttempt);
-
-            UpdateBoardPopulationStatus(decision.StatusText, decision.StatusKind);
-
-            if (decision.ShouldScheduleRetry)
-            {
-                ScheduleBoardPopulationRetry();
-            }
+                _processingGeneration,
+                _currentRows,
+                MaxBoardPopulationRetryAttempts,
+                UpdateBoardPopulationStatus,
+                ScheduleBoardPopulationRetry);
         }
 
         private void ScheduleBoardPopulationRetry()
         {
-            _boardPopulationRetryController.ScheduleRetry(
+            _boardPopulationSurface.ScheduleBoardPopulationRetry(
                 _currentRows,
                 Dispatcher,
                 UpdateBoardPopulationStatus,
@@ -1635,7 +1424,7 @@ namespace PitmastersGrill
 
         private Task ProcessRetryPassAsync()
         {
-            return _boardPopulationRetryController.ProcessRetryPassAsync(
+            return _boardPopulationSurface.ProcessRetryPassAsync(
                 _currentRows,
                 () => _backgroundIntelUpdateService.BeginForegroundPriority(),
                 (rows, generation) => ProcessRowBatchAsync(rows.ToList(), generation),
@@ -1646,7 +1435,7 @@ namespace PitmastersGrill
 
         private void CancelBoardPopulationRetry()
         {
-            _boardPopulationRetryController.CancelRetry();
+            _boardPopulationSurface.CancelBoardPopulationRetry();
         }
 
         private void ResetBoardPopulationTracking(bool preserveLastProcessedClipboardText = false)
@@ -1657,8 +1446,7 @@ namespace PitmastersGrill
 
         private void ResetEntryAndRetryTracking(bool preserveLastProcessedClipboardText = false)
         {
-            _boardPopulationEntryController.ResetTracking(preserveLastProcessedClipboardText);
-            _boardPopulationRetryController.ResetTracking();
+            _boardPopulationSurface.ResetBoardPopulationTracking(preserveLastProcessedClipboardText);
         }
 
         private void UpdateBoardPopulationStatus(string statusText, BoardPopulationStatusKind kind)
@@ -1841,12 +1629,7 @@ namespace PitmastersGrill
         {
             _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
             RecomputeCorpAllianceCounts();
-
-            if (_activePilotDetailWindow != null &&
-                _pilotDetailWindowLifecycleController.ShouldRefreshActiveWindow(row.CharacterName))
-            {
-                _activePilotDetailWindow.RefreshRow();
-            }
+            _pilotDetailSurface.RefreshActiveDetailWindowIfSelected(row);
         }
 
         private void RefreshConfirmedCynoModuleStateForCurrentRows()
@@ -1940,35 +1723,17 @@ namespace PitmastersGrill
 
         private void PilotBoard_Sorting(object sender, DataGridSortingEventArgs e)
         {
-            if (PilotBoard == null)
-            {
-                return;
-            }
-
             e.Handled = true;
-
-            var sortMemberPath = e.Column.SortMemberPath;
-            if (string.IsNullOrWhiteSpace(sortMemberPath))
+            if (_boardSortController.TryHandleSorting(
+                PilotBoard,
+                e.Column,
+                _currentRows,
+                PilotBoard.SelectedItem as PilotBoardRow,
+                out var sortMemberPath,
+                out var nextDirection))
             {
-                sortMemberPath = GetSortMemberPathFromColumn(e.Column);
-                if (string.IsNullOrWhiteSpace(sortMemberPath))
-                {
-                    return;
-                }
+                AppLogger.UiInfo($"Board sort changed. member='{sortMemberPath}' direction={nextDirection}");
             }
-
-            var nextDirection = _activeBoardSortMemberPath == sortMemberPath &&
-                                _activeBoardSortDirection == ListSortDirection.Ascending
-                ? ListSortDirection.Descending
-                : ListSortDirection.Ascending;
-
-            _activeBoardSortMemberPath = sortMemberPath;
-            _activeBoardSortDirection = nextDirection;
-
-            ApplySortIndicatorState(e.Column, nextDirection);
-            ApplyCurrentBoardOrdering();
-
-            AppLogger.UiInfo($"Board sort changed. member='{sortMemberPath}' direction={nextDirection}");
         }
 
         private void PilotBoard_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -2181,28 +1946,21 @@ namespace PitmastersGrill
 
         private void ClearBoard(string reason)
         {
-            var clearedRowCount = _currentRows.Count;
-
-            _diagnostics.ClearBoardStart(clearedRowCount);
-
-            SaveCurrentNotesAndTags();
-            CancelBoardPopulationRetry();
-            _processingGeneration++;
-            ResetEntryAndRetryTracking();
-            ResetManualBoardSort();
-            UnsubscribeFromAllBoardRows();
-
             PilotBoard.SelectedItem = null;
-            _currentRows.Clear();
-            RecomputeCorpAllianceCounts();
-            CloseActiveDetailWindow();
-            UpdateOpenDetailsButtonState();
-
-            UpdateLastRefreshed();
-            UpdateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
-
-            AppLogger.UiInfo($"Board cleared. reason='{reason}' removedRows={clearedRowCount}");
-            _diagnostics.ClearBoardComplete();
+            _boardPopulationSurface.ClearBoard(
+                reason,
+                _currentRows,
+                SaveCurrentNotesAndTags,
+                CancelBoardPopulationRetry,
+                () => ResetEntryAndRetryTracking(),
+                ResetManualBoardSort,
+                UnsubscribeFromAllBoardRows,
+                RecomputeCorpAllianceCounts,
+                CloseActiveDetailWindow,
+                UpdateOpenDetailsButtonState,
+                UpdateLastRefreshed,
+                UpdateBoardPopulationStatus,
+                () => _processingGeneration++);
         }
 
         private void OpenZkillButton_Click(object sender, RoutedEventArgs e)
@@ -2218,7 +1976,7 @@ namespace PitmastersGrill
 
         private async void EnableKillmailDbPullButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelMaintenanceActionsController.RunEnableKillmailDbPullAsync();
+            await _intelSupportSurface.RunEnableKillmailDbPullAsync();
         }
 
 
@@ -2234,62 +1992,62 @@ namespace PitmastersGrill
 
         private void OpenLogsButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsActionController?.OpenLogs();
+            _diagnosticsSupportSurface.OpenLogs();
         }
 
         private void PackageDiagnosticsButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsActionController?.PackageDiagnostics();
+            _diagnosticsSupportSurface.PackageDiagnostics();
         }
 
         private void OpenDiagnosticsFolderButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsActionController?.OpenDiagnosticsFolder();
+            _diagnosticsSupportSurface.OpenDiagnosticsFolder();
         }
 
         private void SetDiagnosticsStatus(string message)
         {
-            _diagnosticsActionController?.SetStatus(message);
+            _diagnosticsSupportSurface.SetStatus(message);
         }
 
         private void RefreshProviderHealthButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.RefreshProviderHealth();
+            _diagnosticsSupportSurface.RefreshProviderHealth();
         }
 
         private void RefreshProviderHealthUi()
         {
-            _diagnosticsCacheMaintenanceController.RefreshProviderHealthUi();
+            _diagnosticsSupportSurface.RefreshProviderHealthUi();
         }
 
         private void RefreshCacheStatsButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.RefreshCacheStats();
+            _diagnosticsSupportSurface.RefreshCacheStats();
         }
 
         private void ClearExpiredCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.ClearExpiredCache();
+            _diagnosticsSupportSurface.ClearExpiredCache();
         }
 
         private void VacuumCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.VacuumCache();
+            _diagnosticsSupportSurface.VacuumCache();
         }
 
         private void ClearAllCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            _diagnosticsCacheMaintenanceController.ClearAllCache();
+            _diagnosticsSupportSurface.ClearAllCache();
         }
 
         private async void RebuildKillmailDerivedIntelButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelMaintenanceActionsController.RunRebuildKillmailDerivedIntelAsync();
+            await _intelSupportSurface.RunRebuildKillmailDerivedIntelAsync();
         }
 
         private void RefreshCacheStatsUi()
         {
-            _diagnosticsCacheMaintenanceController.RefreshCacheStatsUi();
+            _diagnosticsSupportSurface.RefreshCacheStatsUi();
         }
 
 
@@ -2330,7 +2088,7 @@ namespace PitmastersGrill
         private async void EnableLiveZkillFeedCheckBox_Checked(object sender, RoutedEventArgs e)
         {
             var enabled = IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl.IsChecked == true;
-            await _intelActionsController.HandleLiveFeedToggleAsync(enabled);
+            await _intelSupportSurface.HandleLiveFeedToggleAsync(enabled);
         }
 
         private void BackgroundHistoricalRepairEnabledCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -2343,17 +2101,17 @@ namespace PitmastersGrill
 
         private async void RunTodaysFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelActionsController.RunTodaysFreshnessAsync();
+            await _intelSupportSurface.RunTodaysFreshnessAsync();
         }
 
         private async void RunHistoricalFreshnessButton_Click(object sender, RoutedEventArgs e)
         {
-            await _intelActionsController.RunHistoricalFreshnessAsync();
+            await _intelSupportSurface.RunHistoricalFreshnessAsync();
         }
 
         public List<long> GetVisibleCharacterIdsForBackgroundHistoricalRepair()
         {
-            return _intelActionsController.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
+            return _intelSupportSurface.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
         }
 
         private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
@@ -2457,207 +2215,27 @@ namespace PitmastersGrill
 
         private void OpenDetailsWindow(PilotBoardRow row)
         {
-            var action = _pilotDetailWindowLifecycleController.DecideOpenAction(row.CharacterName);
-            if (action == PilotDetailWindowOpenAction.ActivateExisting)
-            {
-                _activePilotDetailWindow?.Activate();
-                return;
-            }
-
-            if (action == PilotDetailWindowOpenAction.ReplaceExisting)
-            {
-                CloseActiveDetailWindow();
-            }
-
-            _activePilotDetailWindow = new PilotDetailWindow(
-                row,
-                _pilotBoardRowDetailFormatter,
-                _notesRepository,
-                TryIgnoreForRow,
-                ToggleWatchForRow,
-                OpenZkillForRow)
-            {
-                Owner = this
-            };
-            _activePilotDetailWindow.ApplyThemeResources(Resources);
-            _activePilotDetailWindow.Topmost = Topmost;
-            PositionDetailWindow(_activePilotDetailWindow);
-            _activePilotDetailWindow.Closed += ActivePilotDetailWindow_Closed;
-            _pilotDetailWindowLifecycleController.MarkWindowOpened(row.CharacterName);
-            _activePilotDetailWindow.Show();
-            AppLogger.UiInfo($"Details window opened. character='{row.CharacterName}'");
-        }
-
-
-        private void PositionDetailWindow(PilotDetailWindow detailWindow)
-        {
-            if (detailWindow == null)
-            {
-                return;
-            }
-
-            detailWindow.WindowStartupLocation = WindowStartupLocation.Manual;
-
-            var detailWidth = detailWindow.Width > 0 ? detailWindow.Width : 430;
-            var detailHeight = detailWindow.Height > 0 ? detailWindow.Height : 360;
-            var ownerWidth = ActualWidth > 0 ? ActualWidth : Width;
-            var ownerHeight = ActualHeight > 0 ? ActualHeight : Height;
-            var ownerLeft = double.IsNaN(Left) ? 0 : Left;
-            var ownerTop = double.IsNaN(Top) ? 0 : Top;
-            var ownerHandle = new WindowInteropHelper(this).Handle;
-            var monitor = ownerHandle != IntPtr.Zero
-                ? FormsScreen.FromHandle(ownerHandle)
-                : FormsScreen.FromPoint(new System.Drawing.Point(
-                    (int)Math.Round(ownerLeft),
-                    (int)Math.Round(ownerTop)));
-
-            var presentationSource = PresentationSource.FromVisual(this);
-            var transformFromDevice = presentationSource?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
-            var workAreaPixels = monitor.WorkingArea;
-            var workTopLeft = transformFromDevice.Transform(new Point(workAreaPixels.Left, workAreaPixels.Top));
-            var workBottomRight = transformFromDevice.Transform(new Point(workAreaPixels.Right, workAreaPixels.Bottom));
-            var workLeft = workTopLeft.X;
-            var workTop = workTopLeft.Y;
-            var workRight = workBottomRight.X;
-            var workBottom = workBottomRight.Y;
-            var preferLeft = _settingsTabController.GetPilotDetailPlacementPreference(_appSettings) == PilotDetailPlacementPreference.AutoPreferLeft;
-            var placement = _pilotDetailWindowPlacementController.BuildPlacement(
-                detailWidth,
-                detailHeight,
-                ownerLeft,
-                ownerTop,
-                ownerWidth,
-                workLeft,
-                workTop,
-                workRight,
-                workBottom,
-                preferLeft,
-                DetailWindowGap);
-
-            detailWindow.Left = placement.Left;
-            detailWindow.Top = placement.Top;
-
-            if (placement.WasAdjusted)
-            {
-                AppLogger.UiInfo(
-                    $"Detail window placement adjusted. ownerBounds=({ownerLeft:0.##},{ownerTop:0.##},{ownerWidth:0.##},{ownerHeight:0.##}) workArea=({workLeft:0.##},{workTop:0.##},{workRight - workLeft:0.##},{workBottom - workTop:0.##}) preferredSide={placement.PreferredSide} finalSide={placement.FinalSide} finalBounds=({placement.Left:0.##},{placement.Top:0.##},{detailWidth:0.##},{detailHeight:0.##})");
-            }
-        }
-
-        private void ActivePilotDetailWindow_Closed(object? sender, EventArgs e)
-        {
-            if (_activePilotDetailWindow != null)
-            {
-                _activePilotDetailWindow.Closed -= ActivePilotDetailWindow_Closed;
-                _activePilotDetailWindow = null;
-            }
-
-            _pilotDetailWindowLifecycleController.ClearActiveWindow();
+            _pilotDetailSurface.OpenDetailsWindow(row);
         }
 
         private void CloseActiveDetailWindow()
         {
-            if (_activePilotDetailWindow == null)
-            {
-                return;
-            }
-
-            var window = _activePilotDetailWindow;
-            _activePilotDetailWindow = null;
-            window.Closed -= ActivePilotDetailWindow_Closed;
-            window.SaveCurrentState();
-            _pilotDetailWindowLifecycleController.ClearActiveWindow();
-            window.Close();
+            _pilotDetailSurface.CloseActiveDetailWindow();
         }
 
         private void ShowDetailPane(PilotBoardRow row)
         {
-            _detailPaneController.ShowDetailPane(
-                row,
-                DetailPane,
-                SelectedCharacterText,
-                FullCorpText,
-                FullAllianceText,
-                FreshnessText,
-                RecentPublicActivityText,
-                CynoSignalText,
-                CynoConfidenceBar,
-                CynoEvidenceText,
-                CynoLimitationsText,
-                ExplainabilityText,
-                NotesTagsBox,
-                KnownCynoOverrideCheckBox,
-                BaitOverrideCheckBox);
-
-            UpdateIgnoreAllianceButtonState(row);
-            UpdateWatchPilotDetailActionState(row);
+            _pilotDetailSurface.ShowDetailPane(row);
         }
 
         private void HideDetailPane()
         {
-            _detailPaneController.HideDetailPane(
-                DetailPane,
-                NotesTagsBox,
-                KnownCynoOverrideCheckBox,
-                BaitOverrideCheckBox);
-
-            if (ExplainabilityText != null)
-            {
-                ExplainabilityText.Text = "Explainability: --";
-            }
-
-            if (RecentPublicActivityText != null)
-            {
-                RecentPublicActivityText.Text = "Recent Public Kill/Loss Activity: --";
-            }
-
-            if (CynoSignalText != null)
-            {
-                CynoSignalText.Text = "Cyno Signal: Unknown";
-            }
-
-            if (CynoConfidenceBar != null)
-            {
-                CynoConfidenceBar.Value = 0;
-            }
-
-            if (CynoEvidenceText != null)
-            {
-                CynoEvidenceText.Text = "Evidence: --";
-            }
-
-            if (CynoLimitationsText != null)
-            {
-                CynoLimitationsText.Text = "Limitations: --";
-            }
-
-            UpdateIgnoreAllianceButtonState(null);
-            UpdateWatchPilotDetailActionState(null);
+            _pilotDetailSurface.HideDetailPane();
         }
 
         private void SaveCurrentNotesAndTags()
         {
-            if (_activePilotDetailWindow != null)
-            {
-                _activePilotDetailWindow.SaveCurrentState();
-                return;
-            }
-
-            if (_detailPaneController == null
-                || NotesTagsBox == null
-                || KnownCynoOverrideCheckBox == null
-                || BaitOverrideCheckBox == null
-                || PilotBoard == null)
-            {
-                AppLogger.UiWarn("Skipping notes/tag save because detail pane state was not fully initialized.");
-                return;
-            }
-
-            _detailPaneController.SaveCurrentNotesAndTags(
-                NotesTagsBox.Text,
-                KnownCynoOverrideCheckBox.IsChecked == true,
-                BaitOverrideCheckBox.IsChecked == true,
-                PilotBoard.SelectedItem as PilotBoardRow);
+            _pilotDetailSurface.SaveCurrentNotesAndTags(PilotBoard?.SelectedItem as PilotBoardRow);
         }
 
         private void IgnoreAllianceListView_IgnoreListChanged(object? sender, EventArgs e)
@@ -2668,15 +2246,9 @@ namespace PitmastersGrill
 
         private void IgnoreAllianceButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedRow = GetSelectedOrDisplayedDetailRow();
-
-            if (selectedRow == null)
-            {
-                AppLogger.UiWarn("Ignore alliance requested with no selected or displayed detail row.");
-                return;
-            }
-
-            TryIgnoreAllianceForRow(selectedRow);
+            _pilotDetailSurface.TryIgnoreAllianceForSelectedOrDisplayedRow(
+                PilotBoard?.SelectedItem as PilotBoardRow,
+                _currentRows);
         }
 
         private bool TryIgnoreAllianceForRow(PilotBoardRow selectedRow)
@@ -2718,52 +2290,19 @@ namespace PitmastersGrill
 
         private PilotBoardRow? GetSelectedOrDisplayedDetailRow()
         {
-            return _detailPaneController.GetSelectedOrDisplayedDetailRow(
-                PilotBoard.SelectedItem as PilotBoardRow,
-                DetailPane.Visibility,
-                SelectedCharacterText.Text,
+            return _pilotDetailSurface.GetSelectedOrDisplayedDetailRow(
+                PilotBoard?.SelectedItem as PilotBoardRow,
                 _currentRows);
-        }
-
-        private bool IsRowDisplayedInDetailPane(PilotBoardRow row)
-        {
-            return _detailPaneController.IsRowDisplayedInDetailPane(
-                row,
-                PilotBoard.SelectedItem as PilotBoardRow,
-                DetailPane.Visibility,
-                SelectedCharacterText.Text);
         }
 
         private void UpdateIgnoreAllianceButtonState(PilotBoardRow? row)
         {
-            if (IgnoreAllianceButton == null)
-            {
-                return;
-            }
-
-            var allianceId = _pilotDetailActionsPresenter.TryGetAllianceId(row?.AllianceId);
-            var state = _pilotDetailActionsPresenter.BuildIgnoreAllianceActionState(
-                row,
-                allianceId.HasValue && _ignoreAllianceCoordinator.ContainsAllianceId(allianceId.Value));
-
-            IgnoreAllianceButton.IsEnabled = state.IsEnabled;
-            IgnoreAllianceButton.ToolTip = state.ToolTip;
+            _pilotDetailSurface.UpdateIgnoreAllianceButtonState(row);
         }
 
         private void UpdateWatchPilotDetailActionState(PilotBoardRow? row)
         {
-            if (WatchPilotDetailAction == null)
-            {
-                return;
-            }
-
-            var state = _pilotDetailActionsPresenter.BuildWatchPilotActionState(row);
-            WatchPilotDetailAction.IsEnabled = state.IsEnabled;
-            WatchPilotDetailAction.Content = state.Content;
-            WatchPilotDetailAction.ToolTip = state.ToolTip;
-            WatchPilotDetailAction.SetResourceReference(
-                Control.ForegroundProperty,
-                state.ForegroundResourceKey);
+            _pilotDetailSurface.UpdateWatchPilotDetailActionState(row);
         }
 
         private void UpdateOpenDetailsButtonState()
@@ -2896,226 +2435,26 @@ namespace PitmastersGrill
 
         private void ToggleWatchForRow(PilotBoardRow row)
         {
-            var pilotId = _pilotDetailActionsPresenter.TryGetPilotId(row.CharacterId);
-            if (!pilotId.HasValue)
-            {
-                UpdateWatchPilotDetailActionState(row);
-                AppLogger.UiWarn($"Watch requested without a valid pilot ID. character='{row.CharacterName}'");
-                return;
-            }
-
-            var newWatchedState = !row.IsWatched;
-            if (!_watchedPilotRepository.SetWatched(row.CharacterId, newWatchedState))
-            {
-                UpdateWatchPilotDetailActionState(row);
-                AppLogger.UiWarn($"Watch state change failed. character='{row.CharacterName}' characterId='{row.CharacterId}'");
-                return;
-            }
-
-            row.IsWatched = newWatchedState;
-            ApplyCurrentBoardOrdering();
-            UpdateWatchPilotDetailActionState(row);
-            RefreshDetailWindowIfSelected(row);
-
-            AppLogger.UiInfo(
-                $"Watch state changed. character='{row.CharacterName}' characterId='{row.CharacterId}' watched={row.IsWatched}");
+            _pilotDetailSurface.ToggleWatchForRow(row);
         }
 
         private void ApplyCurrentBoardOrdering()
         {
-            if (_currentRows.Count <= 1)
-            {
-                return;
-            }
-
-            var selectedRow = PilotBoard.SelectedItem as PilotBoardRow;
-            var baseOrderIndexes = _currentRows
-                .Select((row, index) => new KeyValuePair<PilotBoardRow, int>(row, index))
-                .ToDictionary(pair => pair.Key, pair => pair.Value);
-
-            var reorderedRows = _currentRows
-                .OrderBy(row => row, Comparer<PilotBoardRow>.Create((leftRow, rightRow) =>
-                    CompareBoardRows(
-                        leftRow,
-                        baseOrderIndexes[leftRow],
-                        rightRow,
-                        baseOrderIndexes[rightRow])))
-                .ToList();
-
-            var changed = false;
-            for (var index = 0; index < reorderedRows.Count; index++)
-            {
-                if (!ReferenceEquals(_currentRows[index], reorderedRows[index]))
+            _boardSortController.ApplyCurrentBoardOrdering(
+                _currentRows,
+                PilotBoard?.SelectedItem as PilotBoardRow,
+                row =>
                 {
-                    changed = true;
-                    break;
-                }
-            }
-
-            if (!changed)
-            {
-                return;
-            }
-
-            _currentRows.Clear();
-            foreach (var row in reorderedRows)
-            {
-                _currentRows.Add(row);
-            }
-
-            if (selectedRow != null && _currentRows.Contains(selectedRow))
-            {
-                PilotBoard.SelectedItem = selectedRow;
-            }
-        }
-
-        private int CompareBoardRows(PilotBoardRow leftRow, int leftIndex, PilotBoardRow rightRow, int rightIndex)
-        {
-            var watchedCompare = Comparer<bool>.Default.Compare(rightRow.IsWatched, leftRow.IsWatched);
-            if (watchedCompare != 0)
-            {
-                return watchedCompare;
-            }
-
-            if (!string.IsNullOrWhiteSpace(_activeBoardSortMemberPath) && _activeBoardSortDirection.HasValue)
-            {
-                var valueCompare = CompareSortValues(
-                    GetBoardSortValue(leftRow, _activeBoardSortMemberPath),
-                    GetBoardSortValue(rightRow, _activeBoardSortMemberPath));
-
-                if (valueCompare != 0)
-                {
-                    return _activeBoardSortDirection == ListSortDirection.Descending
-                        ? -valueCompare
-                        : valueCompare;
-                }
-            }
-
-            return leftIndex.CompareTo(rightIndex);
-        }
-
-        private static int CompareSortValues(object? leftValue, object? rightValue)
-        {
-            if (leftValue == null && rightValue == null)
-            {
-                return 0;
-            }
-
-            if (leftValue == null)
-            {
-                return -1;
-            }
-
-            if (rightValue == null)
-            {
-                return 1;
-            }
-
-            if (leftValue is string leftString && rightValue is string rightString)
-            {
-                return StringComparer.OrdinalIgnoreCase.Compare(leftString, rightString);
-            }
-
-            if (leftValue is IComparable comparable)
-            {
-                try
-                {
-                    return comparable.CompareTo(rightValue);
-                }
-                catch (ArgumentException)
-                {
-                    return StringComparer.OrdinalIgnoreCase.Compare(
-                        leftValue.ToString(),
-                        rightValue.ToString());
-                }
-            }
-
-            return StringComparer.OrdinalIgnoreCase.Compare(
-                leftValue.ToString(),
-                rightValue.ToString());
-        }
-
-        private static object? GetBoardSortValue(PilotBoardRow row, string? sortMemberPath)
-        {
-            if (row == null || string.IsNullOrWhiteSpace(sortMemberPath))
-            {
-                return null;
-            }
-
-            return sortMemberPath switch
-            {
-                nameof(PilotBoardRow.CharacterName) => row.CharacterName,
-                nameof(PilotBoardRow.AllianceNameDisplay) => row.AllianceNameDisplay,
-                nameof(PilotBoardRow.CorpNameDisplay) => row.CorpNameDisplay,
-                nameof(PilotBoardRow.KillCount) => row.KillCount,
-                nameof(PilotBoardRow.LossCount) => row.LossCount,
-                nameof(PilotBoardRow.AvgAttackersWhenAttacking) => row.AvgAttackersWhenAttacking,
-                nameof(PilotBoardRow.LastShipSeenName) => row.LastShipSeenName,
-                nameof(PilotBoardRow.LastShipSeenDateDisplay) => row.LastShipSeenAtUtc,
-                nameof(PilotBoardRow.LastShipSeenAtUtc) => row.LastShipSeenAtUtc,
-                nameof(PilotBoardRow.LastPublicCynoCapableHull) => row.LastPublicCynoCapableHull,
-                _ => GetBoardSortValueByReflection(row, sortMemberPath)
-            };
-        }
-
-        private static object? GetBoardSortValueByReflection(PilotBoardRow row, string sortMemberPath)
-        {
-            var property = typeof(PilotBoardRow).GetProperty(sortMemberPath);
-            return property?.GetValue(row);
+                    if (PilotBoard != null)
+                    {
+                        PilotBoard.SelectedItem = row;
+                    }
+                });
         }
 
         private void ResetManualBoardSort()
         {
-            _activeBoardSortMemberPath = nameof(PilotBoardRow.CharacterName);
-            _activeBoardSortDirection = ListSortDirection.Ascending;
-
-            if (CharacterColumn != null)
-            {
-                ApplySortIndicatorState(CharacterColumn, ListSortDirection.Ascending);
-                return;
-            }
-
-            ClearBoardSortIndicators();
-        }
-
-        private void ApplySortIndicatorState(DataGridColumn activeColumn, ListSortDirection direction)
-        {
-            if (PilotBoard == null)
-            {
-                return;
-            }
-
-            foreach (var column in PilotBoard.Columns)
-            {
-                column.SortDirection = ReferenceEquals(column, activeColumn)
-                    ? direction
-                    : null;
-            }
-        }
-
-        private void ClearBoardSortIndicators()
-        {
-            if (PilotBoard == null)
-            {
-                return;
-            }
-
-            foreach (var column in PilotBoard.Columns)
-            {
-                column.SortDirection = null;
-            }
-        }
-
-        private static string? GetSortMemberPathFromColumn(DataGridColumn column)
-        {
-            if (column is DataGridBoundColumn boundColumn &&
-                boundColumn.Binding is Binding binding &&
-                binding.Path != null)
-            {
-                return binding.Path.Path;
-            }
-
-            return null;
+            _boardSortController.ResetManualBoardSort(PilotBoard, CharacterColumn);
         }
 
         private long? GetIgnoreId(PilotBoardRow row, IgnoreEntryType type)
@@ -3194,85 +2533,6 @@ namespace PitmastersGrill
             _analysisTabPresenter.UpdateAnalysisTab(_currentRows);
         }
 
-        private bool IsSessionContextStale()
-        {
-            return _eveSessionContextCoordinator.IsStale(
-                _currentEveSessionContext,
-                _lastSessionContextRefreshUtc,
-                DateTime.UtcNow);
-        }
-
-        private void TriggerSessionContextRefresh(string reason, bool force)
-        {
-            if (!_eveSessionContextCoordinator.ShouldTriggerRefresh(
-                _isShuttingDown,
-                force,
-                _currentEveSessionContext,
-                _lastSessionContextRefreshUtc,
-                _isSessionContextRefreshInFlight,
-                DateTime.UtcNow))
-            {
-                return;
-            }
-
-            _ = RefreshSessionContextAsync(reason);
-        }
-
-        private async Task RefreshSessionContextAsync(string reason)
-        {
-            if (_isSessionContextRefreshInFlight || _isShuttingDown)
-            {
-                return;
-            }
-
-            _isSessionContextRefreshInFlight = true;
-            try
-            {
-                AppLogger.UiDebug($"EVE session context refresh started. reason='{reason}'");
-                var context = await _eveSessionContextService.CaptureAsync(_windowShutdownCts.Token);
-                _lastSessionContextRefreshUtc = DateTime.UtcNow;
-                _currentEveSessionContext = context;
-
-                await Dispatcher.InvokeAsync(() => ApplyEveSessionContext(context));
-            }
-            catch (OperationCanceledException)
-            {
-                // Shutdown or refresh cancellation is expected.
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiWarn($"EVE session context refresh failed. reason='{reason}' message={ex.Message}");
-                var fallback = _eveSessionContextCoordinator.CreateFallbackContext();
-
-                _lastSessionContextRefreshUtc = DateTime.UtcNow;
-                _currentEveSessionContext = fallback;
-                await Dispatcher.InvokeAsync(() => ApplyEveSessionContext(fallback));
-            }
-            finally
-            {
-                _isSessionContextRefreshInFlight = false;
-            }
-        }
-
-        private void ApplyEveSessionContext(EveSessionContext context)
-        {
-            if (AnalysisCurrentCharacterText == null ||
-                AnalysisCurrentSystemText == null ||
-                AnalysisEvidenceSourceText == null ||
-                AnalysisObservedAtText == null ||
-                AnalysisContextStatusText == null)
-            {
-                return;
-            }
-
-            var projection = _eveSessionContextCoordinator.BuildProjection(context);
-            AnalysisCurrentCharacterText.Text = projection.CharacterText;
-            AnalysisCurrentSystemText.Text = projection.SystemText;
-            AnalysisEvidenceSourceText.Text = projection.EvidenceSourceText;
-            AnalysisObservedAtText.Text = projection.ObservedAtText;
-            AnalysisContextStatusText.Text = projection.StatusText;
-        }
-
         private void AnalysisHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
             e.Handled = true;
@@ -3329,16 +2589,57 @@ namespace PitmastersGrill
             }
         }
 
-        private WindowLayoutMode GetCurrentWindowLayoutMode() { return CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal; }
-        private void RestoreWindowLayoutFromSettings() { RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode()); }
-        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode) { var workAreas = GetMonitorWorkAreasDip(); var virtualDesktopSummary = _windowLayoutController.BuildVirtualDesktopSummary(workAreas); var restoreResult = _windowLayoutController.BuildRestoreResult(_appSettings, mode, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, DefaultWindowWidth, DefaultWindowHeight, workAreas); AppLogger.UiInfo($"Window layout restore decision={restoreResult.RestoreDecision} mode={mode} savedBounds={_windowLayoutController.DescribeRect(restoreResult.SavedBounds)} fallbackReason='{restoreResult.RestoreReason}' wasMaximized={restoreResult.ShouldRestoreMaximized} virtualWorkAreas={virtualDesktopSummary}"); _isRestoringWindowLayout = true; try { WindowState = WindowState.Normal; Left = restoreResult.TargetBounds.Left; Top = restoreResult.TargetBounds.Top; Width = restoreResult.TargetBounds.Width; Height = restoreResult.TargetBounds.Height; _lastKnownNormalBounds = restoreResult.TargetBounds; if (restoreResult.ShouldRestoreMaximized) { WindowState = WindowState.Maximized; } _lastNonMinimizedWindowState = restoreResult.LastNonMinimizedWindowState; } finally { _isRestoringWindowLayout = false; } AppLogger.UiInfo($"Window layout restore applied mode={mode} finalBounds={_windowLayoutController.DescribeRect(restoreResult.TargetBounds)} finalWindowState={WindowState}"); }
-        private void SaveWindowLayoutToSettings(string reason) { SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode()); }
-        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode) { var effectiveState = WindowState == WindowState.Minimized ? _lastNonMinimizedWindowState : WindowState; if (effectiveState == WindowState.Maximized && _windowLayoutController.IsUsableWindowBounds(RestoreBounds)) { _lastKnownNormalBounds = RestoreBounds; } else if (WindowState == WindowState.Normal) { TrackCurrentNormalWindowBounds("Save"); } var bounds = _windowLayoutController.IsUsableWindowBounds(_lastKnownNormalBounds) ? _lastKnownNormalBounds : effectiveState == WindowState.Maximized ? RestoreBounds : new Rect(Left, Top, Width, Height); var workAreas = GetMonitorWorkAreasDip(); if (!_windowLayoutController.TryBuildLayoutSnapshot(bounds, effectiveState, MinWidth, MinHeight, MinimumSavedWindowWidth, MinimumSavedWindowHeight, MinimumVisibleWindowEdge, workAreas, out var snapshot, out var failureReason)) { AppLogger.UiWarn($"Window layout save skipped.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} failureReason='{failureReason}' virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); return; } _windowLayoutController.ApplySnapshot(_appSettings, snapshot, mode); _mainWindowAppearanceController.SaveSettings(_appSettings); AppLogger.UiInfo($"Window layout saved.\nreason='{reason}' mode={mode} bounds={_windowLayoutController.DescribeRect(bounds)} maximized={snapshot.IsMaximized} virtualWorkAreas={_windowLayoutController.BuildVirtualDesktopSummary(workAreas)}"); }
-        private void ClearSavedWindowLayoutSettings() { _windowLayoutController.ClearAllSavedLayouts(_appSettings); _mainWindowAppearanceController.SaveSettings(_appSettings); }
+        private WindowLayoutMode GetCurrentWindowLayoutMode() => CompactModeToggleButton?.IsChecked == true ? WindowLayoutMode.Board : WindowLayoutMode.Normal;
+
+        private void RestoreWindowLayoutFromSettings() => RestoreWindowLayoutFromSettings(GetCurrentWindowLayoutMode());
+
+        private void RestoreWindowLayoutFromSettings(WindowLayoutMode mode)
+        {
+            _windowLayoutSurface.RestoreFromSettings(
+                _appSettings,
+                mode,
+                MinWidth,
+                MinHeight,
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                MinimumVisibleWindowEdge,
+                DefaultWindowWidth,
+                DefaultWindowHeight,
+                bounds =>
+                {
+                    Left = bounds.Left;
+                    Top = bounds.Top;
+                    Width = bounds.Width;
+                    Height = bounds.Height;
+                },
+                state => WindowState = state,
+                AppLogger.UiInfo);
+        }
+
+        private void SaveWindowLayoutToSettings(string reason) => SaveWindowLayoutToSettings(reason, GetCurrentWindowLayoutMode());
+
+        private void SaveWindowLayoutToSettings(string reason, WindowLayoutMode mode)
+        {
+            _windowLayoutSurface.SaveToSettings(
+                _appSettings,
+                reason,
+                mode,
+                WindowState,
+                RestoreBounds,
+                new Rect(Left, Top, Width, Height),
+                MinWidth,
+                MinHeight,
+                MinimumSavedWindowWidth,
+                MinimumSavedWindowHeight,
+                MinimumVisibleWindowEdge,
+                AppLogger.UiInfo,
+                AppLogger.UiWarn);
+        }
+
+        private void ClearSavedWindowLayoutSettings() => _windowLayoutSurface.ClearSavedLayouts(_appSettings);
         private Rect GetDefaultWindowBoundsForCurrentDisplay()
         {
-            return _windowLayoutController.GetDefaultWindowBounds(
-                GetMonitorWorkAreasDip(),
+            return _windowLayoutSurface.GetDefaultWindowBounds(
                 MinimumSavedWindowWidth,
                 MinimumSavedWindowHeight,
                 DefaultWindowWidth,
