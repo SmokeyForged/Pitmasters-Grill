@@ -1,53 +1,9 @@
-#!/usr/bin/env python3
-# Update PMG draft-release workflow with release_kind audit input.
-#
-# Usage:
-#   python update_pmg_draft_release_workflow_release_kind.py --repo-root . --dry-run
-#   python update_pmg_draft_release_workflow_release_kind.py --repo-root .
-#
-# Intent:
-# - Keep operator-supplied version as authoritative.
-# - Add release_kind as audit/context only.
-# - Include release_kind in workflow logs and package summary.
+name: Draft PMG Release
 
-from __future__ import annotations
-
-import argparse
-from pathlib import Path
-
-
-def replace_once(text: str, old: str, new: str, label: str) -> str:
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(f"Expected exactly one match for {label}, found {count}.")
-    return text.replace(old, new, 1)
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo-root", default=".", help="Repository root path")
-    parser.add_argument("--dry-run", action="store_true", help="Report only; do not write")
-    args = parser.parse_args()
-
-    repo_root = Path(args.repo_root).resolve()
-    workflow_path = repo_root / ".github" / "workflows" / "draft-release.yml"
-
-    if not workflow_path.exists():
-        raise SystemExit(f"Workflow file not found: {workflow_path}")
-
-    text = workflow_path.read_text(encoding="utf-8-sig")
-
-    if "release_kind:" in text:
-        print("No change needed: release_kind input already exists.")
-        return 0
-
-    old_inputs = """      version:
-        description: "Release version to draft, for example 1.4.0"
-        required: true
-        type: string
-"""
-
-    new_inputs = """      version:
+on:
+  workflow_dispatch:
+    inputs:
+      version:
         description: "Release version to draft, for example 1.4.0"
         required: true
         type: string
@@ -61,70 +17,216 @@ def main() -> int:
           - minor
           - major
           - hotfix
-"""
 
-    text = replace_once(text, old_inputs, new_inputs, "workflow_dispatch inputs")
+permissions:
+  contents: write
 
-    old_validate = """          $version = "${{ github.event.inputs.version }}".Trim()
+jobs:
+  draft-release:
+    name: Build package and create draft release
+    runs-on: windows-latest
 
-          if ($version -notmatch '^\\d+\\.\\d+\\.\\d+$') {
-"""
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    new_validate = """          $version = "${{ github.event.inputs.version }}".Trim()
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate release metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $version = "${{ github.event.inputs.version }}".Trim()
           $releaseKind = "${{ github.event.inputs.release_kind }}".Trim()
 
           if ($releaseKind -notin @("patch", "minor", "major", "hotfix")) {
             throw "release_kind must be one of: patch, minor, major, hotfix. Got '$releaseKind'."
           }
 
-          if ($version -notmatch '^\\d+\\.\\d+\\.\\d+$') {
-"""
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version input must be semantic version major.minor.patch. Got '$version'."
+          }
 
-    text = replace_once(text, old_validate, new_validate, "version validation block")
+          $projectPath = "PitmastersGrill/PitmastersGrill.csproj"
+          if (-not (Test-Path $projectPath)) {
+            throw "Project file missing: $projectPath"
+          }
 
-    old_env = """          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-"""
+          $projectText = Get-Content $projectPath -Raw
+          if ($projectText -notmatch '<PmgReleaseVersion>(?<version>[^<]+)</PmgReleaseVersion>') {
+            throw "PmgReleaseVersion was not found in $projectPath."
+          }
 
-    new_env = """          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $projectVersion = $Matches["version"].Trim()
+          if ($projectVersion -ne $version) {
+            throw "Version input '$version' does not match PmgReleaseVersion '$projectVersion'."
+          }
+
+          $tag = "v$version"
+          $title = "Pitmasters Grill $version"
+          $zipName = "PMG_General-Release_v$version.zip"
+          $notesPath = Join-Path "Patch Notes" ("General-Release_{0}.md" -f $version.Replace(".", "-"))
+
+          if (-not (Test-Path $notesPath -PathType Leaf)) {
+            throw "Release notes file missing: $notesPath"
+          }
+
+          $readme = Get-Content "README.md" -Raw
+          if ($readme -notmatch [regex]::Escape($tag)) {
+            throw "README.md does not reference current release tag $tag."
+          }
+
+          $patchNotesIndex = Get-Content (Join-Path "Patch Notes" "readme.md") -Raw
+          if ($patchNotesIndex -notmatch [regex]::Escape($tag)) {
+            throw "Patch Notes/readme.md does not reference current release tag $tag."
+          }
+
+          $releaseDesign = Get-Content "docs/RELEASE-AUTOMATION-DESIGN.md" -Raw
+          if ($releaseDesign -notmatch 'PMG_General-Release_v<major>\.<minor>\.<patch>\.zip') {
+            throw "Canonical release ZIP naming pattern was not found in docs/RELEASE-AUTOMATION-DESIGN.md."
+          }
+
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "RELEASE_KIND=$releaseKind" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-"""
+          "RELEASE_TITLE=$title" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_NOTES_PATH=$notesPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-    text = replace_once(text, old_env, new_env, "GITHUB_ENV release variables")
-
-    old_log = """          Write-Host "Release version: $version"
-          Write-Host "Release tag: $tag"
-"""
-
-    new_log = """          Write-Host "Release version: $version"
+          Write-Host "Release version: $version"
           Write-Host "Release kind: $releaseKind"
           Write-Host "Release tag: $tag"
-"""
+          Write-Host "Release title: $title"
+          Write-Host "Release ZIP: $zipName"
+          Write-Host "Release notes: $notesPath"
 
-    text = replace_once(text, old_log, new_log, "release metadata logs")
+      - name: Refuse if release already exists
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Continue"
 
-    old_summary = """            "Version: $env:RELEASE_VERSION"
-            "Release title: $env:RELEASE_TITLE"
-"""
+          $output = gh release view $env:RELEASE_TAG --repo "${{ github.repository }}" 2>&1
+          $exitCode = $LASTEXITCODE
 
-    new_summary = """            "Version: $env:RELEASE_VERSION"
+          if ($exitCode -eq 0) {
+            Write-Host $output
+            throw "Release $env:RELEASE_TAG already exists. Refusing to overwrite or mutate an existing release."
+          }
+
+          Write-Host "No existing release found for $env:RELEASE_TAG. Continuing."
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore PitmastersGrill/PitmastersGrill.slnx
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build PitmastersGrill/PitmastersGrill.slnx --configuration Release --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: dotnet test PitmastersGrill.Tests/PitmastersGrill.Tests.csproj --configuration Release --no-build
+
+      - name: Check dependency vulnerabilities
+        shell: pwsh
+        run: ./tools/dependencies/check-dotnet-vulnerabilities.ps1
+
+      - name: Publish win-x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $publishPath = Join-Path $env:RUNNER_TEMP "pmg-publish"
+          if (Test-Path $publishPath) {
+            Remove-Item $publishPath -Recurse -Force
+          }
+
+          dotnet publish PitmastersGrill/PitmastersGrill.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained false `
+            --output $publishPath
+
+          if (-not (Test-Path (Join-Path $publishPath "PitmastersGrill.exe")) -and -not (Test-Path (Join-Path $publishPath "PitmastersGrill.dll"))) {
+            throw "Publish output does not contain PitmastersGrill.exe or PitmastersGrill.dll."
+          }
+
+          "PUBLISH_PATH=$publishPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Publish path: $publishPath"
+
+      - name: Package ZIP and checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $releaseRoot = Join-Path $env:GITHUB_WORKSPACE "release-output"
+          if (Test-Path $releaseRoot) {
+            Remove-Item $releaseRoot -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
+
+          $zipPath = Join-Path $releaseRoot $env:RELEASE_ZIP_NAME
+          $checksumPath = "$zipPath.sha256"
+
+          Compress-Archive -Path (Join-Path $env:PUBLISH_PATH "*") -DestinationPath $zipPath -Force
+
+          $hash = Get-FileHash -Path $zipPath -Algorithm SHA256
+          "$($hash.Hash)  $($env:RELEASE_ZIP_NAME)" | Set-Content -Path $checksumPath -Encoding UTF8
+
+          $summaryPath = Join-Path $releaseRoot "release-package-summary.txt"
+          @(
+            "Version: $env:RELEASE_VERSION"
             "Release kind: $env:RELEASE_KIND"
             "Release title: $env:RELEASE_TITLE"
-"""
+            "Tag: $env:RELEASE_TAG"
+            "ZIP: $env:RELEASE_ZIP_NAME"
+            "Checksum: $($env:RELEASE_ZIP_NAME).sha256"
+            "SHA256: $($hash.Hash)"
+            "Release notes: $env:RELEASE_NOTES_PATH"
+            "Commit: $env:GITHUB_SHA"
+          ) | Set-Content -Path $summaryPath -Encoding UTF8
 
-    text = replace_once(text, old_summary, new_summary, "package summary release kind")
+          "RELEASE_ROOT=$releaseRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_ZIP_PATH=$zipPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_CHECKSUM_PATH=$checksumPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_SUMMARY_PATH=$summaryPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-    if args.dry_run:
-        print(f"[dry-run] Would update {workflow_path}")
-        print("[dry-run] Add release_kind workflow input and package summary field.")
-        return 0
+          Write-Host "ZIP: $zipPath"
+          Write-Host "Checksum: $checksumPath"
+          Write-Host "SHA256: $($hash.Hash)"
 
-    workflow_path.write_text(text, encoding="utf-8", newline="\n")
-    print(f"Updated {workflow_path}")
-    print("Added release_kind workflow input and package summary field.")
-    return 0
+      - name: Upload release artifacts to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: PMG-General-Release-${{ env.RELEASE_VERSION }}
+          path: |
+            release-output/${{ env.RELEASE_ZIP_NAME }}
+            release-output/${{ env.RELEASE_ZIP_NAME }}.sha256
+            release-output/release-package-summary.txt
+          if-no-files-found: error
 
+      - name: Create GitHub draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+          gh release create $env:RELEASE_TAG `
+            $env:RELEASE_ZIP_PATH `
+            $env:RELEASE_CHECKSUM_PATH `
+            --repo "${{ github.repository }}" `
+            --title $env:RELEASE_TITLE `
+            --notes-file $env:RELEASE_NOTES_PATH `
+            --target $env:GITHUB_SHA `
+            --draft
+
+          Write-Host "Draft release created for $env:RELEASE_TAG."
+          Write-Host "Review the draft in GitHub before publishing."
