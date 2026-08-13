@@ -7,24 +7,24 @@ namespace PitmastersGrill.Services
 {
     public sealed class KillmailDbWriteGate
     {
-        private readonly SemaphoreSlim _gate = new(1, 1);
+        private static readonly SemaphoreSlim SharedGate = new(1, 1);
 
         public IDisposable Enter(string operationName, CancellationToken cancellationToken = default)
         {
             var normalizedOperation = NormalizeOperationName(operationName);
             AppLogger.KillmailImportDebug($"Killmail DB write gate wait. operation='{normalizedOperation}'");
-            _gate.Wait(cancellationToken);
+            SharedGate.Wait(cancellationToken);
             AppLogger.KillmailImportDebug($"Killmail DB write gate acquired. operation='{normalizedOperation}'");
-            return new Releaser(this, normalizedOperation);
+            return new Releaser(normalizedOperation);
         }
 
         public async Task<IDisposable> EnterAsync(string operationName, CancellationToken cancellationToken = default)
         {
             var normalizedOperation = NormalizeOperationName(operationName);
             AppLogger.KillmailImportDebug($"Killmail DB write gate wait. operation='{normalizedOperation}'");
-            await _gate.WaitAsync(cancellationToken);
+            await SharedGate.WaitAsync(cancellationToken);
             AppLogger.KillmailImportDebug($"Killmail DB write gate acquired. operation='{normalizedOperation}'");
-            return new Releaser(this, normalizedOperation);
+            return new Releaser(normalizedOperation);
         }
 
         private static string NormalizeOperationName(string operationName)
@@ -34,21 +34,19 @@ namespace PitmastersGrill.Services
                 : operationName.Trim();
         }
 
-        private void Release(string operationName)
+        private static void Release(string operationName)
         {
-            _gate.Release();
+            SharedGate.Release();
             AppLogger.KillmailImportDebug($"Killmail DB write gate released. operation='{operationName}'");
         }
 
         private sealed class Releaser : IDisposable
         {
-            private readonly KillmailDbWriteGate _owner;
             private readonly string _operationName;
             private int _disposed;
 
-            public Releaser(KillmailDbWriteGate owner, string operationName)
+            public Releaser(string operationName)
             {
-                _owner = owner;
                 _operationName = operationName;
             }
 
@@ -59,7 +57,7 @@ namespace PitmastersGrill.Services
                     return;
                 }
 
-                _owner.Release(_operationName);
+                Release(_operationName);
             }
         }
     }
