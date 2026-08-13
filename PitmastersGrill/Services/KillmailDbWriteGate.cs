@@ -27,6 +27,13 @@ namespace PitmastersGrill.Services
             return new Releaser(normalizedOperation);
         }
 
+        public async Task WaitForIdleAsync(string operationName, CancellationToken cancellationToken = default)
+        {
+            using var gate = await EnterAsync(
+                $"{NormalizeOperationName(operationName)} quiescence barrier",
+                cancellationToken);
+        }
+
         private static string NormalizeOperationName(string operationName)
         {
             return string.IsNullOrWhiteSpace(operationName)
