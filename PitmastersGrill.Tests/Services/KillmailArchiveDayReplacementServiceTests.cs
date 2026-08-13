@@ -186,7 +186,7 @@ namespace PitmastersGrill.Tests.Services
 
         private static string ReadOnlyCharacter(string databasePath, string tableName)
         {
-            using var connection = new SqliteConnection($"Data Source={databasePath}"));
+            using var connection = new SqliteConnection($"Data Source={databasePath}");
             connection.Open();
             using var command = connection.CreateCommand();
             command.CommandText = $"SELECT character_id FROM {tableName} WHERE day_utc = $dayUtc;";
