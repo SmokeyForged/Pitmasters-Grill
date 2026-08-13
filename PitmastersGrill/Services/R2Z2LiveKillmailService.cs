@@ -106,7 +106,31 @@ namespace PitmastersGrill.Services
         {
             CancelWorker();
         }
+public async Task StopAsync()
+{
+    Task? workerTask;
 
+    lock (_sync)
+    {
+        AppLogger.KillmailImportInfo("R2Z2 live feed worker stop-and-wait requested.");
+        _runCts?.Cancel();
+        workerTask = _workerTask;
+    }
+
+    if (workerTask == null)
+    {
+        return;
+    }
+
+    try
+    {
+        await workerTask.ConfigureAwait(false);
+    }
+    catch (OperationCanceledException)
+    {
+        // Normal shutdown if cancellation wins before the worker begins.
+    }
+}
         private void EnsureWorkerStarted(string reason)
         {
             lock (_sync)
@@ -235,7 +259,7 @@ namespace PitmastersGrill.Services
                         }
 
                         var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                        var processed = ProcessSequencePayload(nextSequenceId, content);
+                        var processed = ProcessSequencePayload(nextSequenceId, content, cancellationToken);
 
                         if (!processed.Success)
                         {
@@ -333,7 +357,10 @@ namespace PitmastersGrill.Services
             });
         }
 
-        private LiveProcessResult ProcessSequencePayload(long requestedSequenceId, string content)
+private LiveProcessResult ProcessSequencePayload(
+    long requestedSequenceId,
+    string content,
+    CancellationToken cancellationToken)
         {
             if (!TryExtractSequenceEnvelope(content, requestedSequenceId, out var envelope, out var error))
             {
@@ -361,7 +388,7 @@ namespace PitmastersGrill.Services
                 Source = "r2z2",
                 SequenceId = envelope.SequenceId,
                 UploadedAtUtc = envelope.UploadedAtUtc
-            }, CancellationToken.None);
+            }, cancellationToken);
 
             if (!importResult.Success)
             {
