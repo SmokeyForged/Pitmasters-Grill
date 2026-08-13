@@ -48,7 +48,7 @@ namespace PitmastersGrill.Services
             var parsed = _parser.ParseKillmailEntry(request.KillmailJson);
             if (parsed == null)
             {
-                RecordFailure(
+                RecordFailureWhileGateHeld(
                     request.KillmailId,
                     request.KillmailHash,
                     request.SequenceId,
@@ -189,6 +189,27 @@ namespace PitmastersGrill.Services
                 $"incremental failure source={source} killmailId={killmailId}",
                 cancellationToken);
 
+            RecordFailureWhileGateHeld(
+                killmailId,
+                killmailHash,
+                sequenceId,
+                source,
+                uploadedAtUtc,
+                killmailTimeUtc,
+                dayUtc,
+                error);
+        }
+
+        private void RecordFailureWhileGateHeld(
+            long killmailId,
+            string killmailHash,
+            long sequenceId,
+            string source,
+            string uploadedAtUtc,
+            string killmailTimeUtc,
+            string dayUtc,
+            string error)
+        {
             using var connection = new SqliteConnection($"Data Source={_databasePath}");
             connection.Open();
 
