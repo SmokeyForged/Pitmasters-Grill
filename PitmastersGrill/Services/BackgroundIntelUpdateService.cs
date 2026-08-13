@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace PitmastersGrill.Services
 {
-    public class BackgroundIntelUpdateService
+    public partial class BackgroundIntelUpdateService
     {
         private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(10);
         private const string ForegroundFreshnessBusyMessage = "Another freshness operation is already running.";
