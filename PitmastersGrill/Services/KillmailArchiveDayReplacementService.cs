@@ -186,7 +186,17 @@ namespace PitmastersGrill.Services
             VALUES (
                 $dayUtc, $characterId, $killmailId, $killmailTimeUtc, $victimShipTypeId,
                 $moduleTypeId, $moduleName, $quantityDestroyed, $quantityDropped,
-                $itemState, $source, $updatedAtUtc);
+                $itemState, $source, $updatedAtUtc)
+            ON CONFLICT(day_utc, character_id, killmail_id, module_type_id)
+            DO UPDATE SET
+                killmail_time_utc = excluded.killmail_time_utc,
+                victim_ship_type_id = excluded.victim_ship_type_id,
+                module_name = excluded.module_name,
+                quantity_destroyed = excluded.quantity_destroyed,
+                quantity_dropped = excluded.quantity_dropped,
+                item_state = excluded.item_state,
+                source = excluded.source,
+                updated_at_utc = excluded.updated_at_utc;
             ";
             command.Parameters.Add("$dayUtc", SqliteType.Text);
             command.Parameters.Add("$characterId", SqliteType.Text);
@@ -243,7 +253,22 @@ namespace PitmastersGrill.Services
                 $victimShipName, $solarSystemId, $solarSystemName,
                 $industrialCynoModuleTypeId, $industrialCynoModuleName,
                 $tackleModuleTypeId, $tackleModuleName, $tackleType,
-                $quantityDestroyed, $quantityDropped, $source, $updatedAtUtc);
+                $quantityDestroyed, $quantityDropped, $source, $updatedAtUtc)
+            ON CONFLICT(day_utc, character_id, killmail_id, tackle_module_type_id)
+            DO UPDATE SET
+                killmail_time_utc = excluded.killmail_time_utc,
+                victim_ship_type_id = excluded.victim_ship_type_id,
+                victim_ship_name = excluded.victim_ship_name,
+                solar_system_id = excluded.solar_system_id,
+                solar_system_name = excluded.solar_system_name,
+                industrial_cyno_module_type_id = excluded.industrial_cyno_module_type_id,
+                industrial_cyno_module_name = excluded.industrial_cyno_module_name,
+                tackle_module_name = excluded.tackle_module_name,
+                tackle_type = excluded.tackle_type,
+                quantity_destroyed = excluded.quantity_destroyed,
+                quantity_dropped = excluded.quantity_dropped,
+                source = excluded.source,
+                updated_at_utc = excluded.updated_at_utc;
             ";
             command.Parameters.Add("$dayUtc", SqliteType.Text);
             command.Parameters.Add("$characterId", SqliteType.Text);
@@ -306,7 +331,18 @@ namespace PitmastersGrill.Services
             VALUES (
                 $dayUtc, $characterId, $killmailId, $killmailTimeUtc, $victimShipTypeId,
                 $victimShipName, $tackleModuleTypeId, $tackleModuleName, $tackleType,
-                $quantityDestroyed, $quantityDropped, $source, $updatedAtUtc);
+                $quantityDestroyed, $quantityDropped, $source, $updatedAtUtc)
+            ON CONFLICT(day_utc, character_id, killmail_id, tackle_module_type_id)
+            DO UPDATE SET
+                killmail_time_utc = excluded.killmail_time_utc,
+                victim_ship_type_id = excluded.victim_ship_type_id,
+                victim_ship_name = excluded.victim_ship_name,
+                tackle_module_name = excluded.tackle_module_name,
+                tackle_type = excluded.tackle_type,
+                quantity_destroyed = excluded.quantity_destroyed,
+                quantity_dropped = excluded.quantity_dropped,
+                source = excluded.source,
+                updated_at_utc = excluded.updated_at_utc;
             ";
             command.Parameters.Add("$dayUtc", SqliteType.Text);
             command.Parameters.Add("$characterId", SqliteType.Text);
