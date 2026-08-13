@@ -412,7 +412,7 @@ namespace PitmastersGrill
                     {
                         AppLogger.AppInfo("Starting background services after UI shown.");
                         backgroundIntelUpdateService.StartIfNeeded();
-                        backgroundIntelUpdateService.StartLiveFeedIfConfiguredAfterUiShown();
+                        backgroundIntelUpdateService.StartLiveFeedIfConfiguredAfterUiShownTracked();
                         backgroundIntelUpdateService.ScheduleBackgroundHistoricalRepairAfterUiShown(
                             () => mainWindow.GetVisibleCharacterIdsForBackgroundHistoricalRepair());
                         AppLogger.AppInfo("Background services started after UI shown.");
