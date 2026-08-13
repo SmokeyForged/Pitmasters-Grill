@@ -18,7 +18,10 @@ namespace PitmastersGrill.Persistence
 
         public string DatabasePath => _databasePath;
 
-        public void ReplaceDay(string dayUtc, IReadOnlyList<PilotCynoModuleObservationDayRecord> records)
+        public void ReplaceDay(
+            string dayUtc,
+            IReadOnlyList<PilotCynoModuleObservationDayRecord> records,
+            bool preserveIncrementalSeen = false)
         {
             using var connection = new SqliteConnection($"Data Source={_databasePath}");
             connection.Open();
@@ -28,8 +31,23 @@ namespace PitmastersGrill.Persistence
             using (var deleteCommand = connection.CreateCommand())
             {
                 deleteCommand.Transaction = transaction;
-                deleteCommand.CommandText = "DELETE FROM pilot_cyno_module_observations_day WHERE day_utc = $dayUtc;";
+                deleteCommand.CommandText =
+                @"
+                DELETE FROM pilot_cyno_module_observations_day
+                WHERE day_utc = $dayUtc
+                  AND (
+                      $preserveIncrementalSeen = 0
+                      OR NOT EXISTS (
+                          SELECT 1
+                          FROM live_killmail_seen
+                          WHERE live_killmail_seen.day_utc = $dayUtc
+                            AND live_killmail_seen.processing_status <> 'error'
+                            AND CAST(live_killmail_seen.killmail_id AS TEXT) = pilot_cyno_module_observations_day.killmail_id
+                      )
+                  );
+                ";
                 deleteCommand.Parameters.AddWithValue("$dayUtc", dayUtc);
+                deleteCommand.Parameters.AddWithValue("$preserveIncrementalSeen", preserveIncrementalSeen ? 1 : 0);
                 deleteCommand.ExecuteNonQuery();
             }
 
