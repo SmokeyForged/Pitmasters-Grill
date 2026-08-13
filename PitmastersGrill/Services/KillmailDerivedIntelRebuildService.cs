@@ -19,15 +19,20 @@ namespace PitmastersGrill.Services
         private readonly PilotCynoTackleObservationDayRepository _cynoTackleObservationRepository;
         private readonly DayImportStateRepository _dayImportStateRepository;
         private readonly KillmailDayArchiveProvider _archiveProvider;
+        private readonly KillmailDbWriteGate _writeGate;
+        private readonly KillmailDerivedDayReplacementService _dayReplacementService;
+        private readonly KillmailDerivedObservationParser _derivedObservationParser = new();
 
         public KillmailDerivedIntelRebuildService()
         {
             var killmailDbPath = KillmailPaths.GetKillmailDatabasePath();
+            _writeGate = new KillmailDbWriteGate();
             _cynoModuleObservationRepository = new PilotCynoModuleObservationDayRepository(killmailDbPath);
             _baitObservationRepository = new PilotBaitObservationDayRepository(killmailDbPath);
             _cynoTackleObservationRepository = new PilotCynoTackleObservationDayRepository(killmailDbPath);
             _dayImportStateRepository = new DayImportStateRepository(killmailDbPath);
             _archiveProvider = new KillmailDayArchiveProvider();
+            _dayReplacementService = new KillmailDerivedDayReplacementService(killmailDbPath, _writeGate);
         }
 
         public Task<KillmailDerivedIntelRebuildResult> RebuildConfirmedCynoModuleObservationsAsync(
@@ -76,6 +81,9 @@ namespace PitmastersGrill.Services
 
             if (options.RebuildAllImportedDays)
             {
+                using var writeGate = _writeGate.Enter(
+                    "derived intel rebuild clear-all",
+                    cancellationToken);
                 _cynoModuleObservationRepository.ClearAll();
                 _baitObservationRepository.ClearAll();
                 _cynoTackleObservationRepository.ClearAll();
@@ -154,6 +162,7 @@ namespace PitmastersGrill.Services
                 var dayObservations = new List<PilotCynoModuleObservationDayRecord>();
                 var dayBaitObservations = new List<PilotBaitObservationDayRecord>();
                 var dayCynoTackleObservations = new List<PilotCynoTackleObservationDayRecord>();
+                var archiveKillmailIds = new HashSet<string>(StringComparer.Ordinal);
                 var relativePaths = _archiveProvider.GetExtractedJsonRelativePaths(day);
                 var dayKillmailsScanned = 0;
 
@@ -165,12 +174,35 @@ namespace PitmastersGrill.Services
                     killmailsScanned++;
                     dayKillmailsScanned++;
 
-                    dayObservations.AddRange(
-                        KillmailDayImportService.ParseConfirmedCynoModuleObservations(json, day, nowUtc));
-                    dayBaitObservations.AddRange(
-                        KillmailDayImportService.ParseDerivedBaitObservations(json, day, nowUtc));
-                    dayCynoTackleObservations.AddRange(
-                        KillmailDayImportService.ParseCynoHullTackleObservations(json, day, nowUtc));
+                    var parsed = _derivedObservationParser.ParseKillmailEntry(json);
+                    if (parsed != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(parsed.KillmailId))
+                        {
+                            archiveKillmailIds.Add(parsed.KillmailId);
+                        }
+
+                        foreach (var observation in parsed.CynoModuleObservations)
+                        {
+                            observation.DayUtc = day;
+                            observation.UpdatedAtUtc = nowUtc;
+                            dayObservations.Add(observation);
+                        }
+
+                        foreach (var observation in parsed.BaitObservations)
+                        {
+                            observation.DayUtc = day;
+                            observation.UpdatedAtUtc = nowUtc;
+                            dayBaitObservations.Add(observation);
+                        }
+
+                        foreach (var observation in parsed.CynoTackleObservations)
+                        {
+                            observation.DayUtc = day;
+                            observation.UpdatedAtUtc = nowUtc;
+                            dayCynoTackleObservations.Add(observation);
+                        }
+                    }
 
                     if (dayKillmailsScanned % 1000 == 0)
                     {
@@ -200,9 +232,13 @@ namespace PitmastersGrill.Services
                         $"Derived industrial-cyno bait observed during rebuild. character_id={bait.CharacterId} killmail_id={bait.KillmailId} killmail_time={bait.KillmailTimeUtc} victim_ship='{bait.VictimShipName}' industrial_cyno='{bait.IndustrialCynoModuleName}' tackle_module='{bait.TackleModuleName}' tackle_type={bait.TackleType}");
                 }
 
-                _cynoModuleObservationRepository.ReplaceDay(day, dayObservations);
-                _baitObservationRepository.ReplaceDay(day, dayBaitObservations);
-                _cynoTackleObservationRepository.ReplaceDay(day, dayCynoTackleObservations);
+                _dayReplacementService.ReplaceDay(
+                    day,
+                    archiveKillmailIds,
+                    dayObservations,
+                    dayBaitObservations,
+                    dayCynoTackleObservations,
+                    cancellationToken);
                 successfulDays++;
 
                 progress?.Report(new KillmailDerivedIntelRebuildProgress
