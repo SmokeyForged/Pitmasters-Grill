@@ -11,7 +11,7 @@ namespace PitmastersGrill.Tests.Services
     public class KillmailIncrementalImportServiceTests
     {
         [Fact]
-        public async Task ImportKillmailJson_MalformedJson_ReturnsFailurePersistsErrorAndReleasesGate()
+        public async Task ImportKillmailJson_UnparseablePayload_ReturnsFailurePersistsErrorAndReleasesGate()
         {
             using var tempDirectory = new TempDirectory();
             var databasePath = tempDirectory.FilePath("killmail.db");
@@ -22,8 +22,8 @@ namespace PitmastersGrill.Tests.Services
             var request = new IncrementalKillmailImportRequest
             {
                 KillmailId = 9001,
-                KillmailHash = "malformed-json-regression",
-                KillmailJson = "{ not-valid-json",
+                KillmailHash = "unparseable-payload-regression",
+                KillmailJson = "{}",
                 Source = "test",
                 SequenceId = 42,
                 UploadedAtUtc = "2026-08-13T15:45:00Z"
@@ -48,7 +48,7 @@ namespace PitmastersGrill.Tests.Services
             Assert.Equal(request.Source, seenRecord.Source);
 
             using var gateProbeCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            using var gateProbe = writeGate.Enter("malformed-json regression gate probe", gateProbeCancellation.Token);
+            using var gateProbe = writeGate.Enter("unparseable-payload regression gate probe", gateProbeCancellation.Token);
         }
 
         private sealed class TempDirectory : IDisposable
