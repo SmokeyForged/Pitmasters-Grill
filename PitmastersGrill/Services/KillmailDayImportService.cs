@@ -309,12 +309,15 @@ namespace PitmastersGrill.Services
 
             var writeStopwatch = Stopwatch.StartNew();
 
-            _pilotRegistryDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotRegistryDayRecord>(registryAccumulators.Values));
-            _pilotFleetObservationDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotFleetObservationDayRecord>(fleetAccumulators.Values));
-            _pilotShipObservationDayRepository.ReplaceDay(remoteDay.DayUtc, new List<PilotShipObservationDayRecord>(shipAccumulators.Values));
-            _pilotCynoModuleObservationDayRepository.ReplaceDay(remoteDay.DayUtc, cynoModuleObservations);
-            _pilotBaitObservationDayRepository.ReplaceDay(remoteDay.DayUtc, baitObservations);
-            _pilotCynoTackleObservationDayRepository.ReplaceDay(remoteDay.DayUtc, cynoTackleObservations);
+new KillmailArchiveDayReplacementService(KillmailPaths.GetKillmailDatabasePath())
+    .ReplaceDay(
+        remoteDay.DayUtc,
+        new List<PilotRegistryDayRecord>(registryAccumulators.Values),
+        new List<PilotFleetObservationDayRecord>(fleetAccumulators.Values),
+        new List<PilotShipObservationDayRecord>(shipAccumulators.Values),
+        cynoModuleObservations,
+        baitObservations,
+        cynoTackleObservations);
 
             writeStopwatch.Stop();
 
