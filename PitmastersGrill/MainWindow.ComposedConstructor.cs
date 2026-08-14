@@ -52,8 +52,6 @@ namespace PitmastersGrill
             _ignoreAllianceBoardController = runtime.IgnoreAllianceBoardController;
             _zkillUrlBuilder = runtime.ZkillUrlBuilder;
             _browserLauncher = runtime.BrowserLauncher;
-            _cacheMaintenanceService = runtime.CacheMaintenanceService;
-            _killmailDerivedIntelRebuildService = runtime.KillmailDerivedIntelRebuildService;
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
