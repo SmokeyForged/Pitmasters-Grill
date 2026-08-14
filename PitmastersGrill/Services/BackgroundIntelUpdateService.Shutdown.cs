@@ -59,18 +59,23 @@ namespace PitmastersGrill.Services
                 AppLogger.KillmailImportInfo("Background intel deterministic stop requested.");
 
                 _shutdownCts.Cancel();
+                AppLogger.KillmailImportInfo("Background intel shutdown R2Z2 stop signal begin.");
                 _r2z2LiveKillmailService.Stop();
+                AppLogger.KillmailImportInfo("Background intel shutdown R2Z2 stop signal complete.");
 
                 Task? liveFeedStartupTask;
                 Task? archiveBackgroundTask;
                 Task? historicalRepairTask;
 
+                AppLogger.KillmailImportInfo("Background intel shutdown snapshot lock wait begin.");
                 lock (_sync)
                 {
+                    AppLogger.KillmailImportInfo("Background intel shutdown snapshot lock acquired.");
                     liveFeedStartupTask = _trackedLiveFeedStartupTask;
                     archiveBackgroundTask = _backgroundTask;
                     historicalRepairTask = _backgroundHistoricalRepairTask;
                 }
+                AppLogger.KillmailImportInfo("Background intel shutdown snapshot lock released.");
 
                 AppLogger.KillmailImportInfo(
                     "Background intel shutdown snapshot. " +
