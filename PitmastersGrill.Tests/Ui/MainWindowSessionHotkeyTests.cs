@@ -44,9 +44,9 @@ namespace PitmastersGrill.Tests.Ui
         }
 
         [Fact]
-        public void MainWindowXaml_PlacesSessionContextBelowBoardAnalysisDetails()
+        public void AnalysisViewXaml_PlacesSessionContextBelowBoardAnalysisDetails()
         {
-            var xaml = ReadMainWindowXaml();
+            var xaml = ReadRepoFile("PitmastersGrill", "Views", "AnalysisView.xaml");
 
             var detailsIndex = xaml.IndexOf("AnalysisDetailsPanel", StringComparison.OrdinalIgnoreCase);
             var sessionIndex = xaml.IndexOf("EVE Session Context", StringComparison.OrdinalIgnoreCase);
@@ -61,11 +61,6 @@ namespace PitmastersGrill.Tests.Ui
         private static string ReadMainWindowCode()
         {
             return ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
-        }
-
-        private static string ReadMainWindowXaml()
-        {
-            return ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
         }
 
         private static string ReadRepoFile(params string[] relativeParts)

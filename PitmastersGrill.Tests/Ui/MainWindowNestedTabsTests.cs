@@ -7,13 +7,13 @@ namespace PitmastersGrill.Tests.Ui
     public sealed class MainWindowNestedTabsTests
     {
         [Fact]
-        public void MainWindowXaml_DefinesSharedNestedTabStyles()
+        public void MainWindowResources_DefinesSharedNestedTabStyles()
         {
-            var xaml = ReadMainWindowXaml();
+            var resourcesXaml = ReadRepoFile("PitmastersGrill", "Resources", "MainWindowResources.xaml");
 
-            Assert.Contains("PmgNestedSubTabControlStyle", xaml);
-            Assert.Contains("PmgNestedSubTabItemStyle", xaml);
-            Assert.Contains("PMG nested sub-tab shared styles", xaml);
+            Assert.Contains("PmgNestedSubTabControlStyle", resourcesXaml);
+            Assert.Contains("PmgNestedSubTabItemStyle", resourcesXaml);
+            Assert.Contains("PMG nested sub-tab shared styles", resourcesXaml);
         }
 
         [Fact]
@@ -41,12 +41,20 @@ namespace PitmastersGrill.Tests.Ui
 
         private static string ReadMainWindowXaml()
         {
+            return ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
+        }
+
+        private static string ReadRepoFile(params string[] relativeParts)
+        {
             var current = new DirectoryInfo(AppContext.BaseDirectory);
 
             while (current is not null)
             {
-                var candidate = Path.Combine(current.FullName, "PitmastersGrill", "MainWindow.xaml");
+                var candidateParts = new string[relativeParts.Length + 1];
+                candidateParts[0] = current.FullName;
+                Array.Copy(relativeParts, 0, candidateParts, 1, relativeParts.Length);
 
+                var candidate = Path.Combine(candidateParts);
                 if (File.Exists(candidate))
                 {
                     return File.ReadAllText(candidate);
@@ -55,7 +63,7 @@ namespace PitmastersGrill.Tests.Ui
                 current = current.Parent;
             }
 
-            throw new FileNotFoundException("Could not locate PitmastersGrill/MainWindow.xaml from the test output directory.");
+            throw new FileNotFoundException($"Could not locate repo file: {string.Join("/", relativeParts)}");
         }
 
         private static int CountOccurrences(string text, string value)

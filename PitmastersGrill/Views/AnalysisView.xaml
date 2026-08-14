@@ -1,0 +1,201 @@
+<UserControl x:Class="PitmastersGrill.Views.AnalysisView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="720"
+             d:DesignWidth="900">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  Padding="12"
+                  Background="{DynamicResource WindowBackgroundBrush}">
+        <StackPanel>
+            <Border Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                    BorderThickness="1"
+                    Padding="16">
+                <StackPanel>
+                    <TextBlock Text="Visible Board Analysis"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource HeaderTextBrush}"
+                               Margin="0,0,0,8"/>
+                    <TextBlock x:Name="AnalysisEmptyStateText"
+                               Style="{DynamicResource SettingsLabelStyle}"
+                               Text="No visible pilots yet. Load or refresh the Grill to see aggregate analysis."
+                               AutomationProperties.AutomationId="AnalysisEmptyStateText"/>
+                    <StackPanel x:Name="AnalysisDetailsPanel"
+                                Visibility="Collapsed"
+                                AutomationProperties.AutomationId="AnalysisDetailsPanel">
+                        <TextBlock x:Name="AnalysisVisibleCountsText"
+                                   Style="{DynamicResource SettingsLabelStyle}"
+                                   Text="Visible pilots: 0 | Watched pilots: 0"
+                                   AutomationProperties.AutomationId="AnalysisVisibleCountsText"/>
+                        <TextBlock x:Name="AnalysisSignalsText"
+                                   Style="{DynamicResource SettingsLabelStyle}"
+                                   Margin="0,2,0,0"
+                                   Text="Confirmed cynos: Hard 0 | Covert 0 | Bait 0"
+                                   AutomationProperties.AutomationId="AnalysisSignalsText"/>
+                        <TextBlock x:Name="AnalysisUniqueCountsText"
+                                   Style="{DynamicResource SettingsLabelStyle}"
+                                   Margin="0,8,0,0"
+                                   Text="Unique corps: 0 | Unique alliances: 0"
+                                   AutomationProperties.AutomationId="AnalysisUniqueCountsText"/>
+                        <TextBlock x:Name="AnalysisAllianceTopText"
+                                   Style="{DynamicResource SettingsLabelStyle}"
+                                   Margin="0,8,0,0"
+                                   AutomationProperties.AutomationId="AnalysisAllianceTopText"/>
+                        <TextBlock x:Name="AnalysisCorpTopText"
+                                   Style="{DynamicResource SettingsLabelStyle}"
+                                   Margin="0,2,0,0"
+                                   AutomationProperties.AutomationId="AnalysisCorpTopText"/>
+                        <TextBlock x:Name="AnalysisHighlightsText"
+                                   Style="{DynamicResource SettingsLabelStyle}"
+                                   Margin="0,8,0,0"
+                                   AutomationProperties.AutomationId="AnalysisHighlightsText"/>
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="All alliances"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Margin="0,0,0,4"/>
+                                <ListBox x:Name="AnalysisAllianceListBox"
+                                         Height="192"
+                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                         Background="{DynamicResource SurfaceBrush}"
+                                         Foreground="{DynamicResource BodyTextBrush}"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         MouseDoubleClick="AnalysisAllianceListBox_MouseDoubleClick"
+                                         AutomationProperties.AutomationId="AnalysisAllianceListBox">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Padding="2"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="All corps"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Margin="0,0,0,4"/>
+                                <ListBox x:Name="AnalysisCorpListBox"
+                                         Height="192"
+                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                         Background="{DynamicResource SurfaceBrush}"
+                                         Foreground="{DynamicResource BodyTextBrush}"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         MouseDoubleClick="AnalysisCorpListBox_MouseDoubleClick"
+                                         AutomationProperties.AutomationId="AnalysisCorpListBox">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Padding="2"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            Padding="16"
+                            Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="EVE Session Context"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource HeaderTextBrush}"
+                                       Margin="0,0,0,8"/>
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Current character"/>
+                                <TextBlock x:Name="AnalysisCurrentCharacterText"
+                                           Grid.Row="0" Grid.Column="1"
+                                           Style="{DynamicResource SettingsLabelStyle}"
+                                           Margin="0"
+                                           Foreground="{DynamicResource BodyTextBrush}"
+                                           Text="Not detected"
+                                           AutomationProperties.AutomationId="AnalysisCurrentCharacterText"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Current system"/>
+                                <TextBlock x:Name="AnalysisCurrentSystemText"
+                                           Grid.Row="1" Grid.Column="1"
+                                           Style="{DynamicResource SettingsLabelStyle}"
+                                           Margin="0"
+                                           Foreground="{DynamicResource BodyTextBrush}"
+                                           Text="Not detected"
+                                           AutomationProperties.AutomationId="AnalysisCurrentSystemText"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Evidence source"/>
+                                <TextBlock x:Name="AnalysisEvidenceSourceText"
+                                           Grid.Row="2" Grid.Column="1"
+                                           Style="{DynamicResource SettingsLabelStyle}"
+                                           Margin="0"
+                                           Foreground="{DynamicResource BodyTextBrush}"
+                                           Text="Not configured"
+                                           AutomationProperties.AutomationId="AnalysisEvidenceSourceText"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Last observed"/>
+                                <TextBlock x:Name="AnalysisObservedAtText"
+                                           Grid.Row="3" Grid.Column="1"
+                                           Style="{DynamicResource SettingsLabelStyle}"
+                                           Margin="0"
+                                           Foreground="{DynamicResource BodyTextBrush}"
+                                           Text="Not detected"
+                                           AutomationProperties.AutomationId="AnalysisObservedAtText"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Text="Confidence / status"/>
+                                <TextBlock x:Name="AnalysisContextStatusText"
+                                           Grid.Row="4" Grid.Column="1"
+                                           Style="{DynamicResource SettingsLabelStyle}"
+                                           Margin="0"
+                                           Foreground="{DynamicResource BodyTextBrush}"
+                                           Text="Unable to infer EVE context"
+                                           AutomationProperties.AutomationId="AnalysisContextStatusText"/>
+                            </Grid>
+                            <TextBlock Style="{DynamicResource SettingsLabelStyle}"
+                                       Margin="0,8,0,0"
+                                       Text="Right-click a Grill row to open pilot details. Board Mode keeps the Grill dense for live use; Analysis collects the aggregate readout here."/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
