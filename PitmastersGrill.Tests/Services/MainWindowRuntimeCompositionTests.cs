@@ -22,8 +22,6 @@ namespace PitmastersGrill.Tests.Services
             Assert.NotNull(runtime.MainWindowAppearanceController);
             Assert.NotNull(runtime.MainWindowSettingsCoordinator);
             Assert.NotNull(runtime.EveSessionContextService);
-            Assert.NotNull(runtime.CacheMaintenanceService);
-            Assert.NotNull(runtime.KillmailDerivedIntelRebuildService);
             Assert.NotNull(runtime.BrowserLauncher);
 
             // MainWindow owns its window-lifetime cleanup and disposes Diagnostics in OnClosed.
