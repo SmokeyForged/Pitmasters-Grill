@@ -371,9 +371,12 @@ namespace PitmastersGrill
                 runtime.KillmailDatasetMetadataRepository.SetUtcNow("last_startup_check_at_utc");
 
                 var backgroundIntelUpdateService = runtime.BackgroundIntelUpdateService;
+                var mainWindowRuntime = ApplicationCompositionRoot.ComposeMainWindowRuntime(
+                    appSettingsService,
+                    Dispatcher);
 
                 AppLogger.AppInfo("MainWindow constructor begin.");
-                var mainWindow = new MainWindow(backgroundIntelUpdateService);
+                var mainWindow = new MainWindow(backgroundIntelUpdateService, mainWindowRuntime);
                 AppLogger.AppInfo("MainWindow constructor end.");
                 MainWindow = mainWindow;
                 _trayIconService = new PmgTrayIconService(this, mainWindow);
