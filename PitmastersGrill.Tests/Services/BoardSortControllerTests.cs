@@ -1,7 +1,6 @@
 using PitmastersGrill.Models;
 using PitmastersGrill.Services;
 using System;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using System.Threading;
@@ -41,7 +40,7 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
-        public void TryHandleSorting_TogglesDirectionAndReordersRows()
+        public void TryHandleSorting_TogglesDirectionAndDelegatesReorder()
         {
             RunOnStaThread(() =>
             {
@@ -53,54 +52,65 @@ namespace PitmastersGrill.Tests.Services
                     Binding = new Binding(nameof(PilotBoardRow.KillCount))
                 };
                 grid.Columns.Add(killsColumn);
-                var rows = new ObservableCollection<PilotBoardRow>
+                using var session = new CurrentBoardSession();
+                session.ReplaceRows(new[]
                 {
-                    new() { CharacterName = "Alpha", KillCount = 2 },
-                    new() { CharacterName = "Bravo", KillCount = 9 }
-                };
+                    new PilotBoardRow { CharacterName = "Alpha", KillCount = 2 },
+                    new PilotBoardRow { CharacterName = "Bravo", KillCount = 9 }
+                });
+
                 var firstHandled = controller.TryHandleSorting(
                     grid,
                     killsColumn,
-                    rows,
-                    rows[0],
+                    session.Snapshot(),
+                    session.Rows[0],
+                    session.ReorderRows,
+                    _ => { },
                     out var firstMember,
                     out var firstDirection);
 
                 Assert.True(firstHandled);
                 Assert.Equal(nameof(PilotBoardRow.KillCount), firstMember);
                 Assert.Equal(ListSortDirection.Ascending, firstDirection);
-                Assert.Equal("Alpha", rows[0].CharacterName);
+                Assert.Equal("Alpha", session.Rows[0].CharacterName);
 
                 var secondHandled = controller.TryHandleSorting(
                     grid,
                     killsColumn,
-                    rows,
-                    rows[0],
+                    session.Snapshot(),
+                    session.Rows[0],
+                    session.ReorderRows,
+                    _ => { },
                     out var secondMember,
                     out var secondDirection);
 
                 Assert.True(secondHandled);
                 Assert.Equal(nameof(PilotBoardRow.KillCount), secondMember);
                 Assert.Equal(ListSortDirection.Descending, secondDirection);
-                Assert.Equal("Bravo", rows[0].CharacterName);
+                Assert.Equal("Bravo", session.Rows[0].CharacterName);
                 Assert.Equal(ListSortDirection.Descending, killsColumn.SortDirection);
             });
         }
 
         [Fact]
-        public void ApplyCurrentBoardOrdering_PrioritizesWatchedRows()
+        public void ApplyCurrentBoardOrdering_PrioritizesWatchedRowsThroughMutationCallback()
         {
             var controller = new BoardSortController();
-            var rows = new ObservableCollection<PilotBoardRow>
+            using var session = new CurrentBoardSession();
+            session.ReplaceRows(new[]
             {
-                new() { CharacterName = "Alpha", IsWatched = false },
-                new() { CharacterName = "Bravo", IsWatched = true }
-            };
+                new PilotBoardRow { CharacterName = "Alpha", IsWatched = false },
+                new PilotBoardRow { CharacterName = "Bravo", IsWatched = true }
+            });
 
-            controller.ApplyCurrentBoardOrdering(rows, null, _ => { });
+            controller.ApplyCurrentBoardOrdering(
+                session.Snapshot(),
+                null,
+                session.ReorderRows,
+                _ => { });
 
-            Assert.Equal("Bravo", rows[0].CharacterName);
-            Assert.Equal("Alpha", rows[1].CharacterName);
+            Assert.Equal("Bravo", session.Rows[0].CharacterName);
+            Assert.Equal("Alpha", session.Rows[1].CharacterName);
         }
 
         private static void RunOnStaThread(Action action)
