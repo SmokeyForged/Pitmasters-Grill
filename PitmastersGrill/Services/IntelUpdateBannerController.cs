@@ -32,7 +32,9 @@ namespace PitmastersGrill.Services
 
             if (!_dispatcher.CheckAccess())
             {
-                _dispatcher.Invoke(() => ApplySnapshot(snapshot, banner, statusText, detailText));
+                _dispatcher.BeginInvoke(
+                    new Action(() => ApplySnapshot(snapshot, banner, statusText, detailText)),
+                    DispatcherPriority.Background);
                 return;
             }
 

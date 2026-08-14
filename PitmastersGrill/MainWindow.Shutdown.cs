@@ -13,6 +13,7 @@ namespace PitmastersGrill
         protected override void OnInitialized(EventArgs e)
         {
             base.OnInitialized(e);
+            EnableMainWindowLifecycleDiagnostics();
             Closing += MainWindow_DeterministicClosing;
         }
 
@@ -32,6 +33,7 @@ namespace PitmastersGrill
 
             _isShuttingDown = true;
             AppLogger.UiInfo("MainWindow close deferred until PMG-owned killmail work is quiescent.");
+            LogMainWindowLifecycle("shutdown-deferred");
 
             if (ExitApplicationButton != null)
             {
@@ -54,21 +56,27 @@ namespace PitmastersGrill
 
         private async Task CompleteDeterministicShutdownAsync()
         {
+            LogMainWindowLifecycle("shutdown-barrier-begin");
+
             try
             {
                 await _backgroundIntelUpdateService.StopAsync();
                 AppLogger.UiInfo("PMG-owned killmail work reached shutdown quiescence.");
+                LogMainWindowLifecycle("shutdown-background-quiescent");
             }
             catch (Exception ex)
             {
+                LogMainWindowLifecycle("shutdown-barrier-fault", $"error='{ex.GetType().Name}'");
                 AppLogger.UiError("PMG-owned killmail shutdown barrier failed.", ex);
             }
             finally
             {
                 _shutdownBarrierComplete = true;
+                LogMainWindowLifecycle("shutdown-barrier-complete");
 
                 if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
                 {
+                    LogMainWindowLifecycle("shutdown-final-close");
                     await Dispatcher.InvokeAsync(Close);
                 }
             }

@@ -154,20 +154,15 @@ namespace PitmastersGrill.Services
 
         public void HandleStatusChanged(IntelUpdateStatusSnapshot snapshot, bool isShuttingDown)
         {
-            _intelUpdateBannerController.HandleStatusChanged(
-                snapshot,
-                _intelUpdateBanner,
-                _intelUpdateStatusText,
-                _intelUpdateDetailText);
-
             if (_dispatcher.CheckAccess())
             {
-                ApplyStatusDetails(snapshot, isShuttingDown);
+                ApplySnapshot(snapshot, isShuttingDown);
+                return;
             }
-            else
-            {
-                _dispatcher.Invoke(() => ApplyStatusDetails(snapshot, isShuttingDown));
-            }
+
+            _dispatcher.BeginInvoke(
+                new Action(() => ApplySnapshot(snapshot, isShuttingDown)),
+                DispatcherPriority.Background);
         }
 
         public void ApplySnapshot(IntelUpdateStatusSnapshot snapshot, bool isShuttingDown)

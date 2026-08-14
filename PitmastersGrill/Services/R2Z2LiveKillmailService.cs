@@ -1,7 +1,6 @@
 using Microsoft.Data.Sqlite;
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
-using PitmastersGrill.Providers;
 using System;
 using System.Globalization;
 using System.Net;
@@ -32,7 +31,6 @@ namespace PitmastersGrill.Services
         private readonly AppSettingsService _appSettingsService;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly KillmailIncrementalImportService _incrementalImportService;
-        private readonly CynoShipCatalog _cynoShipCatalog = new();
         private readonly HttpClient _httpClient;
 
         private Task? _workerTask;
@@ -106,31 +104,33 @@ namespace PitmastersGrill.Services
         {
             CancelWorker();
         }
-public async Task StopAsync()
-{
-    Task? workerTask;
 
-    lock (_sync)
-    {
-        AppLogger.KillmailImportInfo("R2Z2 live feed worker stop-and-wait requested.");
-        _runCts?.Cancel();
-        workerTask = _workerTask;
-    }
+        public async Task StopAsync()
+        {
+            Task? workerTask;
 
-    if (workerTask == null)
-    {
-        return;
-    }
+            lock (_sync)
+            {
+                AppLogger.KillmailImportInfo("R2Z2 live feed worker stop-and-wait requested.");
+                _runCts?.Cancel();
+                workerTask = _workerTask;
+            }
 
-    try
-    {
-        await workerTask.ConfigureAwait(false);
-    }
-    catch (OperationCanceledException)
-    {
-        // Normal shutdown if cancellation wins before the worker begins.
-    }
-}
+            if (workerTask == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await workerTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal shutdown if cancellation wins before the worker begins.
+            }
+        }
+
         private void EnsureWorkerStarted(string reason)
         {
             lock (_sync)
@@ -357,10 +357,10 @@ public async Task StopAsync()
             });
         }
 
-private LiveProcessResult ProcessSequencePayload(
-    long requestedSequenceId,
-    string content,
-    CancellationToken cancellationToken)
+        private LiveProcessResult ProcessSequencePayload(
+            long requestedSequenceId,
+            string content,
+            CancellationToken cancellationToken)
         {
             if (!TryExtractSequenceEnvelope(content, requestedSequenceId, out var envelope, out var error))
             {
@@ -422,508 +422,6 @@ private LiveProcessResult ProcessSequencePayload(
                 KillmailId = envelope.KillmailId,
                 DayUtc = importResult.DayUtc
             };
-        }
-
-        private void UpsertRegistryRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            string dayUtc,
-            KillmailRegistryPilotSeen record,
-            string updatedAtUtc)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO pilot_registry_day (
-                day_utc,
-                character_id,
-                first_seen_killmail_time_utc,
-                last_seen_killmail_time_utc,
-                seen_count,
-                updated_at_utc
-            )
-            VALUES (
-                $dayUtc,
-                $characterId,
-                $firstSeen,
-                $lastSeen,
-                1,
-                $updatedAtUtc
-            )
-            ON CONFLICT(day_utc, character_id) DO UPDATE SET
-                first_seen_killmail_time_utc = CASE
-                    WHEN pilot_registry_day.first_seen_killmail_time_utc = '' OR excluded.first_seen_killmail_time_utc < pilot_registry_day.first_seen_killmail_time_utc
-                        THEN excluded.first_seen_killmail_time_utc
-                    ELSE pilot_registry_day.first_seen_killmail_time_utc
-                END,
-                last_seen_killmail_time_utc = CASE
-                    WHEN excluded.last_seen_killmail_time_utc > pilot_registry_day.last_seen_killmail_time_utc
-                        THEN excluded.last_seen_killmail_time_utc
-                    ELSE pilot_registry_day.last_seen_killmail_time_utc
-                END,
-                seen_count = pilot_registry_day.seen_count + 1,
-                updated_at_utc = excluded.updated_at_utc;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", dayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-            command.Parameters.AddWithValue("$firstSeen", record.FirstSeenKillmailTimeUtc);
-            command.Parameters.AddWithValue("$lastSeen", record.LastSeenKillmailTimeUtc);
-            command.Parameters.AddWithValue("$updatedAtUtc", updatedAtUtc);
-            command.ExecuteNonQuery();
-        }
-
-        private void UpsertFleetRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            string dayUtc,
-            KillmailFleetPilotSeen record,
-            string derivedAtUtc)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO pilot_fleet_observations_day (
-                day_utc,
-                character_id,
-                attacker_sample_count,
-                attacker_count_sum,
-                derived_at_utc
-            )
-            VALUES (
-                $dayUtc,
-                $characterId,
-                1,
-                $attackerCountSum,
-                $derivedAtUtc
-            )
-            ON CONFLICT(day_utc, character_id) DO UPDATE SET
-                attacker_sample_count = pilot_fleet_observations_day.attacker_sample_count + 1,
-                attacker_count_sum = pilot_fleet_observations_day.attacker_count_sum + excluded.attacker_count_sum,
-                derived_at_utc = excluded.derived_at_utc;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", dayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-            command.Parameters.AddWithValue("$attackerCountSum", record.AttackerCountForThisKillmail);
-            command.Parameters.AddWithValue("$derivedAtUtc", derivedAtUtc);
-            command.ExecuteNonQuery();
-        }
-
-        private string UpsertShipRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            string dayUtc,
-            KillmailShipPilotSeen record,
-            string updatedAtUtc)
-        {
-            var isCynoCapable = _cynoShipCatalog.TryGetCynoShipName(record.LastSeenShipTypeId, out var cynoShipName);
-            var action = DetermineShipUpsertAction(connection, transaction, dayUtc, record);
-
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO pilot_ship_observations_day (
-                day_utc,
-                character_id,
-                last_seen_ship_type_id,
-                last_seen_ship_time_utc,
-                last_seen_cyno_ship_type_id,
-                last_seen_cyno_ship_name,
-                last_seen_cyno_ship_time_utc,
-                updated_at_utc
-            )
-            VALUES (
-                $dayUtc,
-                $characterId,
-                $lastSeenShipTypeId,
-                $lastSeenShipTimeUtc,
-                $lastSeenCynoShipTypeId,
-                $lastSeenCynoShipName,
-                $lastSeenCynoShipTimeUtc,
-                $updatedAtUtc
-            )
-            ON CONFLICT(day_utc, character_id) DO UPDATE SET
-                last_seen_ship_type_id = CASE
-                    WHEN excluded.last_seen_ship_time_utc > pilot_ship_observations_day.last_seen_ship_time_utc
-                        THEN excluded.last_seen_ship_type_id
-                    ELSE pilot_ship_observations_day.last_seen_ship_type_id
-                END,
-                last_seen_ship_time_utc = CASE
-                    WHEN excluded.last_seen_ship_time_utc > pilot_ship_observations_day.last_seen_ship_time_utc
-                        THEN excluded.last_seen_ship_time_utc
-                    ELSE pilot_ship_observations_day.last_seen_ship_time_utc
-                END,
-                last_seen_cyno_ship_type_id = CASE
-                    WHEN excluded.last_seen_cyno_ship_time_utc <> ''
-                         AND (pilot_ship_observations_day.last_seen_cyno_ship_time_utc = ''
-                              OR excluded.last_seen_cyno_ship_time_utc > pilot_ship_observations_day.last_seen_cyno_ship_time_utc)
-                        THEN excluded.last_seen_cyno_ship_type_id
-                    ELSE pilot_ship_observations_day.last_seen_cyno_ship_type_id
-                END,
-                last_seen_cyno_ship_name = CASE
-                    WHEN excluded.last_seen_cyno_ship_time_utc <> ''
-                         AND (pilot_ship_observations_day.last_seen_cyno_ship_time_utc = ''
-                              OR excluded.last_seen_cyno_ship_time_utc > pilot_ship_observations_day.last_seen_cyno_ship_time_utc)
-                        THEN excluded.last_seen_cyno_ship_name
-                    ELSE pilot_ship_observations_day.last_seen_cyno_ship_name
-                END,
-                last_seen_cyno_ship_time_utc = CASE
-                    WHEN excluded.last_seen_cyno_ship_time_utc <> ''
-                         AND (pilot_ship_observations_day.last_seen_cyno_ship_time_utc = ''
-                              OR excluded.last_seen_cyno_ship_time_utc > pilot_ship_observations_day.last_seen_cyno_ship_time_utc)
-                        THEN excluded.last_seen_cyno_ship_time_utc
-                    ELSE pilot_ship_observations_day.last_seen_cyno_ship_time_utc
-                END,
-                updated_at_utc = excluded.updated_at_utc;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", dayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-            command.Parameters.AddWithValue("$lastSeenShipTypeId", (object?)record.LastSeenShipTypeId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$lastSeenShipTimeUtc", record.LastSeenShipTimeUtc);
-            command.Parameters.AddWithValue("$lastSeenCynoShipTypeId", isCynoCapable ? (object?)record.LastSeenShipTypeId ?? DBNull.Value : DBNull.Value);
-            command.Parameters.AddWithValue("$lastSeenCynoShipName", isCynoCapable ? cynoShipName : "");
-            command.Parameters.AddWithValue("$lastSeenCynoShipTimeUtc", isCynoCapable ? record.LastSeenShipTimeUtc : "");
-            command.Parameters.AddWithValue("$updatedAtUtc", updatedAtUtc);
-            command.ExecuteNonQuery();
-            return action;
-        }
-
-        private static string DetermineShipUpsertAction(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            string dayUtc,
-            KillmailShipPilotSeen record)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            SELECT last_seen_ship_time_utc
-            FROM pilot_ship_observations_day
-            WHERE day_utc = $dayUtc
-              AND character_id = $characterId
-            LIMIT 1;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", dayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-
-            var existingLastSeen = command.ExecuteScalar()?.ToString() ?? "";
-
-            if (string.IsNullOrWhiteSpace(existingLastSeen))
-            {
-                return "inserted";
-            }
-
-            return string.CompareOrdinal(record.LastSeenShipTimeUtc ?? "", existingLastSeen) > 0
-                ? "updated"
-                : "skipped";
-        }
-
-        private static void UpsertCynoModuleRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            PilotCynoModuleObservationDayRecord record)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO pilot_cyno_module_observations_day (
-                day_utc,
-                character_id,
-                killmail_id,
-                killmail_time_utc,
-                victim_ship_type_id,
-                module_type_id,
-                module_name,
-                quantity_destroyed,
-                quantity_dropped,
-                item_state,
-                source,
-                updated_at_utc
-            )
-            VALUES (
-                $dayUtc,
-                $characterId,
-                $killmailId,
-                $killmailTimeUtc,
-                $victimShipTypeId,
-                $moduleTypeId,
-                $moduleName,
-                $quantityDestroyed,
-                $quantityDropped,
-                $itemState,
-                $source,
-                $updatedAtUtc
-            )
-            ON CONFLICT(day_utc, character_id, killmail_id, module_type_id) DO UPDATE SET
-                killmail_time_utc = excluded.killmail_time_utc,
-                victim_ship_type_id = excluded.victim_ship_type_id,
-                module_name = excluded.module_name,
-                quantity_destroyed = excluded.quantity_destroyed,
-                quantity_dropped = excluded.quantity_dropped,
-                item_state = excluded.item_state,
-                source = excluded.source,
-                updated_at_utc = excluded.updated_at_utc;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", record.DayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-            command.Parameters.AddWithValue("$killmailId", record.KillmailId);
-            command.Parameters.AddWithValue("$killmailTimeUtc", record.KillmailTimeUtc);
-            command.Parameters.AddWithValue("$victimShipTypeId", (object?)record.VictimShipTypeId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$moduleTypeId", record.ModuleTypeId);
-            command.Parameters.AddWithValue("$moduleName", record.ModuleName);
-            command.Parameters.AddWithValue("$quantityDestroyed", record.QuantityDestroyed);
-            command.Parameters.AddWithValue("$quantityDropped", record.QuantityDropped);
-            command.Parameters.AddWithValue("$itemState", record.ItemState);
-            command.Parameters.AddWithValue("$source", record.Source);
-            command.Parameters.AddWithValue("$updatedAtUtc", record.UpdatedAtUtc);
-            command.ExecuteNonQuery();
-        }
-
-        private static void UpsertBaitRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            PilotBaitObservationDayRecord record)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO pilot_bait_observations_day (
-                day_utc,
-                character_id,
-                killmail_id,
-                killmail_time_utc,
-                victim_ship_type_id,
-                victim_ship_name,
-                solar_system_id,
-                solar_system_name,
-                industrial_cyno_module_type_id,
-                industrial_cyno_module_name,
-                tackle_module_type_id,
-                tackle_module_name,
-                tackle_type,
-                quantity_destroyed,
-                quantity_dropped,
-                source,
-                updated_at_utc
-            )
-            VALUES (
-                $dayUtc,
-                $characterId,
-                $killmailId,
-                $killmailTimeUtc,
-                $victimShipTypeId,
-                $victimShipName,
-                $solarSystemId,
-                $solarSystemName,
-                $industrialCynoModuleTypeId,
-                $industrialCynoModuleName,
-                $tackleModuleTypeId,
-                $tackleModuleName,
-                $tackleType,
-                $quantityDestroyed,
-                $quantityDropped,
-                $source,
-                $updatedAtUtc
-            )
-            ON CONFLICT(day_utc, character_id, killmail_id, tackle_module_type_id) DO UPDATE SET
-                killmail_time_utc = excluded.killmail_time_utc,
-                victim_ship_type_id = excluded.victim_ship_type_id,
-                victim_ship_name = excluded.victim_ship_name,
-                solar_system_id = excluded.solar_system_id,
-                solar_system_name = excluded.solar_system_name,
-                industrial_cyno_module_type_id = excluded.industrial_cyno_module_type_id,
-                industrial_cyno_module_name = excluded.industrial_cyno_module_name,
-                tackle_module_name = excluded.tackle_module_name,
-                tackle_type = excluded.tackle_type,
-                quantity_destroyed = excluded.quantity_destroyed,
-                quantity_dropped = excluded.quantity_dropped,
-                source = excluded.source,
-                updated_at_utc = excluded.updated_at_utc;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", record.DayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-            command.Parameters.AddWithValue("$killmailId", record.KillmailId);
-            command.Parameters.AddWithValue("$killmailTimeUtc", record.KillmailTimeUtc);
-            command.Parameters.AddWithValue("$victimShipTypeId", (object?)record.VictimShipTypeId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$victimShipName", record.VictimShipName);
-            command.Parameters.AddWithValue("$solarSystemId", (object?)record.SolarSystemId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$solarSystemName", record.SolarSystemName);
-            command.Parameters.AddWithValue("$industrialCynoModuleTypeId", record.IndustrialCynoModuleTypeId);
-            command.Parameters.AddWithValue("$industrialCynoModuleName", record.IndustrialCynoModuleName);
-            command.Parameters.AddWithValue("$tackleModuleTypeId", record.TackleModuleTypeId);
-            command.Parameters.AddWithValue("$tackleModuleName", record.TackleModuleName);
-            command.Parameters.AddWithValue("$tackleType", record.TackleType.ToString());
-            command.Parameters.AddWithValue("$quantityDestroyed", record.QuantityDestroyed);
-            command.Parameters.AddWithValue("$quantityDropped", record.QuantityDropped);
-            command.Parameters.AddWithValue("$source", record.Source);
-            command.Parameters.AddWithValue("$updatedAtUtc", record.UpdatedAtUtc);
-            command.ExecuteNonQuery();
-        }
-
-        private static void UpsertCynoTackleRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            PilotCynoTackleObservationDayRecord record)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO pilot_cyno_tackle_observations_day (
-                day_utc,
-                character_id,
-                killmail_id,
-                killmail_time_utc,
-                victim_ship_type_id,
-                victim_ship_name,
-                tackle_module_type_id,
-                tackle_module_name,
-                tackle_type,
-                quantity_destroyed,
-                quantity_dropped,
-                source,
-                updated_at_utc
-            )
-            VALUES (
-                $dayUtc,
-                $characterId,
-                $killmailId,
-                $killmailTimeUtc,
-                $victimShipTypeId,
-                $victimShipName,
-                $tackleModuleTypeId,
-                $tackleModuleName,
-                $tackleType,
-                $quantityDestroyed,
-                $quantityDropped,
-                $source,
-                $updatedAtUtc
-            )
-            ON CONFLICT(day_utc, character_id, killmail_id, tackle_module_type_id) DO UPDATE SET
-                killmail_time_utc = excluded.killmail_time_utc,
-                victim_ship_type_id = excluded.victim_ship_type_id,
-                victim_ship_name = excluded.victim_ship_name,
-                tackle_module_name = excluded.tackle_module_name,
-                tackle_type = excluded.tackle_type,
-                quantity_destroyed = excluded.quantity_destroyed,
-                quantity_dropped = excluded.quantity_dropped,
-                source = excluded.source,
-                updated_at_utc = excluded.updated_at_utc;
-            ";
-            command.Parameters.AddWithValue("$dayUtc", record.DayUtc);
-            command.Parameters.AddWithValue("$characterId", record.CharacterId);
-            command.Parameters.AddWithValue("$killmailId", record.KillmailId);
-            command.Parameters.AddWithValue("$killmailTimeUtc", record.KillmailTimeUtc);
-            command.Parameters.AddWithValue("$victimShipTypeId", (object?)record.VictimShipTypeId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$victimShipName", record.VictimShipName);
-            command.Parameters.AddWithValue("$tackleModuleTypeId", record.TackleModuleTypeId);
-            command.Parameters.AddWithValue("$tackleModuleName", record.TackleModuleName);
-            command.Parameters.AddWithValue("$tackleType", record.TackleType.ToString());
-            command.Parameters.AddWithValue("$quantityDestroyed", record.QuantityDestroyed);
-            command.Parameters.AddWithValue("$quantityDropped", record.QuantityDropped);
-            command.Parameters.AddWithValue("$source", record.Source);
-            command.Parameters.AddWithValue("$updatedAtUtc", record.UpdatedAtUtc);
-            command.ExecuteNonQuery();
-        }
-
-        private static void UpsertSeenRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            long killmailId,
-            string killmailHash,
-            long sequenceId,
-            string killmailTimeUtc,
-            string dayUtc,
-            string uploadedAtUtc,
-            string processedAtUtc,
-            string processingStatus,
-            string lastError)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO live_killmail_seen (
-                killmail_id,
-                killmail_hash,
-                first_sequence_id,
-                last_sequence_id,
-                killmail_time_utc,
-                day_utc,
-                uploaded_at_utc,
-                processed_at_utc,
-                source,
-                processing_status,
-                last_error
-            )
-            VALUES (
-                $killmailId,
-                $killmailHash,
-                $firstSequenceId,
-                $lastSequenceId,
-                $killmailTimeUtc,
-                $dayUtc,
-                $uploadedAtUtc,
-                $processedAtUtc,
-                'r2z2',
-                $processingStatus,
-                $lastError
-            )
-            ON CONFLICT(killmail_id) DO UPDATE SET
-                killmail_hash = excluded.killmail_hash,
-                last_sequence_id = excluded.last_sequence_id,
-                killmail_time_utc = excluded.killmail_time_utc,
-                day_utc = excluded.day_utc,
-                uploaded_at_utc = excluded.uploaded_at_utc,
-                processed_at_utc = excluded.processed_at_utc,
-                source = excluded.source,
-                processing_status = excluded.processing_status,
-                last_error = excluded.last_error;
-            ";
-            command.Parameters.AddWithValue("$killmailId", killmailId);
-            command.Parameters.AddWithValue("$killmailHash", killmailHash ?? "");
-            command.Parameters.AddWithValue("$firstSequenceId", sequenceId);
-            command.Parameters.AddWithValue("$lastSequenceId", sequenceId);
-            command.Parameters.AddWithValue("$killmailTimeUtc", killmailTimeUtc ?? "");
-            command.Parameters.AddWithValue("$dayUtc", dayUtc ?? "");
-            command.Parameters.AddWithValue("$uploadedAtUtc", uploadedAtUtc ?? "");
-            command.Parameters.AddWithValue("$processedAtUtc", processedAtUtc ?? "");
-            command.Parameters.AddWithValue("$processingStatus", processingStatus ?? "processed");
-            command.Parameters.AddWithValue("$lastError", lastError ?? "");
-            command.ExecuteNonQuery();
-        }
-
-        private static bool TryGetSeenRecord(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            long killmailId,
-            out long lastSequenceId)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            SELECT last_sequence_id
-            FROM live_killmail_seen
-            WHERE killmail_id = $killmailId
-            LIMIT 1;
-            ";
-            command.Parameters.AddWithValue("$killmailId", killmailId);
-
-            var scalar = command.ExecuteScalar();
-            if (scalar == null || scalar == DBNull.Value)
-            {
-                lastSequenceId = 0;
-                return false;
-            }
-
-            lastSequenceId = Convert.ToInt64(scalar, CultureInfo.InvariantCulture);
-            return true;
         }
 
         private void PersistEnabledFlag(bool enabled)

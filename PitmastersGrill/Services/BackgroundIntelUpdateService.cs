@@ -82,22 +82,6 @@ namespace PitmastersGrill.Services
             ReleaseWakeSignal();
         }
 
-        public void StartLiveFeedIfConfiguredAfterUiShown()
-        {
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    _r2z2LiveKillmailService.StartIfConfiguredAfterUiShown();
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.KillmailImportWarn($"R2Z2 deferred startup failed. message={ex.Message}");
-                    AppLogger.ErrorOnly("R2Z2 deferred startup exception.", ex);
-                }
-            });
-        }
-
         public Task SetLiveFeedEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
         {
             return _r2z2LiveKillmailService.SetEnabledAsync(enabled, cancellationToken);
