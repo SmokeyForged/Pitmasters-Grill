@@ -1,5 +1,7 @@
+using PitmastersGrill.Views;
 using System;
 using System.IO;
+using System.Threading;
 using Xunit;
 
 namespace PitmastersGrill.Tests.Ui
@@ -50,6 +52,30 @@ namespace PitmastersGrill.Tests.Ui
 
             Assert.Contains("Style=\"{DynamicResource SettingsLabelStyle}\"", analysisXaml);
             Assert.DoesNotContain("Style=\"{StaticResource SettingsLabelStyle}\"", analysisXaml);
+        }
+
+        [Fact]
+        public void AnalysisView_XamlLoadsWithoutParentResourceScope()
+        {
+            Exception? loadFailure = null;
+
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    _ = new AnalysisView();
+                }
+                catch (Exception ex)
+                {
+                    loadFailure = ex;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            Assert.Null(loadFailure);
         }
 
         [Fact]
