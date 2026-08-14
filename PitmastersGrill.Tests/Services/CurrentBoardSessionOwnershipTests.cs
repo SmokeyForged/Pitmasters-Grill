@@ -9,7 +9,8 @@ namespace PitmastersGrill.Tests.Services
         [Fact]
         public void MainWindow_DelegatesCurrentBoardStateToSession()
         {
-            var mainWindowSource = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
+            var mainWindowSource = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs")
+                + ReadRepoFile("PitmastersGrill", "MainWindow.ComposedConstructor.cs");
 
             Assert.Contains("CurrentBoardSession _currentBoardSession", mainWindowSource);
             Assert.Contains("PilotBoard.ItemsSource = _currentBoardSession.Rows", mainWindowSource);

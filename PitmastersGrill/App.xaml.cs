@@ -14,6 +14,8 @@ namespace PitmastersGrill
     public partial class App : Application
     {
         private PmgTrayIconService? _trayIconService;
+        private ApplicationRuntimeDependencies? _runtime;
+
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -58,6 +60,7 @@ namespace PitmastersGrill
             {
                 _trayIconService?.Dispose();
                 _trayIconService = null;
+                _runtime = null;
                 AppLogger.AppInfo($"Application exit. exitCode={e.ApplicationExitCode}");
                 AppLogger.Shutdown();
             }
@@ -250,8 +253,9 @@ namespace PitmastersGrill
             }
         }
 
-
-        private async Task RunReleaseUpdateAwarenessCheckAsync(Views.StartupSplashWindow splash)
+        private async Task RunReleaseUpdateAwarenessCheckAsync(
+            Views.StartupSplashWindow splash,
+            AppSettingsService appSettingsService)
         {
             try
             {
@@ -267,7 +271,6 @@ namespace PitmastersGrill
                     });
                 });
 
-                var appSettingsService = new AppSettingsService();
                 var settings = appSettingsService.Load();
                 var currentVersion = GetCurrentApplicationVersionText();
                 var updateService = new PmgUpdateAwarenessService(new GitHubLatestReleaseChecker(), currentVersion);
@@ -352,45 +355,28 @@ namespace PitmastersGrill
                 IsExceptionMessage = false
             });
             splash.Show();
-            await RunReleaseUpdateAwarenessCheckAsync(splash);
+
+            var appSettingsService = new AppSettingsService();
+            await RunReleaseUpdateAwarenessCheckAsync(splash, appSettingsService);
 
             try
             {
-                var killmailDbPath = KillmailPaths.GetKillmailDatabasePath();
+                var runtime = ApplicationCompositionRoot.ComposeNormalRuntime(appSettingsService);
+                _runtime = runtime;
 
                 AppLogger.AppInfo("Killmail DB bootstrap begin.");
-                var killmailBootstrap = new KillmailDatabaseBootstrap(killmailDbPath);
-                killmailBootstrap.Initialize();
+                runtime.KillmailDatabaseBootstrap.Initialize();
                 AppLogger.AppInfo("Killmail DB bootstrap end.");
 
-                var metadataRepository = new KillmailDatasetMetadataRepository(killmailDbPath);
-                var dayImportStateRepository = new DayImportStateRepository(killmailDbPath);
-                var archiveProvider = new KillmailDayArchiveProvider();
-                var freshnessService = new KillmailDatasetFreshnessService(metadataRepository);
-                var appSettingsService = new AppSettingsService();
-                var writeGate = new KillmailDbWriteGate();
-                var incrementalImportService = new KillmailIncrementalImportService(killmailDbPath, writeGate);
-                var dayImportService = new KillmailDayImportService(
-                    writeGate,
-                    dayImportStateRepository,
-                    metadataRepository,
-                    archiveProvider);
-                var r2z2LiveKillmailService = new R2Z2LiveKillmailService(appSettingsService, incrementalImportService);
-                var todaysFreshnessService = new TodaysFreshnessService(incrementalImportService);
-                var historicalFreshnessService = new HistoricalFreshnessService(incrementalImportService, appSettingsService);
+                runtime.KillmailDatasetMetadataRepository.SetUtcNow("last_startup_check_at_utc");
 
-                var backgroundIntelUpdateService = new BackgroundIntelUpdateService(
-                    freshnessService,
-                    writeGate,
-                    dayImportService,
-                    r2z2LiveKillmailService,
-                    todaysFreshnessService,
-                    historicalFreshnessService);
-
-                metadataRepository.SetUtcNow("last_startup_check_at_utc");
+                var backgroundIntelUpdateService = runtime.BackgroundIntelUpdateService;
+                var mainWindowRuntime = ApplicationCompositionRoot.ComposeMainWindowRuntime(
+                    appSettingsService,
+                    Dispatcher);
 
                 AppLogger.AppInfo("MainWindow constructor begin.");
-                var mainWindow = new MainWindow(backgroundIntelUpdateService);
+                var mainWindow = new MainWindow(backgroundIntelUpdateService, mainWindowRuntime);
                 AppLogger.AppInfo("MainWindow constructor end.");
                 MainWindow = mainWindow;
                 _trayIconService = new PmgTrayIconService(this, mainWindow);
