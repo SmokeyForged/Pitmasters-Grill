@@ -10,7 +10,7 @@ namespace PitmastersGrill.Tests.Services
         public void ComposeMainWindowRuntime_UsesSharedSettingsAndBuildsNonControlGraph()
         {
             var appSettingsService = new AppSettingsService();
-            using var runtime = ApplicationCompositionRoot.ComposeMainWindowRuntime(
+            var runtime = ApplicationCompositionRoot.ComposeMainWindowRuntime(
                 appSettingsService,
                 Dispatcher.CurrentDispatcher);
 
@@ -25,6 +25,9 @@ namespace PitmastersGrill.Tests.Services
             Assert.NotNull(runtime.CacheMaintenanceService);
             Assert.NotNull(runtime.KillmailDerivedIntelRebuildService);
             Assert.NotNull(runtime.BrowserLauncher);
+
+            // MainWindow owns its window-lifetime cleanup and disposes Diagnostics in OnClosed.
+            runtime.Diagnostics.Dispose();
         }
     }
 }
