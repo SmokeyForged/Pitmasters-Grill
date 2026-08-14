@@ -14,13 +14,33 @@ namespace PitmastersGrill.Services
             TodaysFreshnessService todaysFreshnessService,
             HistoricalFreshnessService historicalFreshnessService)
         {
-            _freshnessService = freshnessService ?? throw new ArgumentNullException(nameof(freshnessService));
+            freshnessService = freshnessService ?? throw new ArgumentNullException(nameof(freshnessService));
+            killmailDayImportService = killmailDayImportService ?? throw new ArgumentNullException(nameof(killmailDayImportService));
             _writeGate = writeGate ?? throw new ArgumentNullException(nameof(writeGate));
-            _killmailDayImportService = killmailDayImportService ?? throw new ArgumentNullException(nameof(killmailDayImportService));
             _metadataRepository = metadataRepository ?? throw new ArgumentNullException(nameof(metadataRepository));
             _r2z2LiveKillmailService = r2z2LiveKillmailService ?? throw new ArgumentNullException(nameof(r2z2LiveKillmailService));
             _todaysFreshnessService = todaysFreshnessService ?? throw new ArgumentNullException(nameof(todaysFreshnessService));
             _historicalFreshnessService = historicalFreshnessService ?? throw new ArgumentNullException(nameof(historicalFreshnessService));
+
+            _foregroundFreshnessCoordinator = new ForegroundFreshnessCoordinator();
+            _archiveSyncWorker = new ArchiveSyncWorker(
+                freshnessService,
+                killmailDayImportService,
+                _foregroundFreshnessCoordinator,
+                _shutdownCts.Token);
+            _backgroundHistoricalRepairScheduler = new BackgroundHistoricalRepairScheduler(
+                _historicalFreshnessService,
+                _foregroundFreshnessCoordinator,
+                _shutdownCts.Token);
+            _statusAggregator = new IntelUpdateStatusAggregator(
+                freshnessService,
+                _metadataRepository,
+                _r2z2LiveKillmailService,
+                _todaysFreshnessService,
+                _historicalFreshnessService);
+
+            _archiveSyncWorker.StateChanged += OnArchiveSyncStateChanged;
+            _foregroundFreshnessCoordinator.PriorityChanged += OnForegroundPriorityChanged;
             _r2z2LiveKillmailService.StatusChanged += OnLiveFeedStatusChanged;
             _todaysFreshnessService.StatusChanged += OnTodaysFreshnessStatusChanged;
             _historicalFreshnessService.StatusChanged += OnHistoricalFreshnessStatusChanged;

@@ -1,4 +1,3 @@
-using PitmastersGrill.Persistence;
 using System;
 using System.Threading.Tasks;
 
@@ -58,31 +57,20 @@ namespace PitmastersGrill.Services
 
                 _shutdownCts.Cancel();
                 _r2z2LiveKillmailService.Stop();
+                _archiveSyncWorker.Wake();
 
                 Task? liveFeedStartupTask;
-                Task? archiveBackgroundTask;
-                Task? historicalRepairTask;
-
                 lock (_sync)
                 {
                     liveFeedStartupTask = _trackedLiveFeedStartupTask;
-                    archiveBackgroundTask = _backgroundTask;
-                    historicalRepairTask = _backgroundHistoricalRepairTask;
                 }
 
-                _deterministicStopTask = CompleteStopAsync(
-                    liveFeedStartupTask,
-                    archiveBackgroundTask,
-                    historicalRepairTask);
-
+                _deterministicStopTask = CompleteStopAsync(liveFeedStartupTask);
                 return _deterministicStopTask;
             }
         }
 
-        private async Task CompleteStopAsync(
-            Task? liveFeedStartupTask,
-            Task? archiveBackgroundTask,
-            Task? historicalRepairTask)
+        private async Task CompleteStopAsync(Task? liveFeedStartupTask)
         {
             await AwaitOwnedTaskAsync(liveFeedStartupTask, "R2Z2 deferred startup").ConfigureAwait(false);
 
@@ -98,14 +86,12 @@ namespace PitmastersGrill.Services
                 AppLogger.ErrorOnly("R2Z2 stop-and-wait exception.", ex);
             }
 
-            await AwaitOwnedTaskAsync(archiveBackgroundTask, "archive background worker").ConfigureAwait(false);
-            await AwaitOwnedTaskAsync(historicalRepairTask, "background historical repair").ConfigureAwait(false);
+            await _archiveSyncWorker.WaitForCompletionAsync().ConfigureAwait(false);
+            await _backgroundHistoricalRepairScheduler.WaitForCompletionAsync().ConfigureAwait(false);
 
-            // Today's/Historical foreground freshness operations are not stored as Tasks, but
-            // each owns this semaphore for the duration of its run. MainWindow has already
-            // cancelled their shared shutdown token before this barrier begins.
-            await _foregroundFreshnessOperationGate.WaitAsync().ConfigureAwait(false);
-            _foregroundFreshnessOperationGate.Release();
+            // Foreground freshness owns one operation gate for both Today's and Historical
+            // requests. Shared shutdown cancellation is triggered before this barrier.
+            await _foregroundFreshnessCoordinator.WaitForIdleAsync().ConfigureAwait(false);
 
             // Final persistence barrier: any writer already inside the process-wide gate must
             // leave before shutdown may continue. Cancelled producers cannot acquire it again.
