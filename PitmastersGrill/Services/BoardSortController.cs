@@ -1,7 +1,6 @@
 using PitmastersGrill.Models;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Controls;
@@ -121,49 +120,6 @@ namespace PitmastersGrill.Services
             }
         }
 
-        // Temporary Phase 3 compatibility overload. Remove after MainWindow is cut over to CurrentBoardSession.
-        public bool TryHandleSorting(
-            DataGrid? pilotBoard,
-            DataGridColumn? column,
-            ObservableCollection<PilotBoardRow> currentRows,
-            PilotBoardRow? selectedRow,
-            out string sortMemberPath,
-            out ListSortDirection nextDirection)
-        {
-            ArgumentNullException.ThrowIfNull(currentRows);
-
-            return TryHandleSorting(
-                pilotBoard,
-                column,
-                currentRows,
-                selectedRow,
-                orderedRows => ReplaceCollection(currentRows, orderedRows),
-                row =>
-                {
-                    if (pilotBoard != null)
-                    {
-                        pilotBoard.SelectedItem = row;
-                    }
-                },
-                out sortMemberPath,
-                out nextDirection);
-        }
-
-        // Temporary Phase 3 compatibility overload. Remove after MainWindow is cut over to CurrentBoardSession.
-        public void ApplyCurrentBoardOrdering(
-            ObservableCollection<PilotBoardRow> currentRows,
-            PilotBoardRow? selectedRow,
-            Action<PilotBoardRow?> restoreSelectedRow)
-        {
-            ArgumentNullException.ThrowIfNull(currentRows);
-
-            ApplyCurrentBoardOrdering(
-                currentRows,
-                selectedRow,
-                orderedRows => ReplaceCollection(currentRows, orderedRows),
-                restoreSelectedRow);
-        }
-
         public void ResetManualBoardSort(DataGrid? pilotBoard, DataGridColumn? defaultColumn)
         {
             _activeBoardSortMemberPath = nameof(PilotBoardRow.CharacterName);
@@ -276,17 +232,6 @@ namespace PitmastersGrill.Services
         {
             var property = typeof(PilotBoardRow).GetProperty(sortMemberPath);
             return property?.GetValue(row);
-        }
-
-        private static void ReplaceCollection(
-            ObservableCollection<PilotBoardRow> currentRows,
-            IReadOnlyList<PilotBoardRow> orderedRows)
-        {
-            currentRows.Clear();
-            foreach (var row in orderedRows)
-            {
-                currentRows.Add(row);
-            }
         }
 
         private static void ApplySortIndicatorState(DataGrid pilotBoard, DataGridColumn activeColumn, ListSortDirection direction)
