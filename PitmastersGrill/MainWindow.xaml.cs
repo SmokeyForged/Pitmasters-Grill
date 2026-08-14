@@ -148,7 +148,11 @@ namespace PitmastersGrill
 
         protected override void OnClosing(CancelEventArgs e)
         {
-            _mainWindowShellSurface.SaveWindowLayoutToSettings("Window closing");
+            if (_isMainWindowInitialized)
+            {
+                _mainWindowShellSurface.SaveWindowLayoutToSettings("Window closing");
+            }
+
             base.OnClosing(e);
         }
 
