@@ -19,6 +19,8 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains("_currentBoardSession.ReplaceRows", mainWindowSource);
             Assert.Contains("_currentBoardSession.RemoveRows", mainWindowSource);
             Assert.Contains("_currentBoardSession.ReorderRows", mainWindowSource);
+            Assert.Contains("ApplyToCurrentRows(_currentBoardSession.Rows", mainWindowSource);
+            Assert.Contains("_currentBoardSession.RemoveRows(applyResult.RemovedRows)", mainWindowSource);
 
             Assert.DoesNotContain("_currentRows", mainWindowSource);
             Assert.DoesNotContain("_processingGeneration", mainWindowSource);
@@ -27,6 +29,18 @@ namespace PitmastersGrill.Tests.Services
             Assert.DoesNotContain("UnsubscribeFromAllBoardRows", mainWindowSource);
             Assert.DoesNotContain("BoardRow_PropertyChanged", mainWindowSource);
             Assert.DoesNotContain("CurrentRows_CollectionChanged", mainWindowSource);
+        }
+
+        [Fact]
+        public void SortAndClearSurfaces_DoNotExposeWritableBoardCollections()
+        {
+            var sortControllerSource = ReadRepoFile("PitmastersGrill", "Services", "BoardSortController.cs");
+            var populationSurfaceSource = ReadRepoFile("PitmastersGrill", "Services", "BoardPopulationSurface.cs");
+
+            Assert.DoesNotContain("ObservableCollection<PilotBoardRow>", sortControllerSource);
+            Assert.DoesNotContain("ObservableCollection<PilotBoardRow>", populationSurfaceSource);
+            Assert.Contains("Action<IReadOnlyList<PilotBoardRow>> applyOrderedRows", sortControllerSource);
+            Assert.Contains("Action clearAndInvalidateBoardSession", populationSurfaceSource);
         }
 
         private static string ReadRepoFile(params string[] relativeSegments)
