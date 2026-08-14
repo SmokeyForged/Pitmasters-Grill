@@ -83,16 +83,14 @@ namespace PitmastersGrill.Services
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(rows);
 
+            var replacementRows = rows.Where(row => row != null).ToList();
+            EnsureUniqueRows(replacementRows, "Board replacement");
+
             UnsubscribeFromAllRows();
             _rows.Clear();
 
-            foreach (var row in rows)
+            foreach (var row in replacementRows)
             {
-                if (row == null)
-                {
-                    continue;
-                }
-
                 SubscribeToRow(row);
                 _rows.Add(row);
             }
@@ -144,6 +142,7 @@ namespace PitmastersGrill.Services
             ArgumentNullException.ThrowIfNull(orderedRows);
 
             var reordered = orderedRows.ToList();
+            EnsureUniqueRows(reordered, "Board ordering");
             if (reordered.Count != _rows.Count || reordered.Any(row => !_rows.Contains(row)))
             {
                 throw new InvalidOperationException("Board ordering must contain exactly the active session rows.");
@@ -235,6 +234,14 @@ namespace PitmastersGrill.Services
             string? propertyName = null)
         {
             Changed?.Invoke(this, new CurrentBoardSessionChangedEventArgs(kind, row, propertyName));
+        }
+
+        private static void EnsureUniqueRows(IReadOnlyCollection<PilotBoardRow> rows, string operation)
+        {
+            if (rows.Count != rows.Distinct().Count())
+            {
+                throw new InvalidOperationException($"{operation} cannot contain duplicate row instances.");
+            }
         }
 
         private void ThrowIfDisposed()
