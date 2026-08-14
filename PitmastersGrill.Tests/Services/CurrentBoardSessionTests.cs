@@ -162,6 +162,26 @@ namespace PitmastersGrill.Tests.Services
             Assert.Equal(new[] { "Alpha", "Bravo" }, session.Rows.Select(row => row.CharacterName));
         }
 
+        [Fact]
+        public void Dispose_UnsubscribesRowsWithoutMutatingObservableView()
+        {
+            var session = new CurrentBoardSession();
+            var row = NewRow("Closing");
+            session.ReplaceRows(new[] { row });
+            var collectionChanges = 0;
+            var sessionChanges = 0;
+            session.Rows.CollectionChanged += (_, _) => collectionChanges++;
+            session.Changed += (_, _) => sessionChanges++;
+
+            session.Dispose();
+            row.IsWatched = true;
+
+            Assert.Equal(0, collectionChanges);
+            Assert.Equal(0, sessionChanges);
+            Assert.Single(session.Rows);
+            Assert.Same(row, session.Rows[0]);
+        }
+
         private static PilotBoardRow NewRow(string characterName)
         {
             return new PilotBoardRow
