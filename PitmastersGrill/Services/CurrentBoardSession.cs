@@ -190,7 +190,6 @@ namespace PitmastersGrill.Services
             }
 
             UnsubscribeFromAllRows();
-            _rows.Clear();
             _disposed = true;
         }
 
