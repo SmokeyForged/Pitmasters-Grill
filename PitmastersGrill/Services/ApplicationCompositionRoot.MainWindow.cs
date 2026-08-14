@@ -44,9 +44,7 @@ namespace PitmastersGrill.Services
             IgnoreAllianceCoordinator ignoreAllianceCoordinator,
             IgnoreAllianceBoardController ignoreAllianceBoardController,
             ZkillUrlBuilder zkillUrlBuilder,
-            BrowserLauncher browserLauncher,
-            CacheMaintenanceService cacheMaintenanceService,
-            KillmailDerivedIntelRebuildService killmailDerivedIntelRebuildService)
+            BrowserLauncher browserLauncher)
         {
             AppSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
             Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
@@ -84,8 +82,6 @@ namespace PitmastersGrill.Services
             IgnoreAllianceBoardController = ignoreAllianceBoardController ?? throw new ArgumentNullException(nameof(ignoreAllianceBoardController));
             ZkillUrlBuilder = zkillUrlBuilder ?? throw new ArgumentNullException(nameof(zkillUrlBuilder));
             BrowserLauncher = browserLauncher ?? throw new ArgumentNullException(nameof(browserLauncher));
-            CacheMaintenanceService = cacheMaintenanceService ?? throw new ArgumentNullException(nameof(cacheMaintenanceService));
-            KillmailDerivedIntelRebuildService = killmailDerivedIntelRebuildService ?? throw new ArgumentNullException(nameof(killmailDerivedIntelRebuildService));
         }
 
         public AppSettingsService AppSettingsService { get; }
@@ -124,8 +120,6 @@ namespace PitmastersGrill.Services
         public IgnoreAllianceBoardController IgnoreAllianceBoardController { get; }
         public ZkillUrlBuilder ZkillUrlBuilder { get; }
         public BrowserLauncher BrowserLauncher { get; }
-        public CacheMaintenanceService CacheMaintenanceService { get; }
-        public KillmailDerivedIntelRebuildService KillmailDerivedIntelRebuildService { get; }
     }
 
     public static partial class ApplicationCompositionRoot
@@ -166,8 +160,6 @@ namespace PitmastersGrill.Services
             var boardPopulationStatusController = new BoardPopulationStatusController();
             var pilotDetailActionsPresenter = new PilotDetailActionsPresenter();
             var boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
-            var cacheMaintenanceService = new CacheMaintenanceService();
-            var killmailDerivedIntelRebuildService = new KillmailDerivedIntelRebuildService();
 
             var localListParser = new LocalListParser();
             var clipboardPayloadInspector = new ClipboardPayloadInspector();
@@ -267,9 +259,7 @@ namespace PitmastersGrill.Services
                 ignoreAllianceCoordinator,
                 ignoreAllianceBoardController,
                 new ZkillUrlBuilder(),
-                new BrowserLauncher(),
-                cacheMaintenanceService,
-                killmailDerivedIntelRebuildService);
+                new BrowserLauncher());
         }
     }
 }
