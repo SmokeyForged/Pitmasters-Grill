@@ -32,6 +32,17 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
+        public void LegacyMainWindowCompositionPath_IsAbsent()
+        {
+            var mainWindowSource = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
+
+            Assert.DoesNotMatch(
+                @"public\s+MainWindow\s*\(\s*BackgroundIntelUpdateService\s+backgroundIntelUpdateService\s*\)",
+                mainWindowSource);
+            Assert.False(RepoFileExists("PitmastersGrill", "Services", "MainWindowCompositionRoot.cs"));
+        }
+
+        [Fact]
         public void BackgroundServices_RemainDeferredUntilAfterFirstRender()
         {
             var appSource = ReadRepoFile("PitmastersGrill", "App.xaml.cs");
@@ -64,6 +75,25 @@ namespace PitmastersGrill.Tests.Services
             }
 
             throw new FileNotFoundException($"Could not locate repository file: {string.Join("/", relativeSegments)}");
+        }
+
+        private static bool RepoFileExists(params string[] relativeSegments)
+        {
+            var current = new DirectoryInfo(AppContext.BaseDirectory);
+            while (current is not null)
+            {
+                var candidateSegments = new string[relativeSegments.Length + 1];
+                candidateSegments[0] = current.FullName;
+                Array.Copy(relativeSegments, 0, candidateSegments, 1, relativeSegments.Length);
+                if (File.Exists(Path.Combine(candidateSegments)))
+                {
+                    return true;
+                }
+
+                current = current.Parent;
+            }
+
+            return false;
         }
     }
 }

@@ -60,7 +60,8 @@ namespace PitmastersGrill.Tests.Ui
 
         private static string ReadMainWindowCode()
         {
-            return ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
+            return ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs")
+                + ReadRepoFile("PitmastersGrill", "MainWindow.ComposedConstructor.cs");
         }
 
         private static string ReadRepoFile(params string[] relativeParts)
