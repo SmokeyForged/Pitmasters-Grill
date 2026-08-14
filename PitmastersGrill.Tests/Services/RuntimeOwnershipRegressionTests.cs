@@ -60,6 +60,26 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains("StartLiveFeedIfConfiguredAfterUiShownTracked()", shutdownSource);
         }
 
+        [Fact]
+        public void IntelStatusUiDispatch_DoesNotSynchronouslyBlockBackgroundPublishers()
+        {
+            var supportSource = ReadRepoFile(
+                "PitmastersGrill",
+                "Services",
+                "IntelSupportSurface.cs");
+            var bannerSource = ReadRepoFile(
+                "PitmastersGrill",
+                "Services",
+                "IntelUpdateBannerController.cs");
+
+            Assert.Contains("_dispatcher.BeginInvoke(", supportSource);
+            Assert.DoesNotContain("_dispatcher.Invoke(", supportSource);
+            Assert.Contains("_intelUpdateBannerController.ApplySnapshot(", supportSource);
+
+            Assert.Contains("_dispatcher.BeginInvoke(", bannerSource);
+            Assert.DoesNotContain("_dispatcher.Invoke(", bannerSource);
+        }
+
         private static string ReadRepoFile(params string[] relativeSegments)
         {
             var path = GetRepoFilePath(relativeSegments);
