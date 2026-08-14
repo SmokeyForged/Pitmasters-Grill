@@ -1,6 +1,7 @@
 using PitmastersGrill.Models;
 using PitmastersGrill.Services;
 using System;
+using System.Collections.Specialized;
 using System.Linq;
 using Xunit;
 
@@ -170,7 +171,7 @@ namespace PitmastersGrill.Tests.Services
             session.ReplaceRows(new[] { row });
             var collectionChanges = 0;
             var sessionChanges = 0;
-            session.Rows.CollectionChanged += (_, _) => collectionChanges++;
+            ((INotifyCollectionChanged)session.Rows).CollectionChanged += (_, _) => collectionChanges++;
             session.Changed += (_, _) => sessionChanges++;
 
             session.Dispose();
