@@ -100,7 +100,6 @@ namespace PitmastersGrill
         private readonly DispatcherTimer _boardColumnLayoutSaveTimer;
         private readonly DispatcherTimer _boardModeHintTimer;
         private readonly CancellationTokenSource _windowShutdownCts = new();
-        private readonly SystemTrayIconService _systemTrayIconService;
         private IgnoreAllianceListView? _ignoreAllianceListView;
 
 
@@ -158,9 +157,6 @@ namespace PitmastersGrill
             Loaded += MainWindow_Loaded;
 
             _diagnostics = new MainWindowDiagnostics(Dispatcher);
-            _systemTrayIconService = new SystemTrayIconService(
-                this,
-                () => RequestApplicationShutdown("Tray icon Exit"));
             _clipboardDebounceTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
             {
                 Interval = TimeSpan.FromMilliseconds(ClipboardDebounceMilliseconds)
@@ -583,7 +579,6 @@ namespace PitmastersGrill
             _boardColumnLayoutSaveTimer.Tick -= BoardColumnLayoutSaveTimer_Tick;
             _boardModeHintTimer.Stop();
             _boardModeHintTimer.Tick -= BoardModeHintTimer_Tick;
-            _systemTrayIconService.Dispose();
             _diagnostics.Dispose();
 
             var hwnd = new WindowInteropHelper(this).Handle;
