@@ -44,6 +44,10 @@ namespace PitmastersGrill.Tests.Services
         public void LiveFeedStartup_UsesTrackedPostUiPath()
         {
             var appSource = ReadRepoFile("PitmastersGrill", "App.xaml.cs");
+            var backgroundSource = ReadRepoFile(
+                "PitmastersGrill",
+                "Services",
+                "BackgroundIntelUpdateService.cs");
             var shutdownSource = ReadRepoFile(
                 "PitmastersGrill",
                 "Services",
@@ -52,6 +56,7 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains(
                 "backgroundIntelUpdateService.StartLiveFeedIfConfiguredAfterUiShownTracked();",
                 appSource);
+            Assert.DoesNotContain("StartLiveFeedIfConfiguredAfterUiShown()", backgroundSource);
             Assert.Contains("StartLiveFeedIfConfiguredAfterUiShownTracked()", shutdownSource);
         }
 
