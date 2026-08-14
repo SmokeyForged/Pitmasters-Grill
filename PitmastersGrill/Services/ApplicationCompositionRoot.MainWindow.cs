@@ -6,10 +6,8 @@ using System.Windows.Threading;
 
 namespace PitmastersGrill.Services
 {
-    public sealed class MainWindowRuntimeDependencies : IDisposable
+    public sealed class MainWindowRuntimeDependencies
     {
-        private bool _disposed;
-
         public MainWindowRuntimeDependencies(
             AppSettingsService appSettingsService,
             MainWindowDiagnostics diagnostics,
@@ -128,17 +126,6 @@ namespace PitmastersGrill.Services
         public BrowserLauncher BrowserLauncher { get; }
         public CacheMaintenanceService CacheMaintenanceService { get; }
         public KillmailDerivedIntelRebuildService KillmailDerivedIntelRebuildService { get; }
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            Diagnostics.Dispose();
-            _disposed = true;
-        }
     }
 
     public static partial class ApplicationCompositionRoot
