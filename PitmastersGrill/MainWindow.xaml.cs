@@ -4,7 +4,6 @@ using PitmastersGrill.Persistence;
 using PitmastersGrill.Services;
 using PitmastersGrill.Views;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -102,8 +101,7 @@ namespace PitmastersGrill
         private readonly CancellationTokenSource _windowShutdownCts = new();
         private IgnoreAllianceListView? _ignoreAllianceListView;
 
-
-        private readonly ObservableCollection<PilotBoardRow> _currentRows = new();
+        private readonly CurrentBoardSession _currentBoardSession = new();
         private readonly ObservableCollection<ProviderHealthSnapshot> _providerHealthRows = new();
         private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisAllianceItems = new();
         private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisCorpItems = new();
@@ -113,7 +111,6 @@ namespace PitmastersGrill
         private bool _isShuttingDown;
         private bool _compactDragPending;
         private Point _compactDragStartPoint;
-        private int _processingGeneration;
         private bool _isMainWindowInitialized;
         public MainWindow(BackgroundIntelUpdateService backgroundIntelUpdateService)
         {
@@ -255,8 +252,8 @@ namespace PitmastersGrill
                     MinHeight = minHeight;
                 },
                 () => _pilotDetailSurface.CloseActiveDetailWindow(),
-                () => _analysisTabPresenter.UpdateBoardSummary(_currentRows),
-                () => _analysisTabPresenter.UpdateAnalysisTab(_currentRows),
+                () => _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows),
+                () => _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows),
                 (reason, force) => _eveSessionContextSurface.TriggerRefresh(reason, force),
                 nowUtc => _eveSessionContextSurface.IsStale(nowUtc),
                 force => _boardLayoutSurface.ScheduleFitVisibleBoardColumnsToViewport(force),
@@ -382,7 +379,7 @@ namespace PitmastersGrill
                 () => _isApplyingSettings,
                 () => _isShuttingDown,
                 _windowShutdownCts.Token,
-                () => _currentRows.ToList(),
+                () => _currentBoardSession.Snapshot(),
                 RefreshCurrentBoardRowsFromLocalIntelAsync,
                 () => _boardPopulationEntryController.IsClipboardProcessing,
                 message => _diagnosticsSupportSurface.SetStatus(message),
@@ -480,8 +477,8 @@ namespace PitmastersGrill
             _mainWindowAppearanceController.ApplyWindowSettings(this, _appSettings, WindowOpacityValueText, Resources);
             _mainWindowShellSurface.UpdateWindowMinimumSize();
 
-            PilotBoard.ItemsSource = _currentRows;
-            _currentRows.CollectionChanged += CurrentRows_CollectionChanged;
+            PilotBoard.ItemsSource = _currentBoardSession.Rows;
+            _currentBoardSession.Changed += CurrentBoardSession_Changed;
             AnalysisAllianceListBox.ItemsSource = _analysisAllianceItems;
             AnalysisCorpListBox.ItemsSource = _analysisCorpItems;
             DiagnosticsSupportViewControl.SetProviderHealthItemsSource(_providerHealthRows);
@@ -492,12 +489,11 @@ namespace PitmastersGrill
             _pilotDetailSurface.HideDetailPane();
             MainTabControl.SelectedIndex = 1;
             _mainWindowShellSurface.ApplyCompactModeUi();
-            _analysisTabPresenter.UpdateBoardSummary(_currentRows);
-            _analysisTabPresenter.UpdateAnalysisTab(_currentRows);
+            _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows);
+            _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows);
             _intelSupportSurface.ApplySnapshot(_backgroundIntelUpdateService.GetSnapshot(), _isShuttingDown);
             _eveSessionContextSurface.ApplyPendingContext();
             _isMainWindowInitialized = true;
-
             AppLogger.DatabaseInfo(
                 $"Killmail data path resolved. displayPath={KillmailPaths.GetKillmailDataDirectoryDisplayPath()} source={KillmailPaths.GetKillmailDataDirectorySourceDescription()}");
 
@@ -569,8 +565,8 @@ namespace PitmastersGrill
             }
 
             _backgroundIntelUpdateService.StatusChanged -= OnIntelUpdateStatusChanged;
-            _currentRows.CollectionChanged -= CurrentRows_CollectionChanged;
-            UnsubscribeFromAllBoardRows();
+            _currentBoardSession.Changed -= CurrentBoardSession_Changed;
+            _currentBoardSession.Dispose();
             _clipboardDebounceTimer.Stop();
             _clipboardDebounceTimer.Tick -= ClipboardDebounceTimer_Tick;
             _compactDragHoldTimer.Stop();
@@ -993,10 +989,10 @@ namespace PitmastersGrill
                 (reason, force) => _eveSessionContextSurface.TriggerRefresh(reason, force),
                 () => _pilotDetailSurface.SaveCurrentNotesAndTags(PilotBoard?.SelectedItem as PilotBoardRow),
                 BuildInitialBoard,
-                beginProcessingGeneration: () => ++_processingGeneration,
-                getCurrentGeneration: () => _processingGeneration,
-                getCurrentRowCount: () => _currentRows.Count,
-                processCurrentRowsAsync: generation => ProcessRowBatchAsync(_currentRows.ToList(), generation),
+                beginProcessingGeneration: _currentBoardSession.BeginProcessingGeneration,
+                getCurrentGeneration: () => _currentBoardSession.CurrentGeneration,
+                getCurrentRowCount: () => _currentBoardSession.Count,
+                processCurrentRowsAsync: generation => ProcessRowBatchAsync(_currentBoardSession.Snapshot().ToList(), generation),
                 updateBoardPopulationStatus: UpdateBoardPopulationStatus,
                 updateLastRefreshed: UpdateLastRefreshed,
                 finalizeBoardPopulationPass: FinalizeBoardPopulationPass);
@@ -1014,8 +1010,8 @@ namespace PitmastersGrill
         {
             _boardPopulationSurface.FinalizeBoardPopulationPass(
                 generation,
-                _processingGeneration,
-                _currentRows,
+                _currentBoardSession.CurrentGeneration,
+                _currentBoardSession.Rows,
                 MaxBoardPopulationRetryAttempts,
                 UpdateBoardPopulationStatus,
                 ScheduleBoardPopulationRetry);
@@ -1024,7 +1020,7 @@ namespace PitmastersGrill
         private void ScheduleBoardPopulationRetry()
         {
             _boardPopulationSurface.ScheduleBoardPopulationRetry(
-                _currentRows,
+                _currentBoardSession.Rows,
                 Dispatcher,
                 UpdateBoardPopulationStatus,
                 ProcessRetryPassAsync);
@@ -1033,10 +1029,10 @@ namespace PitmastersGrill
         private Task ProcessRetryPassAsync()
         {
             return _boardPopulationSurface.ProcessRetryPassAsync(
-                _currentRows,
+                _currentBoardSession.Rows,
                 () => _backgroundIntelUpdateService.BeginForegroundPriority(),
                 (rows, generation) => ProcessRowBatchAsync(rows.ToList(), generation),
-                () => _processingGeneration,
+                () => _currentBoardSession.CurrentGeneration,
                 UpdateLastRefreshed,
                 FinalizeBoardPopulationPass);
         }
@@ -1082,10 +1078,10 @@ namespace PitmastersGrill
                 await _boardPopulationRowProcessor.ProcessAsync(
                     row,
                     generation,
-                    () => _processingGeneration,
+                    () => _currentBoardSession.CurrentGeneration,
                     action => Dispatcher.InvokeAsync(() =>
                     {
-                        if (generation != _processingGeneration)
+                        if (!_currentBoardSession.IsCurrentGeneration(generation))
                         {
                             return;
                         }
@@ -1099,7 +1095,7 @@ namespace PitmastersGrill
 
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    if (generation != _processingGeneration)
+                    if (!_currentBoardSession.IsCurrentGeneration(generation))
                     {
                         return;
                     }
@@ -1109,7 +1105,7 @@ namespace PitmastersGrill
                     _pilotDetailSurface.UpdateWatchPilotDetailActionState(
                         _pilotDetailSurface.GetSelectedOrDisplayedDetailRow(
                             PilotBoard?.SelectedItem as PilotBoardRow,
-                            _currentRows));
+                            _currentBoardSession.Rows));
                     RefreshDetailWindowIfSelected(row);
                 });
 
@@ -1117,7 +1113,7 @@ namespace PitmastersGrill
                 {
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        if (generation != _processingGeneration)
+                        if (!_currentBoardSession.IsCurrentGeneration(generation))
                         {
                             return;
                         }
@@ -1148,8 +1144,6 @@ namespace PitmastersGrill
             var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
 
             ResetManualBoardSort();
-            UnsubscribeFromAllBoardRows();
-            _currentRows.Clear();
 
             foreach (var row in initialRows)
             {
@@ -1158,10 +1152,9 @@ namespace PitmastersGrill
                 row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
                 ApplyWatchedState(row);
                 _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
-                SubscribeToBoardRow(row);
-                _currentRows.Add(row);
             }
 
+            _currentBoardSession.ReplaceRows(initialRows);
             ApplyCurrentBoardOrdering();
             ApplyIgnoredAllianceRowsToCurrentBoard();
             RecomputeCorpAllianceCounts();
@@ -1172,9 +1165,8 @@ namespace PitmastersGrill
             UpdateLastRefreshed();
 
             buildStopwatch.Stop();
-            _diagnostics.InitialBoardBuildComplete(_currentRows.Count, buildStopwatch.ElapsedMilliseconds);
+            _diagnostics.InitialBoardBuildComplete(_currentBoardSession.Count, buildStopwatch.ElapsedMilliseconds);
         }
-
 
         private void RemoveIgnoredAllianceRowFromCurrentBoard(PilotBoardRow row)
         {
@@ -1183,7 +1175,7 @@ namespace PitmastersGrill
                 return;
             }
 
-            var removed = _currentRows.Remove(row);
+            var removed = _currentBoardSession.RemoveRow(row);
             if (!removed)
             {
                 return;
@@ -1196,7 +1188,6 @@ namespace PitmastersGrill
                 _pilotDetailSurface.CloseActiveDetailWindow();
             }
 
-            UnsubscribeFromBoardRow(row);
             AppLogger.UiInfo($"Ignored alliance filter removed a resolved row from current board. character='{row.CharacterName}' allianceId='{row.AllianceId}'");
             RecomputeCorpAllianceCounts();
         }
@@ -1204,19 +1195,14 @@ namespace PitmastersGrill
         private void ApplyIgnoredAllianceRowsToCurrentBoard()
         {
             var selectedRow = PilotBoard.SelectedItem as PilotBoardRow;
-            var applyResult = _ignoreAllianceBoardController.ApplyToCurrentRows(_currentRows, selectedRow);
+            var applyResult = _ignoreAllianceBoardController.ApplyToCurrentRows(_currentBoardSession.Rows, selectedRow);
 
             if (applyResult.RemovedCount == 0)
             {
                 return;
             }
 
-            foreach (var removedRow in applyResult.RemovedRows)
-            {
-                UnsubscribeFromBoardRow(removedRow);
-                _currentRows.Remove(removedRow);
-            }
-
+            _currentBoardSession.RemoveRows(applyResult.RemovedRows);
             RecomputeCorpAllianceCounts();
 
             if (applyResult.SelectedRowRemoved)
@@ -1241,7 +1227,7 @@ namespace PitmastersGrill
         }
         private void RefreshConfirmedCynoModuleStateForCurrentRows()
         {
-            foreach (var row in _currentRows)
+            foreach (var row in _currentBoardSession.Rows)
             {
                 _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
             }
@@ -1256,19 +1242,19 @@ namespace PitmastersGrill
         {
             var showCounts = _appSettings.ShowCorpAllianceCounts;
 
-            var corpCounts = _currentRows
+            var corpCounts = _currentBoardSession.Rows
                 .Select(row => new { Row = row, Key = GetCorpCountKey(row) })
                 .Where(item => !string.IsNullOrWhiteSpace(item.Key))
                 .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
 
-            var allianceCounts = _currentRows
+            var allianceCounts = _currentBoardSession.Rows
                 .Select(row => new { Row = row, Key = GetAllianceCountKey(row) })
                 .Where(item => !string.IsNullOrWhiteSpace(item.Key))
                 .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
 
-            foreach (var row in _currentRows)
+            foreach (var row in _currentBoardSession.Rows)
             {
                 row.ShowCorpAllianceCounts = showCounts;
 
@@ -1283,8 +1269,8 @@ namespace PitmastersGrill
                     : 0;
             }
 
-            _analysisTabPresenter.UpdateBoardSummary(_currentRows);
-            _analysisTabPresenter.UpdateAnalysisTab(_currentRows);
+            _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows);
+            _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows);
         }
 
         private static string GetCorpCountKey(PilotBoardRow row)
@@ -1334,8 +1320,10 @@ namespace PitmastersGrill
             if (_boardSortController.TryHandleSorting(
                 PilotBoard,
                 e.Column,
-                _currentRows,
+                _currentBoardSession.Snapshot(),
                 PilotBoard.SelectedItem as PilotBoardRow,
+                _currentBoardSession.ReorderRows,
+                row => PilotBoard.SelectedItem = row,
                 out var sortMemberPath,
                 out var nextDirection))
             {
@@ -1521,7 +1509,7 @@ namespace PitmastersGrill
         {
             var selectedRow = _pilotDetailSurface.GetSelectedOrDisplayedDetailRow(
                 PilotBoard?.SelectedItem as PilotBoardRow,
-                _currentRows);
+                _currentBoardSession.Rows);
             if (selectedRow == null)
             {
                 AppLogger.UiWarn("Watch requested with no selected or displayed detail row.");
@@ -1551,18 +1539,17 @@ namespace PitmastersGrill
             PilotBoard.SelectedItem = null;
             _boardPopulationSurface.ClearBoard(
                 reason,
-                _currentRows,
+                () => _currentBoardSession.Count,
                 () => _pilotDetailSurface.SaveCurrentNotesAndTags(PilotBoard?.SelectedItem as PilotBoardRow),
                 CancelBoardPopulationRetry,
                 () => ResetEntryAndRetryTracking(),
                 ResetManualBoardSort,
-                UnsubscribeFromAllBoardRows,
+                () => _currentBoardSession.ClearAndInvalidate(),
                 RecomputeCorpAllianceCounts,
                 _pilotDetailSurface.CloseActiveDetailWindow,
                 static () => { },
                 UpdateLastRefreshed,
-                UpdateBoardPopulationStatus,
-                () => _processingGeneration++);
+                UpdateBoardPopulationStatus);
         }
 
         private void OpenZkillButton_Click(object sender, RoutedEventArgs e)
@@ -1592,15 +1579,15 @@ namespace PitmastersGrill
 
         private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
         {
-            if (_currentRows.Count == 0)
+            if (_currentBoardSession.Count == 0)
             {
                 return;
             }
-            AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentRows.Count}");
+            AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentBoardSession.Count}");
             CancelBoardPopulationRetry();
-            var generation = ++_processingGeneration;
+            var generation = _currentBoardSession.BeginProcessingGeneration();
             UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral);
-            await ProcessRowBatchAsync(_currentRows.ToList(), generation);
+            await ProcessRowBatchAsync(_currentBoardSession.Snapshot().ToList(), generation);
             FinalizeBoardPopulationPass(generation);
             UpdateLastRefreshed();
         }
@@ -1649,7 +1636,7 @@ namespace PitmastersGrill
         {
             _pilotDetailSurface.TryIgnoreAllianceForSelectedOrDisplayedRow(
                 PilotBoard?.SelectedItem as PilotBoardRow,
-                _currentRows);
+                _currentBoardSession.Rows);
         }
         private bool TryIgnoreAllianceForRow(PilotBoardRow selectedRow)
         {
@@ -1807,8 +1794,9 @@ namespace PitmastersGrill
         private void ApplyCurrentBoardOrdering()
         {
             _boardSortController.ApplyCurrentBoardOrdering(
-                _currentRows,
+                _currentBoardSession.Snapshot(),
                 PilotBoard?.SelectedItem as PilotBoardRow,
+                _currentBoardSession.ReorderRows,
                 row =>
                 {
                     if (PilotBoard != null)
@@ -1848,39 +1836,10 @@ namespace PitmastersGrill
         {
             LastRefreshedText.Text = $"Last Refreshed: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
         }
-        private void CurrentRows_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        private void CurrentBoardSession_Changed(object? sender, CurrentBoardSessionChangedEventArgs e)
         {
-            _analysisTabPresenter.UpdateBoardSummary(_currentRows);
-            _analysisTabPresenter.UpdateAnalysisTab(_currentRows);
-        }
-        private void SubscribeToBoardRow(PilotBoardRow row)
-        {
-            row.PropertyChanged -= BoardRow_PropertyChanged;
-            row.PropertyChanged += BoardRow_PropertyChanged;
-        }
-        private void UnsubscribeFromBoardRow(PilotBoardRow row)
-        {
-            row.PropertyChanged -= BoardRow_PropertyChanged;
-        }
-        private void UnsubscribeFromAllBoardRows()
-        {
-            foreach (var row in _currentRows)
-            {
-                row.PropertyChanged -= BoardRow_PropertyChanged;
-            }
-        }
-        private void BoardRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName is nameof(PilotBoardRow.IsWatched) or
-                nameof(PilotBoardRow.BaitOverride) or
-                nameof(PilotBoardRow.HasDerivedBaitEvidence) or
-                nameof(PilotBoardRow.BoardSignalKind) or
-                nameof(PilotBoardRow.CorpName) or
-                nameof(PilotBoardRow.AllianceName))
-            {
-                _analysisTabPresenter.UpdateBoardSummary(_currentRows);
-                _analysisTabPresenter.UpdateAnalysisTab(_currentRows);
-            }
+            _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows);
+            _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows);
         }
 
         private void AnalysisHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

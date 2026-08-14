@@ -3,7 +3,6 @@ using PitmastersGrill.Models;
 using PitmastersGrill.Services;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Runtime.Serialization;
 using System.Windows.Threading;
 using Xunit;
@@ -56,53 +55,51 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
-        public void ClearBoard_ClearsRowsAndInvokesCallbacks()
+        public void ClearBoard_DelegatesMutationAndInvokesCallbacks()
         {
             using var diagnostics = new MainWindowDiagnostics(Dispatcher.CurrentDispatcher);
             var surface = CreateSurface(diagnostics);
-            var rows = new ObservableCollection<PilotBoardRow>
+            using var session = new CurrentBoardSession();
+            session.ReplaceRows(new[]
             {
-                new() { CharacterName = "Aura" },
-                new() { CharacterName = "Chribba" }
-            };
+                new PilotBoardRow { CharacterName = "Aura" },
+                new PilotBoardRow { CharacterName = "Chribba" }
+            });
+            var activeGeneration = session.BeginProcessingGeneration();
             var saveCalls = 0;
             var retryCancelled = 0;
             var resetCalls = 0;
             var sortResetCalls = 0;
-            var unsubscribeCalls = 0;
             var recountCalls = 0;
             var closeCalls = 0;
             var detailButtonUpdates = 0;
             var refreshedCalls = 0;
-            var generationIncrements = 0;
             string? statusText = null;
 
             surface.ClearBoard(
                 "test clear",
-                rows,
+                () => session.Count,
                 () => saveCalls++,
                 () => retryCancelled++,
                 () => resetCalls++,
                 () => sortResetCalls++,
-                () => unsubscribeCalls++,
+                () => session.ClearAndInvalidate(),
                 () => recountCalls++,
                 () => closeCalls++,
                 () => detailButtonUpdates++,
                 () => refreshedCalls++,
-                (text, _) => statusText = text,
-                () => generationIncrements++);
+                (text, _) => statusText = text);
 
-            Assert.Empty(rows);
+            Assert.Empty(session.Rows);
+            Assert.False(session.IsCurrentGeneration(activeGeneration));
             Assert.Equal(1, saveCalls);
             Assert.Equal(1, retryCancelled);
             Assert.Equal(1, resetCalls);
             Assert.Equal(1, sortResetCalls);
-            Assert.Equal(1, unsubscribeCalls);
             Assert.Equal(1, recountCalls);
             Assert.Equal(1, closeCalls);
             Assert.Equal(1, detailButtonUpdates);
             Assert.Equal(1, refreshedCalls);
-            Assert.Equal(1, generationIncrements);
             Assert.Equal("Board cleared", statusText);
         }
 
