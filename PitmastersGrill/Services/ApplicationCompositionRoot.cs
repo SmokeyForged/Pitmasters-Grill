@@ -24,7 +24,7 @@ namespace PitmastersGrill.Services
         public BackgroundIntelUpdateService BackgroundIntelUpdateService { get; }
     }
 
-    public static class ApplicationCompositionRoot
+    public static partial class ApplicationCompositionRoot
     {
         public static ApplicationRuntimeDependencies ComposeNormalRuntime(AppSettingsService appSettingsService)
         {
