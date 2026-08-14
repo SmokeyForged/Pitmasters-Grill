@@ -75,6 +75,18 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
+        public void ReplaceRows_RejectsDuplicateRowInstances()
+        {
+            using var session = new CurrentBoardSession();
+            var row = NewRow("Duplicate");
+
+            var exception = Assert.Throws<InvalidOperationException>(() => session.ReplaceRows(new[] { row, row }));
+
+            Assert.Contains("duplicate row instances", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(session.Rows);
+        }
+
+        [Fact]
         public void RemoveRow_UnsubscribesRemovedRow()
         {
             using var session = new CurrentBoardSession();
@@ -134,6 +146,20 @@ namespace PitmastersGrill.Tests.Services
 
             Assert.Equal(new[] { "Bravo", "Alpha" }, session.Rows.Select(row => row.CharacterName));
             Assert.Throws<InvalidOperationException>(() => session.ReorderRows(new[] { alpha }));
+        }
+
+        [Fact]
+        public void ReorderRows_RejectsDuplicateRowInstances()
+        {
+            using var session = new CurrentBoardSession();
+            var alpha = NewRow("Alpha");
+            var bravo = NewRow("Bravo");
+            session.ReplaceRows(new[] { alpha, bravo });
+
+            var exception = Assert.Throws<InvalidOperationException>(() => session.ReorderRows(new[] { alpha, alpha }));
+
+            Assert.Contains("duplicate row instances", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(new[] { "Alpha", "Bravo" }, session.Rows.Select(row => row.CharacterName));
         }
 
         private static PilotBoardRow NewRow(string characterName)
