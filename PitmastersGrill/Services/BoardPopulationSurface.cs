@@ -3,7 +3,6 @@ using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -218,48 +217,9 @@ namespace PitmastersGrill.Services
 
             saveCurrentNotesAndTags();
             cancelBoardPopulationRetry();
-            resetTracking();
-            resetManualBoardSort();
             clearAndInvalidateBoardSession();
-            recomputeCorpAllianceCounts();
-            closeActiveDetailWindow();
-            updateOpenDetailsButtonState();
-
-            updateLastRefreshed();
-            updateBoardPopulationStatus("Board cleared", BoardPopulationStatusKind.Neutral);
-
-            AppLogger.UiInfo($"Board cleared. reason='{reason}' removedRows={clearedRowCount}");
-            _diagnostics.ClearBoardComplete();
-        }
-
-        // Temporary Phase 3 compatibility overload. Remove after MainWindow is cut over to CurrentBoardSession.
-        public void ClearBoard(
-            string reason,
-            ObservableCollection<PilotBoardRow> currentRows,
-            Action saveCurrentNotesAndTags,
-            Action cancelBoardPopulationRetry,
-            Action resetTracking,
-            Action resetManualBoardSort,
-            Action unsubscribeFromAllBoardRows,
-            Action recomputeCorpAllianceCounts,
-            Action closeActiveDetailWindow,
-            Action updateOpenDetailsButtonState,
-            Action updateLastRefreshed,
-            Action<string, BoardPopulationStatusKind> updateBoardPopulationStatus,
-            Action incrementProcessingGeneration)
-        {
-            var clearedRowCount = currentRows.Count;
-
-            _diagnostics.ClearBoardStart(clearedRowCount);
-
-            saveCurrentNotesAndTags();
-            cancelBoardPopulationRetry();
-            incrementProcessingGeneration();
             resetTracking();
             resetManualBoardSort();
-            unsubscribeFromAllBoardRows();
-
-            currentRows.Clear();
             recomputeCorpAllianceCounts();
             closeActiveDetailWindow();
             updateOpenDetailsButtonState();
