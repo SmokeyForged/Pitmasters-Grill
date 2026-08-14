@@ -1,7 +1,6 @@
 using PitmastersGrill.Models;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Controls;
@@ -17,8 +16,10 @@ namespace PitmastersGrill.Services
         public bool TryHandleSorting(
             DataGrid? pilotBoard,
             DataGridColumn? column,
-            ObservableCollection<PilotBoardRow> currentRows,
+            IReadOnlyList<PilotBoardRow> currentRows,
             PilotBoardRow? selectedRow,
+            Action<IReadOnlyList<PilotBoardRow>> applyOrderedRows,
+            Action<PilotBoardRow?> restoreSelectedRow,
             out string sortMemberPath,
             out ListSortDirection nextDirection)
         {
@@ -49,18 +50,28 @@ namespace PitmastersGrill.Services
             _activeBoardSortDirection = nextDirection;
 
             ApplySortIndicatorState(pilotBoard, column, nextDirection);
-            ApplyCurrentBoardOrdering(currentRows, selectedRow, row => pilotBoard.SelectedItem = row);
+            ApplyCurrentBoardOrdering(
+                currentRows,
+                selectedRow,
+                applyOrderedRows,
+                restoreSelectedRow);
             return true;
         }
 
         public void ApplyCurrentBoardOrdering(
-            ObservableCollection<PilotBoardRow> currentRows,
+            IReadOnlyList<PilotBoardRow> currentRows,
             PilotBoardRow? selectedRow,
+            Action<IReadOnlyList<PilotBoardRow>> applyOrderedRows,
             Action<PilotBoardRow?> restoreSelectedRow)
         {
             if (currentRows == null)
             {
                 throw new ArgumentNullException(nameof(currentRows));
+            }
+
+            if (applyOrderedRows == null)
+            {
+                throw new ArgumentNullException(nameof(applyOrderedRows));
             }
 
             if (restoreSelectedRow == null)
@@ -101,13 +112,9 @@ namespace PitmastersGrill.Services
                 return;
             }
 
-            currentRows.Clear();
-            foreach (var row in reorderedRows)
-            {
-                currentRows.Add(row);
-            }
+            applyOrderedRows(reorderedRows);
 
-            if (selectedRow != null && currentRows.Contains(selectedRow))
+            if (selectedRow != null && reorderedRows.Contains(selectedRow))
             {
                 restoreSelectedRow(selectedRow);
             }
