@@ -44,6 +44,15 @@ namespace PitmastersGrill.Tests.Ui
         }
 
         [Fact]
+        public void AnalysisView_InheritedWindowResourcesUseDeferredLookup()
+        {
+            var analysisXaml = ReadRepoFile("PitmastersGrill", "Views", "AnalysisView.xaml");
+
+            Assert.Contains("Style=\"{DynamicResource SettingsLabelStyle}\"", analysisXaml);
+            Assert.DoesNotContain("Style=\"{StaticResource SettingsLabelStyle}\"", analysisXaml);
+        }
+
+        [Fact]
         public void AnalysisViewCodeBehind_RemainsPresentationOnly()
         {
             var source = ReadRepoFile("PitmastersGrill", "Views", "AnalysisView.xaml.cs");
