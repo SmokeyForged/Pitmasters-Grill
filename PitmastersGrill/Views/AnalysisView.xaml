@@ -21,36 +21,36 @@
                                Foreground="{DynamicResource HeaderTextBrush}"
                                Margin="0,0,0,8"/>
                     <TextBlock x:Name="AnalysisEmptyStateText"
-                               Style="{StaticResource SettingsLabelStyle}"
+                               Style="{DynamicResource SettingsLabelStyle}"
                                Text="No visible pilots yet. Load or refresh the Grill to see aggregate analysis."
                                AutomationProperties.AutomationId="AnalysisEmptyStateText"/>
                     <StackPanel x:Name="AnalysisDetailsPanel"
                                 Visibility="Collapsed"
                                 AutomationProperties.AutomationId="AnalysisDetailsPanel">
                         <TextBlock x:Name="AnalysisVisibleCountsText"
-                                   Style="{StaticResource SettingsLabelStyle}"
+                                   Style="{DynamicResource SettingsLabelStyle}"
                                    Text="Visible pilots: 0 | Watched pilots: 0"
                                    AutomationProperties.AutomationId="AnalysisVisibleCountsText"/>
                         <TextBlock x:Name="AnalysisSignalsText"
-                                   Style="{StaticResource SettingsLabelStyle}"
+                                   Style="{DynamicResource SettingsLabelStyle}"
                                    Margin="0,2,0,0"
                                    Text="Confirmed cynos: Hard 0 | Covert 0 | Bait 0"
                                    AutomationProperties.AutomationId="AnalysisSignalsText"/>
                         <TextBlock x:Name="AnalysisUniqueCountsText"
-                                   Style="{StaticResource SettingsLabelStyle}"
+                                   Style="{DynamicResource SettingsLabelStyle}"
                                    Margin="0,8,0,0"
                                    Text="Unique corps: 0 | Unique alliances: 0"
                                    AutomationProperties.AutomationId="AnalysisUniqueCountsText"/>
                         <TextBlock x:Name="AnalysisAllianceTopText"
-                                   Style="{StaticResource SettingsLabelStyle}"
+                                   Style="{DynamicResource SettingsLabelStyle}"
                                    Margin="0,8,0,0"
                                    AutomationProperties.AutomationId="AnalysisAllianceTopText"/>
                         <TextBlock x:Name="AnalysisCorpTopText"
-                                   Style="{StaticResource SettingsLabelStyle}"
+                                   Style="{DynamicResource SettingsLabelStyle}"
                                    Margin="0,2,0,0"
                                    AutomationProperties.AutomationId="AnalysisCorpTopText"/>
                         <TextBlock x:Name="AnalysisHighlightsText"
-                                   Style="{StaticResource SettingsLabelStyle}"
+                                   Style="{DynamicResource SettingsLabelStyle}"
                                    Margin="0,8,0,0"
                                    AutomationProperties.AutomationId="AnalysisHighlightsText"/>
                         <Grid Margin="0,10,0,0">
@@ -139,7 +139,7 @@
                                            Text="Current character"/>
                                 <TextBlock x:Name="AnalysisCurrentCharacterText"
                                            Grid.Row="0" Grid.Column="1"
-                                           Style="{StaticResource SettingsLabelStyle}"
+                                           Style="{DynamicResource SettingsLabelStyle}"
                                            Margin="0"
                                            Foreground="{DynamicResource BodyTextBrush}"
                                            Text="Not detected"
@@ -150,7 +150,7 @@
                                            Text="Current system"/>
                                 <TextBlock x:Name="AnalysisCurrentSystemText"
                                            Grid.Row="1" Grid.Column="1"
-                                           Style="{StaticResource SettingsLabelStyle}"
+                                           Style="{DynamicResource SettingsLabelStyle}"
                                            Margin="0"
                                            Foreground="{DynamicResource BodyTextBrush}"
                                            Text="Not detected"
@@ -161,7 +161,7 @@
                                            Text="Evidence source"/>
                                 <TextBlock x:Name="AnalysisEvidenceSourceText"
                                            Grid.Row="2" Grid.Column="1"
-                                           Style="{StaticResource SettingsLabelStyle}"
+                                           Style="{DynamicResource SettingsLabelStyle}"
                                            Margin="0"
                                            Foreground="{DynamicResource BodyTextBrush}"
                                            Text="Not configured"
@@ -172,7 +172,7 @@
                                            Text="Last observed"/>
                                 <TextBlock x:Name="AnalysisObservedAtText"
                                            Grid.Row="3" Grid.Column="1"
-                                           Style="{StaticResource SettingsLabelStyle}"
+                                           Style="{DynamicResource SettingsLabelStyle}"
                                            Margin="0"
                                            Foreground="{DynamicResource BodyTextBrush}"
                                            Text="Not detected"
@@ -183,13 +183,13 @@
                                            Text="Confidence / status"/>
                                 <TextBlock x:Name="AnalysisContextStatusText"
                                            Grid.Row="4" Grid.Column="1"
-                                           Style="{StaticResource SettingsLabelStyle}"
+                                           Style="{DynamicResource SettingsLabelStyle}"
                                            Margin="0"
                                            Foreground="{DynamicResource BodyTextBrush}"
                                            Text="Unable to infer EVE context"
                                            AutomationProperties.AutomationId="AnalysisContextStatusText"/>
                             </Grid>
-                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                            <TextBlock Style="{DynamicResource SettingsLabelStyle}"
                                        Margin="0,8,0,0"
                                        Text="Right-click a Grill row to open pilot details. Board Mode keeps the Grill dense for live use; Analysis collects the aggregate readout here."/>
                         </StackPanel>
