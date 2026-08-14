@@ -3,7 +3,6 @@ using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -197,31 +196,30 @@ namespace PitmastersGrill.Services
 
         public void ClearBoard(
             string reason,
-            ObservableCollection<PilotBoardRow> currentRows,
+            Func<int> getCurrentRowCount,
             Action saveCurrentNotesAndTags,
             Action cancelBoardPopulationRetry,
             Action resetTracking,
             Action resetManualBoardSort,
-            Action unsubscribeFromAllBoardRows,
+            Action clearAndInvalidateBoardSession,
             Action recomputeCorpAllianceCounts,
             Action closeActiveDetailWindow,
             Action updateOpenDetailsButtonState,
             Action updateLastRefreshed,
-            Action<string, BoardPopulationStatusKind> updateBoardPopulationStatus,
-            Action incrementProcessingGeneration)
+            Action<string, BoardPopulationStatusKind> updateBoardPopulationStatus)
         {
-            var clearedRowCount = currentRows.Count;
+            ArgumentNullException.ThrowIfNull(getCurrentRowCount);
+            ArgumentNullException.ThrowIfNull(clearAndInvalidateBoardSession);
+
+            var clearedRowCount = getCurrentRowCount();
 
             _diagnostics.ClearBoardStart(clearedRowCount);
 
             saveCurrentNotesAndTags();
             cancelBoardPopulationRetry();
-            incrementProcessingGeneration();
             resetTracking();
             resetManualBoardSort();
-            unsubscribeFromAllBoardRows();
-
-            currentRows.Clear();
+            clearAndInvalidateBoardSession();
             recomputeCorpAllianceCounts();
             closeActiveDetailWindow();
             updateOpenDetailsButtonState();
