@@ -135,6 +135,7 @@ namespace PitmastersGrill.Services
 
             var diagnostics = new MainWindowDiagnostics(dispatcher);
             var mainWindowAppearanceController = new MainWindowAppearanceController(appSettingsService);
+            var intelStorageSettingsController = new IntelStorageSettingsController(appSettingsService);
             var eveSessionContextCoordinator = new EveSessionContextCoordinator();
             var eveSessionContextService = new EveSessionContextService();
             var boardDisplaySettingsController = new BoardDisplaySettingsController();
@@ -142,16 +143,17 @@ namespace PitmastersGrill.Services
             var boardSortController = new BoardSortController();
             var boardColumnSettingsController = new BoardColumnSettingsController(
                 boardColumnLayoutController,
-                settings => mainWindowAppearanceController.SaveSettings(settings));
+                appSettingsService.Save);
             var boardColumnLayoutPersistenceController = new BoardColumnLayoutPersistenceController(
                 boardColumnLayoutController,
-                settings => mainWindowAppearanceController.SaveSettings(settings));
+                appSettingsService.Save);
             var settingsTabController = new SettingsTabController();
             var mainWindowSettingsCoordinator = new MainWindowSettingsCoordinator(
                 mainWindowAppearanceController,
+                intelStorageSettingsController,
                 settingsTabController,
                 boardDisplaySettingsController,
-                settings => mainWindowAppearanceController.SaveSettings(settings));
+                appSettingsService.Save);
             var analysisTabController = new AnalysisTabController();
             var mainWindowShellModeCoordinator = new MainWindowShellModeCoordinator();
             var mainWindowInteropController = new MainWindowInteropController();

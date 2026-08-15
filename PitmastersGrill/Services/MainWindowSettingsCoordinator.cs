@@ -9,20 +9,45 @@ namespace PitmastersGrill.Services
     public sealed class MainWindowSettingsCoordinator
     {
         private readonly MainWindowAppearanceController _appearanceController;
+        private readonly IntelStorageSettingsController _intelStorageSettingsController;
         private readonly SettingsTabController _settingsTabController;
         private readonly BoardDisplaySettingsController _boardDisplaySettingsController;
         private readonly Action<AppSettings> _saveSettings;
 
         public MainWindowSettingsCoordinator(
             MainWindowAppearanceController appearanceController,
+            IntelStorageSettingsController intelStorageSettingsController,
             SettingsTabController settingsTabController,
             BoardDisplaySettingsController boardDisplaySettingsController,
             Action<AppSettings> saveSettings)
         {
             _appearanceController = appearanceController ?? throw new ArgumentNullException(nameof(appearanceController));
+            _intelStorageSettingsController = intelStorageSettingsController ?? throw new ArgumentNullException(nameof(intelStorageSettingsController));
             _settingsTabController = settingsTabController ?? throw new ArgumentNullException(nameof(settingsTabController));
             _boardDisplaySettingsController = boardDisplaySettingsController ?? throw new ArgumentNullException(nameof(boardDisplaySettingsController));
             _saveSettings = saveSettings ?? throw new ArgumentNullException(nameof(saveSettings));
+
+            MainWindowAppearanceControllerStorageCompatibility.Register(
+                _appearanceController,
+                _intelStorageSettingsController,
+                _saveSettings);
+        }
+
+        internal MainWindowSettingsCoordinator(
+            MainWindowAppearanceController appearanceController,
+            SettingsTabController settingsTabController,
+            BoardDisplaySettingsController boardDisplaySettingsController,
+            Action<AppSettings> saveSettings)
+            : this(
+                appearanceController,
+                new IntelStorageSettingsController(
+                    saveSettings,
+                    _ => { },
+                    (_, _, _) => { }),
+                settingsTabController,
+                boardDisplaySettingsController,
+                saveSettings)
+        {
         }
 
         public void InitializeSettingsUi(
@@ -56,14 +81,16 @@ namespace PitmastersGrill.Services
                 panelModeRestartNoticeText,
                 windowOpacitySlider,
                 windowOpacityValueText,
+                visualThemeComboBox,
+                colorBlindModeComboBox,
+                logLevelComboBox);
+            _intelStorageSettingsController.InitializeSettingsUi(
+                settings,
                 maxKillmailAgeDaysTextBox,
                 effectiveMaxKillmailAgeText,
                 killmailDataRootPathTextBox,
                 killmailDataPathModeText,
-                effectiveKillmailDataPathText,
-                visualThemeComboBox,
-                colorBlindModeComboBox,
-                logLevelComboBox);
+                effectiveKillmailDataPathText);
             _settingsTabController.ApplySettingsToControls(
                 settings,
                 enableLiveZkillFeedCheckBox,
@@ -74,6 +101,59 @@ namespace PitmastersGrill.Services
                 showBoardGridLinesCheckBox,
                 boardTextSizeComboBox,
                 boardFontFamilyComboBox);
+        }
+
+        public void SaveMaxKillmailAge(
+            AppSettings settings,
+            TextBox maxKillmailAgeDaysTextBox,
+            TextBlock effectiveMaxKillmailAgeText)
+        {
+            _intelStorageSettingsController.SaveMaxKillmailAge(
+                settings,
+                maxKillmailAgeDaysTextBox,
+                effectiveMaxKillmailAgeText);
+        }
+
+        public void ResetMaxKillmailAgeToDefault(
+            AppSettings settings,
+            TextBox maxKillmailAgeDaysTextBox,
+            TextBlock effectiveMaxKillmailAgeText)
+        {
+            _intelStorageSettingsController.ResetMaxKillmailAgeToDefault(
+                settings,
+                maxKillmailAgeDaysTextBox,
+                effectiveMaxKillmailAgeText);
+        }
+
+        public void SaveKillmailPath(
+            AppSettings settings,
+            TextBox killmailDataRootPathTextBox,
+            TextBlock killmailDataPathModeText,
+            TextBlock effectiveKillmailDataPathText)
+        {
+            _intelStorageSettingsController.SaveKillmailPath(
+                settings,
+                killmailDataRootPathTextBox,
+                killmailDataPathModeText,
+                effectiveKillmailDataPathText);
+        }
+
+        public void ResetKillmailPathToDefault(
+            AppSettings settings,
+            TextBox killmailDataRootPathTextBox,
+            TextBlock killmailDataPathModeText,
+            TextBlock effectiveKillmailDataPathText)
+        {
+            _intelStorageSettingsController.ResetKillmailPathToDefault(
+                settings,
+                killmailDataRootPathTextBox,
+                killmailDataPathModeText,
+                effectiveKillmailDataPathText);
+        }
+
+        public int GetMaxKillmailAgeDaysSettingValue(AppSettings settings)
+        {
+            return _intelStorageSettingsController.GetMaxKillmailAgeDaysSettingValue(settings);
         }
 
         public void HandleDarkModeChanged(
