@@ -24,6 +24,10 @@ namespace PitmastersGrill.Tests.Services
         public void R2Z2EvidencePersistence_DelegatesToIncrementalImport()
         {
             var source = ReadRepoFile("PitmastersGrill", "Services", "R2Z2LiveKillmailService.cs");
+            var stateRepository = ReadRepoFile(
+                "PitmastersGrill",
+                "Persistence",
+                "R2Z2FeedStateRepository.cs");
 
             Assert.Contains("_incrementalImportService.ImportKillmailJson", source);
 
@@ -36,8 +40,14 @@ namespace PitmastersGrill.Tests.Services
             Assert.DoesNotContain("UpsertSeenRecord(", source);
             Assert.DoesNotContain("TryGetSeenRecord(", source);
 
-            Assert.Contains("INSERT INTO live_killmail_feed_state", source);
-            Assert.Contains("SELECT COUNT(*) FROM live_killmail_seen", source);
+            Assert.DoesNotContain("INSERT INTO live_killmail_feed_state", source);
+            Assert.DoesNotContain("SELECT COUNT(*) FROM live_killmail_seen", source);
+            Assert.Contains("_feedStateRepository.Update(", source);
+            Assert.Contains("_feedStateRepository.ReadSnapshot()", source);
+
+            Assert.Contains("INSERT INTO live_killmail_feed_state", stateRepository);
+            Assert.Contains("SELECT COUNT(*) FROM live_killmail_seen", stateRepository);
+            Assert.DoesNotContain("ImportKillmailJson", stateRepository);
         }
 
         [Fact]

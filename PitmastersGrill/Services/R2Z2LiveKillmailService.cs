@@ -1,10 +1,7 @@
-using Microsoft.Data.Sqlite;
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
 using System.Globalization;
-using System.Net;
-using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,25 +10,15 @@ namespace PitmastersGrill.Services
 {
     public sealed class R2Z2LiveKillmailService
     {
-        private const string FeedName = "r2z2";
-        private const string CurrentSequenceUrl = "https://r2z2.zkillboard.com/ephemeral/sequence.json";
-        private const string SequenceFileUrlFormat = "https://r2z2.zkillboard.com/ephemeral/{0}.json";
         private const int DefaultStartupSequenceOverlap = 250;
         private const int CurrentDayBridgeSequenceOverlap = 10000;
-        private static readonly TimeSpan SuccessPacingDelay = TimeSpan.FromMilliseconds(200);
-        private static readonly TimeSpan CaughtUpBaseDelay = TimeSpan.FromSeconds(8);
-        private static readonly TimeSpan CaughtUpJitterMaxDelay = TimeSpan.FromSeconds(2);
-        private static readonly TimeSpan RateLimitBaseDelay = TimeSpan.FromSeconds(30);
-        private static readonly TimeSpan RateLimitJitterMaxDelay = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan RateLimitMaxDelay = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan ErrorBackoffDelay = TimeSpan.FromSeconds(15);
 
         private readonly object _sync = new();
-        private readonly string _databasePath;
         private readonly AppSettingsService _appSettingsService;
         private readonly KillmailDatasetMetadataRepository _metadataRepository;
         private readonly KillmailIncrementalImportService _incrementalImportService;
-        private readonly HttpClient _httpClient;
+        private readonly R2Z2SequenceClient _sequenceClient;
+        private readonly R2Z2FeedStateRepository _feedStateRepository;
 
         private Task? _workerTask;
         private CancellationTokenSource? _runCts;
@@ -41,16 +28,27 @@ namespace PitmastersGrill.Services
         public R2Z2LiveKillmailService(
             AppSettingsService appSettingsService,
             KillmailIncrementalImportService incrementalImportService)
+            : this(
+                appSettingsService,
+                incrementalImportService,
+                new KillmailDatasetMetadataRepository(KillmailPaths.GetKillmailDatabasePath()),
+                new R2Z2SequenceClient(),
+                new R2Z2FeedStateRepository(KillmailPaths.GetKillmailDatabasePath()))
+        {
+        }
+
+        internal R2Z2LiveKillmailService(
+            AppSettingsService appSettingsService,
+            KillmailIncrementalImportService incrementalImportService,
+            KillmailDatasetMetadataRepository metadataRepository,
+            R2Z2SequenceClient sequenceClient,
+            R2Z2FeedStateRepository feedStateRepository)
         {
             _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
             _incrementalImportService = incrementalImportService ?? throw new ArgumentNullException(nameof(incrementalImportService));
-            _databasePath = KillmailPaths.GetKillmailDatabasePath();
-            _metadataRepository = new KillmailDatasetMetadataRepository(_databasePath);
-            _httpClient = new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(30)
-            };
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(AppHttpDefaults.GenericUserAgent);
+            _metadataRepository = metadataRepository ?? throw new ArgumentNullException(nameof(metadataRepository));
+            _sequenceClient = sequenceClient ?? throw new ArgumentNullException(nameof(sequenceClient));
+            _feedStateRepository = feedStateRepository ?? throw new ArgumentNullException(nameof(feedStateRepository));
             _snapshot = CreateDisabledSnapshot();
         }
 
@@ -163,38 +161,38 @@ namespace PitmastersGrill.Services
 
             try
             {
-                await EnsureInitializedSequenceAsync(cancellationToken);
+                await EnsureInitializedSequenceAsync(cancellationToken).ConfigureAwait(false);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var state = LoadFeedState();
+                    var state = _feedStateRepository.Load();
                     if (state == null || state.Enabled == 0)
                     {
-                        UpdateSnapshot(ReadSnapshotFromDatabase());
+                        UpdateSnapshot(_feedStateRepository.ReadSnapshot());
                         return;
                     }
 
                     if (!state.NextSequenceId.HasValue || state.NextSequenceId.Value <= 0)
                     {
-                        await EnsureInitializedSequenceAsync(cancellationToken);
+                        await EnsureInitializedSequenceAsync(cancellationToken).ConfigureAwait(false);
                         continue;
                     }
 
                     var nextSequenceId = state.NextSequenceId.Value;
-                    var sequenceUrl = string.Format(CultureInfo.InvariantCulture, SequenceFileUrlFormat, nextSequenceId);
-                    AppLogger.KillmailImportDebug($"R2Z2 sequence fetch start. sequence={nextSequenceId} url={sequenceUrl}");
 
                     try
                     {
-                        using var response = await _httpClient.GetAsync(sequenceUrl, cancellationToken);
+                        var fetch = await _sequenceClient
+                            .FetchSequenceAsync(nextSequenceId, consecutiveRateLimitCount + 1, cancellationToken)
+                            .ConfigureAwait(false);
 
-                        if (response.StatusCode == HttpStatusCode.NotFound)
+                        if (fetch.Status == R2Z2SequenceFetchStatus.NotFound)
                         {
                             consecutiveRateLimitCount = 0;
-                            var retryDelay = BuildCaughtUpDelay();
-                            var retryAtUtc = DateTime.UtcNow.Add(retryDelay).ToString("o");
+                            var retryAtUtc = DateTime.UtcNow.Add(fetch.RetryDelay).ToString("o");
                             SetNextRetryAtUtc(retryAtUtc);
-                            AppLogger.KillmailImportDebug($"R2Z2 caught up wait. sequence={nextSequenceId} status=404 retryDelayMs={(long)retryDelay.TotalMilliseconds} retryAtUtc={retryAtUtc}");
+                            AppLogger.KillmailImportDebug(
+                                $"R2Z2 caught up wait. sequence={nextSequenceId} status=404 retryDelayMs={(long)fetch.RetryDelay.TotalMilliseconds} retryAtUtc={retryAtUtc}");
                             UpdateFeedState(stateUpdate =>
                             {
                                 stateUpdate.Status = "Caught up / waiting";
@@ -203,17 +201,17 @@ namespace PitmastersGrill.Services
                                 stateUpdate.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
                             });
 
-                            await Task.Delay(retryDelay, cancellationToken);
+                            await Task.Delay(fetch.RetryDelay, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
 
-                        if (response.StatusCode == (HttpStatusCode)429)
+                        if (fetch.Status == R2Z2SequenceFetchStatus.RateLimited)
                         {
                             consecutiveRateLimitCount++;
-                            var retryDelay = GetRateLimitDelay(response, consecutiveRateLimitCount, out var delaySource);
-                            var retryAtUtc = DateTime.UtcNow.Add(retryDelay).ToString("o");
+                            var retryAtUtc = DateTime.UtcNow.Add(fetch.RetryDelay).ToString("o");
                             SetNextRetryAtUtc(retryAtUtc);
-                            AppLogger.KillmailImportDebug($"R2Z2 rate limit backoff. sequence={nextSequenceId} status=429 retryDelayMs={(long)retryDelay.TotalMilliseconds} source={delaySource} consecutive429={consecutiveRateLimitCount} retryAtUtc={retryAtUtc}");
+                            AppLogger.KillmailImportDebug(
+                                $"R2Z2 rate limit backoff. sequence={nextSequenceId} status=429 retryDelayMs={(long)fetch.RetryDelay.TotalMilliseconds} source={fetch.DelaySource} consecutive429={consecutiveRateLimitCount} retryAtUtc={retryAtUtc}");
                             UpdateFeedState(stateUpdate =>
                             {
                                 stateUpdate.Status = "Backing off after rate limit";
@@ -222,11 +220,11 @@ namespace PitmastersGrill.Services
                                 stateUpdate.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
                             });
 
-                            await Task.Delay(retryDelay, cancellationToken);
+                            await Task.Delay(fetch.RetryDelay, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
 
-                        if (response.StatusCode == HttpStatusCode.Forbidden)
+                        if (fetch.Status == R2Z2SequenceFetchStatus.Forbidden)
                         {
                             SetNextRetryAtUtc("");
                             AppLogger.KillmailImportWarn($"R2Z2 live feed paused. sequence={nextSequenceId} status=403");
@@ -241,25 +239,24 @@ namespace PitmastersGrill.Services
                             return;
                         }
 
-                        if (!response.IsSuccessStatusCode)
+                        if (fetch.Status == R2Z2SequenceFetchStatus.Error)
                         {
                             SetNextRetryAtUtc("");
-                            var error = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
-                            AppLogger.KillmailImportWarn($"R2Z2 sequence fetch failed. sequence={nextSequenceId} error={error}");
+                            AppLogger.KillmailImportWarn(
+                                $"R2Z2 sequence fetch failed. sequence={nextSequenceId} error={fetch.Error}");
                             UpdateFeedState(stateUpdate =>
                             {
                                 stateUpdate.Status = "Error";
                                 stateUpdate.LastErrorAtUtc = DateTime.UtcNow.ToString("o");
-                                stateUpdate.LastError = error;
+                                stateUpdate.LastError = fetch.Error;
                                 stateUpdate.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
                             });
 
-                            await Task.Delay(ErrorBackoffDelay, cancellationToken);
+                            await Task.Delay(fetch.RetryDelay, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
 
-                        var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                        var processed = ProcessSequencePayload(nextSequenceId, content, cancellationToken);
+                        var processed = ProcessSequencePayload(nextSequenceId, fetch.Content, cancellationToken);
 
                         if (!processed.Success)
                         {
@@ -274,7 +271,7 @@ namespace PitmastersGrill.Services
                                 stateUpdate.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
                             });
 
-                            await Task.Delay(ErrorBackoffDelay, cancellationToken);
+                            await Task.Delay(_sequenceClient.ErrorBackoffDelay, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
 
@@ -284,7 +281,7 @@ namespace PitmastersGrill.Services
                             processed.WasDuplicate
                                 ? $"R2Z2 duplicate killmail skipped. sequence={nextSequenceId} killmailId={processed.KillmailId}"
                                 : $"R2Z2 live killmail processed. sequence={nextSequenceId} killmailId={processed.KillmailId} day={processed.DayUtc}");
-                        await Task.Delay(SuccessPacingDelay, cancellationToken);
+                        await Task.Delay(_sequenceClient.SuccessPacingDelay, cancellationToken).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException)
                     {
@@ -304,7 +301,7 @@ namespace PitmastersGrill.Services
                             stateUpdate.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
                         });
 
-                        await Task.Delay(ErrorBackoffDelay, cancellationToken);
+                        await Task.Delay(_sequenceClient.ErrorBackoffDelay, cancellationToken).ConfigureAwait(false);
                     }
                 }
             }
@@ -319,7 +316,7 @@ namespace PitmastersGrill.Services
 
         private async Task EnsureInitializedSequenceAsync(CancellationToken cancellationToken)
         {
-            var state = LoadFeedState() ?? CreateDefaultState();
+            var state = _feedStateRepository.LoadOrDefault();
             if (state.NextSequenceId.HasValue && state.NextSequenceId.Value > 0)
             {
                 return;
@@ -332,21 +329,14 @@ namespace PitmastersGrill.Services
                 stateUpdate.UpdatedAtUtc = DateTime.UtcNow.ToString("o");
             });
 
-            AppLogger.KillmailImportDebug("R2Z2 current sequence fetch begin.");
-            using var response = await _httpClient.GetAsync(CurrentSequenceUrl, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (!TryParseCurrentSequenceId(payload, out var currentSequenceId))
-            {
-                throw new InvalidOperationException("Unable to parse the current R2Z2 sequence.");
-            }
+            var currentSequenceId = await _sequenceClient
+                .GetCurrentSequenceIdAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             var startupOverlap = DetermineStartupSequenceOverlap(out var overlapReason);
             var initializedNextSequence = Math.Max(1, currentSequenceId - startupOverlap);
             AppLogger.KillmailImportInfo(
                 $"R2Z2 startup sequence initialized. currentSequence={currentSequenceId} nextSequence={initializedNextSequence} overlap={startupOverlap} reason={overlapReason}");
-            AppLogger.KillmailImportDebug($"R2Z2 current sequence fetch end. currentSequence={currentSequenceId}");
 
             UpdateFeedState(stateUpdate =>
             {
@@ -413,7 +403,8 @@ namespace PitmastersGrill.Services
 
             AppLogger.KillmailImportDebug(
                 $"R2Z2 derived observations. sequence={requestedSequenceId} killmailId={envelope.KillmailId} registry={importResult.RegistryObservationCount} fleet={importResult.FleetObservationCount} ship={importResult.ShipObservationCount} cyno={importResult.CynoObservationCount} bait={importResult.BaitObservationCount} tackle={importResult.TackleObservationCount}");
-            AppLogger.KillmailImportDebug($"R2Z2 checkpoint updated. sequence={envelope.SequenceId} duplicate={importResult.WasDuplicate.ToString().ToLowerInvariant()}");
+            AppLogger.KillmailImportDebug(
+                $"R2Z2 checkpoint updated. sequence={envelope.SequenceId} duplicate={importResult.WasDuplicate.ToString().ToLowerInvariant()}");
 
             return new LiveProcessResult
             {
@@ -444,162 +435,10 @@ namespace PitmastersGrill.Services
             });
         }
 
-        private void UpdateFeedState(Action<LiveFeedStateRow> update)
+        private void UpdateFeedState(Action<R2Z2FeedState> update)
         {
-            using var connection = new SqliteConnection($"Data Source={_databasePath}");
-            connection.Open();
-
-            using var transaction = connection.BeginTransaction();
-            UpdateFeedStateInTransaction(connection, transaction, update);
-            transaction.Commit();
-
-            UpdateSnapshot(ReadSnapshotFromDatabase());
-        }
-
-        private void UpdateFeedStateInTransaction(
-            SqliteConnection connection,
-            SqliteTransaction transaction,
-            Action<LiveFeedStateRow> update)
-        {
-            var state = LoadFeedState(connection, transaction) ?? CreateDefaultState();
-            update(state);
-            UpsertFeedState(connection, transaction, state);
-        }
-
-        private LiveFeedStateRow? LoadFeedState()
-        {
-            using var connection = new SqliteConnection($"Data Source={_databasePath}");
-            connection.Open();
-            return LoadFeedState(connection, transaction: null);
-        }
-
-        private static LiveFeedStateRow? LoadFeedState(SqliteConnection connection, SqliteTransaction? transaction)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            SELECT
-                feed_name,
-                enabled,
-                next_sequence_id,
-                last_processed_sequence_id,
-                last_success_at_utc,
-                last_404_at_utc,
-                last_error_at_utc,
-                last_error,
-                status,
-                updated_at_utc
-            FROM live_killmail_feed_state
-            WHERE feed_name = $feedName
-            LIMIT 1;
-            ";
-            command.Parameters.AddWithValue("$feedName", FeedName);
-
-            using var reader = command.ExecuteReader();
-            if (!reader.Read())
-            {
-                return null;
-            }
-
-            return new LiveFeedStateRow
-            {
-                FeedName = reader.IsDBNull(0) ? FeedName : reader.GetString(0),
-                Enabled = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
-                NextSequenceId = reader.IsDBNull(2) ? null : reader.GetInt64(2),
-                LastProcessedSequenceId = reader.IsDBNull(3) ? null : reader.GetInt64(3),
-                LastSuccessAtUtc = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                Last404AtUtc = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                LastErrorAtUtc = reader.IsDBNull(6) ? "" : reader.GetString(6),
-                LastError = reader.IsDBNull(7) ? "" : reader.GetString(7),
-                Status = reader.IsDBNull(8) ? "Disabled" : reader.GetString(8),
-                UpdatedAtUtc = reader.IsDBNull(9) ? "" : reader.GetString(9)
-            };
-        }
-
-        private static void UpsertFeedState(SqliteConnection connection, SqliteTransaction transaction, LiveFeedStateRow state)
-        {
-            using var command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText =
-            @"
-            INSERT INTO live_killmail_feed_state (
-                feed_name,
-                enabled,
-                next_sequence_id,
-                last_processed_sequence_id,
-                last_success_at_utc,
-                last_404_at_utc,
-                last_error_at_utc,
-                last_error,
-                status,
-                updated_at_utc
-            )
-            VALUES (
-                $feedName,
-                $enabled,
-                $nextSequenceId,
-                $lastProcessedSequenceId,
-                $lastSuccessAtUtc,
-                $last404AtUtc,
-                $lastErrorAtUtc,
-                $lastError,
-                $status,
-                $updatedAtUtc
-            )
-            ON CONFLICT(feed_name) DO UPDATE SET
-                enabled = excluded.enabled,
-                next_sequence_id = excluded.next_sequence_id,
-                last_processed_sequence_id = excluded.last_processed_sequence_id,
-                last_success_at_utc = excluded.last_success_at_utc,
-                last_404_at_utc = excluded.last_404_at_utc,
-                last_error_at_utc = excluded.last_error_at_utc,
-                last_error = excluded.last_error,
-                status = excluded.status,
-                updated_at_utc = excluded.updated_at_utc;
-            ";
-            command.Parameters.AddWithValue("$feedName", state.FeedName);
-            command.Parameters.AddWithValue("$enabled", state.Enabled);
-            command.Parameters.AddWithValue("$nextSequenceId", (object?)state.NextSequenceId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$lastProcessedSequenceId", (object?)state.LastProcessedSequenceId ?? DBNull.Value);
-            command.Parameters.AddWithValue("$lastSuccessAtUtc", state.LastSuccessAtUtc ?? "");
-            command.Parameters.AddWithValue("$last404AtUtc", state.Last404AtUtc ?? "");
-            command.Parameters.AddWithValue("$lastErrorAtUtc", state.LastErrorAtUtc ?? "");
-            command.Parameters.AddWithValue("$lastError", state.LastError ?? "");
-            command.Parameters.AddWithValue("$status", state.Status ?? "Disabled");
-            command.Parameters.AddWithValue("$updatedAtUtc", state.UpdatedAtUtc ?? "");
-            command.ExecuteNonQuery();
-        }
-
-        private R2Z2LiveFeedSnapshot ReadSnapshotFromDatabase()
-        {
-            var state = LoadFeedState() ?? CreateDefaultState();
-            return new R2Z2LiveFeedSnapshot
-            {
-                Source = "R2Z2",
-                Enabled = state.Enabled != 0,
-                Status = string.IsNullOrWhiteSpace(state.Status) ? "Disabled" : state.Status,
-                NextSequenceId = state.NextSequenceId,
-                LastProcessedSequenceId = state.LastProcessedSequenceId,
-                LastSuccessAtUtc = state.LastSuccessAtUtc,
-                LastCaughtUpAtUtc = state.Last404AtUtc,
-                LastErrorAtUtc = state.LastErrorAtUtc,
-                LastError = state.LastError,
-                RecentLiveImportsCount = CountSeenRows()
-            };
-        }
-
-        private int CountSeenRows()
-        {
-            using var connection = new SqliteConnection($"Data Source={_databasePath}");
-            connection.Open();
-
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT COUNT(*) FROM live_killmail_seen;";
-            var scalar = command.ExecuteScalar();
-            return scalar == null || scalar == DBNull.Value
-                ? 0
-                : Convert.ToInt32(scalar, CultureInfo.InvariantCulture);
+            _feedStateRepository.Update(update);
+            UpdateSnapshot(_feedStateRepository.ReadSnapshot());
         }
 
         private void UpdateSnapshot(R2Z2LiveFeedSnapshot snapshot)
@@ -641,100 +480,6 @@ namespace PitmastersGrill.Services
             };
         }
 
-        private static LiveFeedStateRow CreateDefaultState()
-        {
-            return new LiveFeedStateRow
-            {
-                FeedName = FeedName,
-                Enabled = 0,
-                Status = "Disabled",
-                UpdatedAtUtc = DateTime.UtcNow.ToString("o")
-            };
-        }
-
-        private static bool TryParseCurrentSequenceId(string payload, out long sequenceId)
-        {
-            sequenceId = 0;
-            if (string.IsNullOrWhiteSpace(payload))
-            {
-                return false;
-            }
-
-            using var document = JsonDocument.Parse(payload);
-            var root = document.RootElement;
-
-            if (root.ValueKind == JsonValueKind.Number && root.TryGetInt64(out sequenceId))
-            {
-                return true;
-            }
-
-            if (TryReadLong(root, "sequence", out sequenceId) || TryReadLong(root, "sequence_id", out sequenceId))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private static TimeSpan BuildCaughtUpDelay()
-        {
-            return CaughtUpBaseDelay + BuildJitter(CaughtUpJitterMaxDelay);
-        }
-
-        private static TimeSpan GetRateLimitDelay(HttpResponseMessage response, int consecutiveRateLimitCount, out string delaySource)
-        {
-            if (TryGetRetryAfterDelay(response, out var retryAfterDelay))
-            {
-                delaySource = "retry-after";
-                return retryAfterDelay + BuildJitter(RateLimitJitterMaxDelay);
-            }
-
-            var multiplier = Math.Max(0, consecutiveRateLimitCount - 1);
-            var exponentialSeconds = RateLimitBaseDelay.TotalSeconds * Math.Pow(2, multiplier);
-            var cappedDelay = TimeSpan.FromSeconds(Math.Min(exponentialSeconds, RateLimitMaxDelay.TotalSeconds));
-            delaySource = "exponential";
-            return cappedDelay + BuildJitter(RateLimitJitterMaxDelay);
-        }
-
-        private static bool TryGetRetryAfterDelay(HttpResponseMessage response, out TimeSpan retryDelay)
-        {
-            retryDelay = TimeSpan.Zero;
-
-            var retryAfter = response?.Headers?.RetryAfter;
-            if (retryAfter == null)
-            {
-                return false;
-            }
-
-            if (retryAfter.Delta.HasValue && retryAfter.Delta.Value > TimeSpan.Zero)
-            {
-                retryDelay = retryAfter.Delta.Value;
-                return true;
-            }
-
-            if (retryAfter.Date.HasValue)
-            {
-                var delay = retryAfter.Date.Value.UtcDateTime - DateTime.UtcNow;
-                if (delay > TimeSpan.Zero)
-                {
-                    retryDelay = delay;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static TimeSpan BuildJitter(TimeSpan maxJitter)
-        {
-            if (maxJitter <= TimeSpan.Zero)
-            {
-                return TimeSpan.Zero;
-            }
-
-            return TimeSpan.FromMilliseconds(Random.Shared.NextDouble() * maxJitter.TotalMilliseconds);
-        }
-
         private void SetNextRetryAtUtc(string nextRetryAtUtc)
         {
             lock (_sync)
@@ -742,7 +487,7 @@ namespace PitmastersGrill.Services
                 _nextRetryAtUtc = nextRetryAtUtc ?? "";
             }
 
-            UpdateSnapshot(ReadSnapshotFromDatabase());
+            UpdateSnapshot(_feedStateRepository.ReadSnapshot());
         }
 
         private int DetermineStartupSequenceOverlap(out string reason)
@@ -777,13 +522,13 @@ namespace PitmastersGrill.Services
                 out day);
         }
 
-        private static bool TryExtractSequenceEnvelope(
+        internal static bool TryExtractSequenceEnvelope(
             string payload,
             long requestedSequenceId,
-            out SequenceEnvelope envelope,
+            out R2Z2SequenceEnvelope envelope,
             out string error)
         {
-            envelope = new SequenceEnvelope();
+            envelope = new R2Z2SequenceEnvelope();
             error = "";
 
             if (string.IsNullOrWhiteSpace(payload))
@@ -900,21 +645,7 @@ namespace PitmastersGrill.Services
             return TryReadString(outer, innerPropertyName);
         }
 
-        private sealed class LiveFeedStateRow
-        {
-            public string FeedName { get; set; } = "r2z2";
-            public int Enabled { get; set; }
-            public long? NextSequenceId { get; set; }
-            public long? LastProcessedSequenceId { get; set; }
-            public string LastSuccessAtUtc { get; set; } = "";
-            public string Last404AtUtc { get; set; } = "";
-            public string LastErrorAtUtc { get; set; } = "";
-            public string LastError { get; set; } = "";
-            public string Status { get; set; } = "Disabled";
-            public string UpdatedAtUtc { get; set; } = "";
-        }
-
-        private sealed class SequenceEnvelope
+        internal sealed class R2Z2SequenceEnvelope
         {
             public long SequenceId { get; set; }
             public string KillmailId { get; set; } = "";

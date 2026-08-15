@@ -1,8 +1,6 @@
-﻿using PitmastersGrill.Models;
+using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using System;
-using System.Globalization;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,11 +24,6 @@ namespace PitmastersGrill.Services
             _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
         }
 
-        public void SaveSettings(AppSettings settings)
-        {
-            _appSettingsService.Save(settings);
-        }
-
         public void InitializeSettingsUi(
             AppSettings settings,
             CheckBox darkModeCheckBox,
@@ -39,19 +32,11 @@ namespace PitmastersGrill.Services
             TextBlock panelModeRestartNoticeText,
             Slider windowOpacitySlider,
             TextBlock windowOpacityValueText,
-            TextBox maxKillmailAgeDaysTextBox,
-            TextBlock effectiveMaxKillmailAgeText,
-            TextBox killmailDataRootPathTextBox,
-            TextBlock killmailDataPathModeText,
-            TextBlock effectiveKillmailDataPathText,
             ComboBox visualThemeComboBox,
             ComboBox colorBlindModeComboBox,
             ComboBox logLevelComboBox)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             if (darkModeCheckBox != null)
             {
@@ -71,7 +56,6 @@ namespace PitmastersGrill.Services
             UpdatePanelModeRestartNotice(panelModeRestartNoticeText, settings);
 
             var opacityPercent = CoerceOpacityPercent(settings.WindowOpacityPercent);
-
             if (windowOpacitySlider != null)
             {
                 windowOpacitySlider.Value = opacityPercent;
@@ -80,26 +64,6 @@ namespace PitmastersGrill.Services
             if (windowOpacityValueText != null)
             {
                 windowOpacityValueText.Text = $"{opacityPercent:0}%";
-            }
-
-            if (maxKillmailAgeDaysTextBox != null)
-            {
-                maxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText(settings);
-            }
-
-            if (effectiveMaxKillmailAgeText != null)
-            {
-                UpdateMaxKillmailAgeUi(effectiveMaxKillmailAgeText, settings);
-            }
-
-            if (killmailDataRootPathTextBox != null)
-            {
-                killmailDataRootPathTextBox.Text = GetKillmailPathEditorText(settings);
-            }
-
-            if (killmailDataPathModeText != null && effectiveKillmailDataPathText != null)
-            {
-                UpdateKillmailPathUi(killmailDataPathModeText, effectiveKillmailDataPathText);
             }
 
             ApplyLogLevelSelection(logLevelComboBox, settings.LogLevel);
@@ -114,10 +78,7 @@ namespace PitmastersGrill.Services
             Window window,
             Action applyBoardPopulationStatusVisual)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             settings.DarkModeEnabled = darkModeEnabled;
             _appSettingsService.Save(settings);
@@ -133,10 +94,7 @@ namespace PitmastersGrill.Services
             TextBlock? windowOpacityValueText,
             ResourceDictionary resources)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             settings.AlwaysOnTopEnabled = alwaysOnTopEnabled;
             _appSettingsService.Save(settings);
@@ -150,10 +108,7 @@ namespace PitmastersGrill.Services
             bool panelModeEnabled,
             TextBlock panelModeRestartNoticeText)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             settings.PanelModeEnabled = panelModeEnabled;
             _appSettingsService.Save(settings);
@@ -175,21 +130,9 @@ namespace PitmastersGrill.Services
             AppSettings settings,
             ResourceDictionary resources)
         {
-            if (window == null)
-            {
-                throw new ArgumentNullException(nameof(window));
-            }
-
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
-
+            ArgumentNullException.ThrowIfNull(window);
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(resources);
             ApplyWindowShell(window, settings, resources);
         }
 
@@ -198,20 +141,9 @@ namespace PitmastersGrill.Services
             AppSettings settings,
             ResourceDictionary resources)
         {
-            if (window == null)
-            {
-                throw new ArgumentNullException(nameof(window));
-            }
-
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
+            ArgumentNullException.ThrowIfNull(window);
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(resources);
 
             if (settings.PanelModeEnabled)
             {
@@ -242,21 +174,16 @@ namespace PitmastersGrill.Services
             AppLogger.UiInfo("Custom startup shell applied. windowStyle=None allowsTransparency=false resizeMode=CanResize captionHeight=0");
         }
 
-        public double HandleWindowOpacityChanged
-(
+        public double HandleWindowOpacityChanged(
             AppSettings settings,
             double sliderValue,
             Window window,
             TextBlock? windowOpacityValueText,
             ResourceDictionary resources)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             var opacityPercent = CoerceOpacityPercent(sliderValue);
-
             if (windowOpacityValueText != null)
             {
                 windowOpacityValueText.Text = $"{opacityPercent:0}%";
@@ -267,19 +194,14 @@ namespace PitmastersGrill.Services
             ApplyWindowSettings(window, settings, windowOpacityValueText, resources);
 
             AppLogger.UiInfo($"Window opacity changed. opacityPercent={opacityPercent:0}");
-
             return opacityPercent;
         }
 
         public void HandleLogLevelChanged(AppSettings settings, ComboBox logLevelComboBox)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             var selectedLogLevel = GetSelectedLogLevel(logLevelComboBox);
-
             if (settings.LogLevel == selectedLogLevel)
             {
                 return;
@@ -288,7 +210,6 @@ namespace PitmastersGrill.Services
             settings.LogLevel = selectedLogLevel;
             _appSettingsService.Save(settings);
             AppLogger.ConfigureLogLevel(selectedLogLevel);
-
             AppLogger.AppInfo($"Log level changed. level={selectedLogLevel}");
         }
 
@@ -299,10 +220,7 @@ namespace PitmastersGrill.Services
             Window window,
             Action applyBoardPopulationStatusVisual)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             var selectedTheme = GetSelectedTheme(visualThemeComboBox);
             if (string.Equals(settings.VisualTheme, selectedTheme.ToString(), StringComparison.Ordinal))
@@ -324,10 +242,7 @@ namespace PitmastersGrill.Services
             Window window,
             Action applyBoardPopulationStatusVisual)
         {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(settings);
 
             var selectedMode = GetSelectedColorBlindMode(colorBlindModeComboBox);
             if (string.Equals(settings.ColorBlindMode, selectedMode.ToString(), StringComparison.Ordinal))
@@ -348,15 +263,8 @@ namespace PitmastersGrill.Services
             Window window,
             Action applyBoardPopulationStatusVisual)
         {
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
-
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(resources);
+            ArgumentNullException.ThrowIfNull(settings);
 
             if (settings.DarkModeEnabled)
             {
@@ -391,26 +299,14 @@ namespace PitmastersGrill.Services
             TextBlock? windowOpacityValueText,
             ResourceDictionary resources)
         {
-            if (window == null)
-            {
-                throw new ArgumentNullException(nameof(window));
-            }
-
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
+            ArgumentNullException.ThrowIfNull(window);
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(resources);
 
             window.Topmost = settings.AlwaysOnTopEnabled;
             ApplySurfaceOpacity(resources, settings);
 
             var opacityPercent = CoerceOpacityPercent(settings.WindowOpacityPercent);
-
             if (windowOpacityValueText != null)
             {
                 windowOpacityValueText.Text = $"{opacityPercent:0}%";
@@ -446,263 +342,12 @@ namespace PitmastersGrill.Services
             }
 
             var useDarkMode = darkModeEnabled ? 1 : 0;
-
             try
             {
                 DwmSetWindowAttribute(hwnd, DwMWaUseImmersiveDarkMode, ref useDarkMode, sizeof(int));
             }
             catch
             {
-            }
-        }
-
-        public void SaveMaxKillmailAge(
-            AppSettings settings,
-            TextBox maxKillmailAgeDaysTextBox,
-            TextBlock effectiveMaxKillmailAgeText)
-        {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (maxKillmailAgeDaysTextBox == null)
-            {
-                throw new ArgumentNullException(nameof(maxKillmailAgeDaysTextBox));
-            }
-
-            if (effectiveMaxKillmailAgeText == null)
-            {
-                throw new ArgumentNullException(nameof(effectiveMaxKillmailAgeText));
-            }
-
-            try
-            {
-                var rawValue = maxKillmailAgeDaysTextBox.Text?.Trim() ?? string.Empty;
-
-                if (!int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedDays))
-                {
-                    MessageBox.Show(
-                        $"Enter a whole number between {KillmailDatasetFreshnessService.MinimumMaxKillmailAgeDays} and {KillmailDatasetFreshnessService.MaximumMaxKillmailAgeDays}.",
-                        "PMG Max Killmail Age",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-
-                    maxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText(settings);
-                    return;
-                }
-
-                var normalizedDays = KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(parsedDays);
-                settings.MaxKillmailAgeDays = normalizedDays;
-                _appSettingsService.Save(settings);
-                maxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText(settings);
-                UpdateMaxKillmailAgeUi(effectiveMaxKillmailAgeText, settings);
-
-                AppLogger.UiInfo($"Max killmail age saved. days={normalizedDays}");
-
-                MessageBox.Show(
-                    $"Max killmail age saved as {normalizedDays} day{(normalizedDays == 1 ? "" : "s")}. The new value will apply the next time you use Enable KillMail DB Pull.",
-                    "PMG Max Killmail Age",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to save max killmail age.", ex);
-
-                MessageBox.Show(
-                    $"Failed to save max killmail age.\n\n{ex.Message}",
-                    "PMG Max Killmail Age Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        public void ResetMaxKillmailAgeToDefault(
-            AppSettings settings,
-            TextBox maxKillmailAgeDaysTextBox,
-            TextBlock effectiveMaxKillmailAgeText)
-        {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (maxKillmailAgeDaysTextBox == null)
-            {
-                throw new ArgumentNullException(nameof(maxKillmailAgeDaysTextBox));
-            }
-
-            if (effectiveMaxKillmailAgeText == null)
-            {
-                throw new ArgumentNullException(nameof(effectiveMaxKillmailAgeText));
-            }
-
-            try
-            {
-                settings.MaxKillmailAgeDays = KillmailDatasetFreshnessService.DefaultMaxKillmailAgeDays;
-                _appSettingsService.Save(settings);
-                maxKillmailAgeDaysTextBox.Text = GetMaxKillmailAgeTextBoxText(settings);
-                UpdateMaxKillmailAgeUi(effectiveMaxKillmailAgeText, settings);
-
-                AppLogger.UiInfo($"Max killmail age reset to default. days={settings.MaxKillmailAgeDays}");
-
-                MessageBox.Show(
-                    $"Max killmail age reset to the default of {settings.MaxKillmailAgeDays} days.",
-                    "PMG Max Killmail Age",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to reset max killmail age to default.", ex);
-
-                MessageBox.Show(
-                    $"Failed to reset max killmail age.\n\n{ex.Message}",
-                    "PMG Max Killmail Age Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        public void SaveKillmailPath(
-            AppSettings settings,
-            TextBox killmailDataRootPathTextBox,
-            TextBlock killmailDataPathModeText,
-            TextBlock effectiveKillmailDataPathText)
-        {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (killmailDataRootPathTextBox == null)
-            {
-                throw new ArgumentNullException(nameof(killmailDataRootPathTextBox));
-            }
-
-            if (killmailDataPathModeText == null)
-            {
-                throw new ArgumentNullException(nameof(killmailDataPathModeText));
-            }
-
-            if (effectiveKillmailDataPathText == null)
-            {
-                throw new ArgumentNullException(nameof(effectiveKillmailDataPathText));
-            }
-
-            try
-            {
-                var rawValue = killmailDataRootPathTextBox.Text?.Trim() ?? string.Empty;
-                var normalizedDefaultPath = KillmailPaths.NormalizeForComparison(KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath());
-
-                if (string.IsNullOrWhiteSpace(rawValue))
-                {
-                    settings.KillmailDataRootPath = string.Empty;
-                    _appSettingsService.Save(settings);
-                    killmailDataRootPathTextBox.Text = GetKillmailPathEditorText(settings);
-                    UpdateKillmailPathUi(killmailDataPathModeText, effectiveKillmailDataPathText);
-
-                    AppLogger.UiInfo("Killmail data path override cleared via blank save. Restart required.");
-
-                    MessageBox.Show(
-                        "Killmail data path reset to the default %LOCALAPPDATA% location. Restart PMG to apply the new path fully.",
-                        "PMG Killmail Data Path",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-
-                    return;
-                }
-
-                var normalizedPath = KillmailPaths.NormalizeForComparison(rawValue);
-
-                if (string.Equals(normalizedPath, normalizedDefaultPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    settings.KillmailDataRootPath = string.Empty;
-                }
-                else
-                {
-                    var expandedPath = KillmailPaths.ExpandPathTokens(rawValue);
-                    Directory.CreateDirectory(expandedPath);
-
-                    settings.KillmailDataRootPath = rawValue;
-                }
-
-                _appSettingsService.Save(settings);
-                killmailDataRootPathTextBox.Text = GetKillmailPathEditorText(settings);
-                UpdateKillmailPathUi(killmailDataPathModeText, effectiveKillmailDataPathText);
-
-                AppLogger.UiInfo(
-                    $"Killmail data path saved. configuredValue='{settings.KillmailDataRootPath ?? string.Empty}' displayPath='{KillmailPaths.GetKillmailDataDirectoryDisplayPath()}' source={KillmailPaths.GetKillmailDataDirectorySourceDescription()} restartRequired=true");
-
-                MessageBox.Show(
-                    "Killmail data path saved. Restart PMG to apply the new path fully. Existing killmail data is not migrated automatically.",
-                    "PMG Killmail Data Path",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to save killmail data path.", ex);
-
-                MessageBox.Show(
-                    $"Failed to save killmail data path.\n\n{ex.Message}",
-                    "PMG Killmail Data Path Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        public void ResetKillmailPathToDefault(
-            AppSettings settings,
-            TextBox killmailDataRootPathTextBox,
-            TextBlock killmailDataPathModeText,
-            TextBlock effectiveKillmailDataPathText)
-        {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (killmailDataRootPathTextBox == null)
-            {
-                throw new ArgumentNullException(nameof(killmailDataRootPathTextBox));
-            }
-
-            if (killmailDataPathModeText == null)
-            {
-                throw new ArgumentNullException(nameof(killmailDataPathModeText));
-            }
-
-            if (effectiveKillmailDataPathText == null)
-            {
-                throw new ArgumentNullException(nameof(effectiveKillmailDataPathText));
-            }
-
-            try
-            {
-                settings.KillmailDataRootPath = string.Empty;
-                _appSettingsService.Save(settings);
-                killmailDataRootPathTextBox.Text = GetKillmailPathEditorText(settings);
-                UpdateKillmailPathUi(killmailDataPathModeText, effectiveKillmailDataPathText);
-
-                AppLogger.UiInfo("Killmail data path reset to default %LOCALAPPDATA% location. Restart required.");
-
-                MessageBox.Show(
-                    "Killmail data path reset to the default %LOCALAPPDATA% location. Restart PMG to apply the new path fully.",
-                    "PMG Killmail Data Path",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to reset killmail data path to default.", ex);
-
-                MessageBox.Show(
-                    $"Failed to reset killmail data path.\n\n{ex.Message}",
-                    "PMG Killmail Data Path Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
             }
         }
 
@@ -760,68 +405,6 @@ namespace PitmastersGrill.Services
                 : AppLogLevel.Normal;
         }
 
-        public int GetMaxKillmailAgeDaysSettingValue(AppSettings settings)
-        {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            return KillmailDatasetFreshnessService.NormalizeMaxKillmailAgeDays(settings.MaxKillmailAgeDays);
-        }
-
-        public string GetMaxKillmailAgeTextBoxText(AppSettings settings)
-        {
-            return GetMaxKillmailAgeDaysSettingValue(settings).ToString(CultureInfo.InvariantCulture);
-        }
-
-        public void UpdateMaxKillmailAgeUi(TextBlock effectiveMaxKillmailAgeText, AppSettings settings)
-        {
-            if (effectiveMaxKillmailAgeText == null)
-            {
-                throw new ArgumentNullException(nameof(effectiveMaxKillmailAgeText));
-            }
-
-            var days = GetMaxKillmailAgeDaysSettingValue(settings);
-            var suffix = days == 1 ? "day" : "days";
-
-            effectiveMaxKillmailAgeText.Text = $"Effective max killmail age: {days} {suffix}";
-        }
-
-        public void UpdateKillmailPathUi(TextBlock killmailDataPathModeText, TextBlock effectiveKillmailDataPathText)
-        {
-            if (killmailDataPathModeText == null)
-            {
-                throw new ArgumentNullException(nameof(killmailDataPathModeText));
-            }
-
-            if (effectiveKillmailDataPathText == null)
-            {
-                throw new ArgumentNullException(nameof(effectiveKillmailDataPathText));
-            }
-
-            var displayPath = KillmailPaths.GetKillmailDataDirectoryDisplayPath();
-            var sourceDescription = KillmailPaths.GetKillmailDataDirectorySourceDescription();
-
-            killmailDataPathModeText.Text = $"Source: {sourceDescription}";
-            effectiveKillmailDataPathText.Text = $"Effective path: {displayPath}";
-        }
-
-        public string GetKillmailPathEditorText(AppSettings settings)
-        {
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
-            if (!string.IsNullOrWhiteSpace(settings.KillmailDataRootPath))
-            {
-                return settings.KillmailDataRootPath;
-            }
-
-            return KillmailPaths.GetDefaultKillmailDataDirectoryDisplayPath();
-        }
-
         private void UpdatePanelModeRestartNotice(TextBlock panelModeRestartNoticeText, AppSettings settings)
         {
             if (panelModeRestartNoticeText == null || settings == null)
@@ -835,17 +418,9 @@ namespace PitmastersGrill.Services
         }
 
         private void ApplySurfaceOpacity(ResourceDictionary resources, AppSettings settings)
-
         {
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
-
-            if (settings == null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
+            ArgumentNullException.ThrowIfNull(resources);
+            ArgumentNullException.ThrowIfNull(settings);
 
             var alpha = (byte)Math.Round(255 * (CoerceOpacityPercent(settings.WindowOpacityPercent) / 100.0));
 
@@ -854,7 +429,6 @@ namespace PitmastersGrill.Services
                 SetBrushResource(resources, "WindowBackgroundBrush", GetColorResource(resources, "BackgroundBase", "#1E1E1E"), alpha);
                 SetBrushResource(resources, "SurfaceBrush", GetColorResource(resources, "PanelBackground", "#1F1F1F"), alpha);
                 SetBrushResource(resources, "SurfaceAltBrush", GetColorResource(resources, "PanelBackgroundAlt", "#252525"), alpha);
-
                 SetBrushResource(resources, "GridBackgroundBrush", GetColorResource(resources, "BoardBackground", "#2B2B2B"), alpha);
                 SetBrushResource(resources, "GridAlternateBrush", GetColorResource(resources, "BoardAlternate", "#323232"), alpha);
                 SetBrushResource(resources, "GridHeaderBrush", GetColorResource(resources, "BoardHeaderBackground", "#202020"), alpha);
@@ -864,7 +438,6 @@ namespace PitmastersGrill.Services
                 SetBrushResource(resources, "WindowBackgroundBrush", "#F5F5F5", alpha);
                 SetBrushResource(resources, "SurfaceBrush", "#FFFFFF", alpha);
                 SetBrushResource(resources, "SurfaceAltBrush", "#FAFAFA", alpha);
-
                 SetBrushResource(resources, "GridBackgroundBrush", "#FFFFFF", alpha);
                 SetBrushResource(resources, "GridAlternateBrush", "#F2F2F2", alpha);
                 SetBrushResource(resources, "GridHeaderBrush", "#E8E8E8", alpha);
