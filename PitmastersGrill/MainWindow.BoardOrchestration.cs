@@ -8,6 +8,7 @@ namespace PitmastersGrill
     public partial class MainWindow
     {
         private BoardRowStateHydrator _boardRowStateHydrator = null!;
+        private BoardInitialSessionAssembler _boardInitialSessionAssembler = null!;
 
         private void BuildInitialBoard(
             List<string> characterNames,
@@ -17,15 +18,16 @@ namespace PitmastersGrill
             _diagnostics.InitialBoardBuildStart(characterNames.Count, identities.Count, stats.Count);
 
             var buildStopwatch = Stopwatch.StartNew();
-            var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
-
             ResetManualBoardSort();
-            _boardRowStateHydrator.Hydrate(initialRows);
 
-            _currentBoardSession.ReplaceRows(initialRows);
-            ApplyCurrentBoardOrdering();
-            ApplyIgnoredAllianceRowsToCurrentBoard();
-            RecomputeCorpAllianceCounts();
+            var result = _boardInitialSessionAssembler.Assemble(characterNames, identities, stats);
+            if (result.RemovedIgnoredRowCount > 0)
+            {
+                AppLogger.UiInfo($"Ignored alliance filter removed rows from initial board. removedRows={result.RemovedIgnoredRowCount}");
+            }
+
+            _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows);
+            _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows);
 
             PilotBoard.SelectedItem = null;
             _pilotDetailSurface.HideDetailPane();
@@ -33,7 +35,7 @@ namespace PitmastersGrill
             UpdateLastRefreshed();
 
             buildStopwatch.Stop();
-            _diagnostics.InitialBoardBuildComplete(_currentBoardSession.Count, buildStopwatch.ElapsedMilliseconds);
+            _diagnostics.InitialBoardBuildComplete(result.FinalRowCount, buildStopwatch.ElapsedMilliseconds);
         }
     }
 }

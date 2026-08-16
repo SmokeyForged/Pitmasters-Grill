@@ -58,6 +58,17 @@ namespace PitmastersGrill
                 _notesRepository.HasNotes,
                 _watchedPilotRepository.IsWatched,
                 _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState);
+            _boardInitialSessionAssembler = new BoardInitialSessionAssembler(
+                _boardRowFactory.CreateRows,
+                rows => _boardRowStateHydrator.Hydrate(rows),
+                _currentBoardSession,
+                (rows, applyOrderedRows) => _boardSortController.ApplyCurrentBoardOrdering(
+                    rows,
+                    selectedRow: null,
+                    applyOrderedRows,
+                    restoreSelectedRow: static _ => { }),
+                rows => _ignoreAllianceBoardController.ApplyToCurrentRows(rows, selectedRow: null).RemovedRows,
+                rows => _boardAffiliationCountService.ApplyCounts(rows, _appSettings.ShowCorpAllianceCounts));
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
