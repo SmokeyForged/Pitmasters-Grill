@@ -10,26 +10,42 @@ namespace PitmastersGrill.Tests.Services
         public void MainWindow_DelegatesCurrentBoardStateToSession()
         {
             var mainWindowSource = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs")
-                + ReadRepoFile("PitmastersGrill", "MainWindow.ComposedConstructor.cs");
+                + ReadRepoFile("PitmastersGrill", "MainWindow.ComposedConstructor.cs")
+                + ReadRepoFile("PitmastersGrill", "MainWindow.BoardOrchestration.cs");
+            var initialAssemblySource = ReadRepoFile(
+                "PitmastersGrill",
+                "Services",
+                "BoardInitialSessionAssembler.cs");
+            var rowProcessingSource = ReadRepoFile(
+                "PitmastersGrill",
+                "Services",
+                "BoardRowProcessingCoordinator.cs");
 
             Assert.Contains("CurrentBoardSession _currentBoardSession", mainWindowSource);
             Assert.Contains("PilotBoard.ItemsSource = _currentBoardSession.Rows", mainWindowSource);
             Assert.Contains("_currentBoardSession.Changed += CurrentBoardSession_Changed", mainWindowSource);
             Assert.Contains("_currentBoardSession.BeginProcessingGeneration", mainWindowSource);
             Assert.Contains("_currentBoardSession.ClearAndInvalidate", mainWindowSource);
-            Assert.Contains("_currentBoardSession.ReplaceRows", mainWindowSource);
             Assert.Contains("_currentBoardSession.RemoveRows", mainWindowSource);
             Assert.Contains("_currentBoardSession.ReorderRows", mainWindowSource);
             Assert.Contains("ApplyToCurrentRows(_currentBoardSession.Rows", mainWindowSource);
             Assert.Contains("_currentBoardSession.RemoveRows(applyResult.RemovedRows)", mainWindowSource);
 
-            Assert.DoesNotContain("_currentRows", mainWindowSource);
-            Assert.DoesNotContain("_processingGeneration", mainWindowSource);
-            Assert.DoesNotContain("SubscribeToBoardRow", mainWindowSource);
-            Assert.DoesNotContain("UnsubscribeFromBoardRow", mainWindowSource);
-            Assert.DoesNotContain("UnsubscribeFromAllBoardRows", mainWindowSource);
-            Assert.DoesNotContain("BoardRow_PropertyChanged", mainWindowSource);
-            Assert.DoesNotContain("CurrentRows_CollectionChanged", mainWindowSource);
+            Assert.DoesNotContain("_currentBoardSession.ReplaceRows", mainWindowSource);
+            Assert.Contains("_currentBoardSession.ReplaceRows", initialAssemblySource);
+            Assert.Contains("_currentBoardSession.ReorderRows", initialAssemblySource);
+            Assert.Contains("_currentBoardSession.RemoveRows", initialAssemblySource);
+            Assert.Contains("_currentBoardSession.BeginProcessingGeneration", rowProcessingSource);
+            Assert.Contains("_currentBoardSession.IsCurrentGeneration", rowProcessingSource);
+
+            var ownershipSources = mainWindowSource + initialAssemblySource + rowProcessingSource;
+            Assert.DoesNotContain("_currentRows", ownershipSources);
+            Assert.DoesNotContain("_processingGeneration", ownershipSources);
+            Assert.DoesNotContain("SubscribeToBoardRow", ownershipSources);
+            Assert.DoesNotContain("UnsubscribeFromBoardRow", ownershipSources);
+            Assert.DoesNotContain("UnsubscribeFromAllBoardRows", ownershipSources);
+            Assert.DoesNotContain("BoardRow_PropertyChanged", ownershipSources);
+            Assert.DoesNotContain("CurrentRows_CollectionChanged", ownershipSources);
         }
 
         [Fact]
