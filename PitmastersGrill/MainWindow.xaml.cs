@@ -106,6 +106,7 @@ namespace PitmastersGrill
         private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisCorpItems = new();
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
+        private readonly BoardAffiliationCountService _boardAffiliationCountService = new();
         private bool _isApplyingSettings;
         private bool _isShuttingDown;
         private bool _compactDragPending;
@@ -682,103 +683,14 @@ namespace PitmastersGrill
                 Resources);
         }
 
-        private async Task ProcessSingleRowAsync(PilotBoardRow row, SemaphoreSlim semaphore, int generation)
+        private Task ProcessSingleRowAsync(PilotBoardRow row, SemaphoreSlim semaphore, int generation)
         {
-            await semaphore.WaitAsync();
-
-            try
-            {
-                await _boardPopulationRowProcessor.ProcessAsync(
-                    row,
-                    generation,
-                    () => _currentBoardSession.CurrentGeneration,
-                    action => Dispatcher.InvokeAsync(() =>
-                    {
-                        if (!_currentBoardSession.IsCurrentGeneration(generation))
-                        {
-                            return;
-                        }
-
-                        action();
-                    }).Task,
-                    RefreshDetailWindowIfSelected,
-                    UpdateLastRefreshed,
-                    (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message),
-                    rowToEvaluate => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(rowToEvaluate));
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (!_currentBoardSession.IsCurrentGeneration(generation))
-                    {
-                        return;
-                    }
-
-                    ApplyWatchedState(row);
-                    ApplyCurrentBoardOrdering();
-                    _pilotDetailSurface.UpdateWatchPilotDetailActionState(
-                        _pilotDetailSurface.GetSelectedOrDisplayedDetailRow(
-                            PilotBoard?.SelectedItem as PilotBoardRow,
-                            _currentBoardSession.Rows));
-                    RefreshDetailWindowIfSelected(row);
-                });
-
-                if (_ignoreAllianceBoardController.ShouldRemoveResolvedRow(row))
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        if (!_currentBoardSession.IsCurrentGeneration(generation))
-                        {
-                            return;
-                        }
-
-                        RemoveIgnoredAllianceRowFromCurrentBoard(row);
-                    });
-                }
-            }
-            finally
-            {
-                semaphore.Release();
-            }
+            return _boardRowProcessingCoordinator.ProcessSingleRowAsync(row, semaphore, generation);
         }
 
         private void HandleRowProcessorMarker(BoardRowProcessMarkerKind markerKind, int generation, string message)
         {
             _boardPopulationTimingMarkerTracker.HandleMarker(markerKind, generation, message);
-        }
-
-        private void BuildInitialBoard(
-            List<string> characterNames,
-            Dictionary<string, ResolverCacheEntry> identities,
-            Dictionary<string, StatsCacheEntry> stats)
-        {
-            _diagnostics.InitialBoardBuildStart(characterNames.Count, identities.Count, stats.Count);
-
-            var buildStopwatch = Stopwatch.StartNew();
-            var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
-
-            ResetManualBoardSort();
-
-            foreach (var row in initialRows)
-            {
-                row.KnownCynoOverride = _notesRepository.GetKnownCynoOverride(row.CharacterName);
-                row.BaitOverride = _notesRepository.GetBaitOverride(row.CharacterName);
-                row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
-                ApplyWatchedState(row);
-                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
-            }
-
-            _currentBoardSession.ReplaceRows(initialRows);
-            ApplyCurrentBoardOrdering();
-            ApplyIgnoredAllianceRowsToCurrentBoard();
-            RecomputeCorpAllianceCounts();
-
-            PilotBoard.SelectedItem = null;
-            _pilotDetailSurface.HideDetailPane();
-            _pilotDetailSurface.CloseActiveDetailWindow();
-            UpdateLastRefreshed();
-
-            buildStopwatch.Stop();
-            _diagnostics.InitialBoardBuildComplete(_currentBoardSession.Count, buildStopwatch.ElapsedMilliseconds);
         }
 
         private void RemoveIgnoredAllianceRowFromCurrentBoard(PilotBoardRow row)
@@ -853,62 +765,12 @@ namespace PitmastersGrill
 
         private void RecomputeCorpAllianceCounts()
         {
-            var showCounts = _appSettings.ShowCorpAllianceCounts;
-
-            var corpCounts = _currentBoardSession.Rows
-                .Select(row => new { Row = row, Key = GetCorpCountKey(row) })
-                .Where(item => !string.IsNullOrWhiteSpace(item.Key))
-                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-
-            var allianceCounts = _currentBoardSession.Rows
-                .Select(row => new { Row = row, Key = GetAllianceCountKey(row) })
-                .Where(item => !string.IsNullOrWhiteSpace(item.Key))
-                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-
-            foreach (var row in _currentBoardSession.Rows)
-            {
-                row.ShowCorpAllianceCounts = showCounts;
-
-                var corpKey = GetCorpCountKey(row);
-                row.CorpLocalCount = !string.IsNullOrWhiteSpace(corpKey) && corpCounts.TryGetValue(corpKey, out var corpCount)
-                    ? corpCount
-                    : 0;
-
-                var allianceKey = GetAllianceCountKey(row);
-                row.AllianceLocalCount = !string.IsNullOrWhiteSpace(allianceKey) && allianceCounts.TryGetValue(allianceKey, out var allianceCount)
-                    ? allianceCount
-                    : 0;
-            }
+            _boardAffiliationCountService.ApplyCounts(
+                _currentBoardSession.Rows,
+                _appSettings.ShowCorpAllianceCounts);
 
             _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows);
             _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows);
-        }
-
-        private static string GetCorpCountKey(PilotBoardRow row)
-        {
-            return BuildAffiliationCountKey(row.CorpId, row.CorpName);
-        }
-
-        private static string GetAllianceCountKey(PilotBoardRow row)
-        {
-            return BuildAffiliationCountKey(row.AllianceId, row.AllianceName);
-        }
-
-        private static string BuildAffiliationCountKey(string id, string name)
-        {
-            if (!string.IsNullOrWhiteSpace(id))
-            {
-                return $"id:{id.Trim()}";
-            }
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                return $"name:{name.Trim().ToUpperInvariant()}";
-            }
-
-            return string.Empty;
         }
 
         private void PilotBoard_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1190,19 +1052,19 @@ namespace PitmastersGrill
             return _intelSupportSurface.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
         }
 
-        private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
+        private Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
         {
-            if (_currentBoardSession.Count == 0)
+            if (_currentBoardSession.Count > 0)
             {
-                return;
+                AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentBoardSession.Count}");
             }
-            AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentBoardSession.Count}");
-            CancelBoardPopulationRetry();
-            var generation = _currentBoardSession.BeginProcessingGeneration();
-            UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral);
-            await ProcessRowBatchAsync(_currentBoardSession.Snapshot().ToList(), generation);
-            FinalizeBoardPopulationPass(generation);
-            UpdateLastRefreshed();
+
+            return _boardRowProcessingCoordinator.RefreshCurrentRowsFromLocalIntelAsync(
+                CancelBoardPopulationRetry,
+                () => UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral),
+                (rows, generation) => ProcessRowBatchAsync(rows.ToList(), generation),
+                FinalizeBoardPopulationPass,
+                UpdateLastRefreshed);
         }
 
         private void OpenZkillForRow(PilotBoardRow selectedRow)
@@ -1251,11 +1113,6 @@ namespace PitmastersGrill
                 PilotBoard?.SelectedItem as PilotBoardRow,
                 _currentBoardSession.Rows);
         }
-        private bool TryIgnoreAllianceForRow(PilotBoardRow selectedRow)
-        {
-            return TryIgnoreForRow(selectedRow, IgnoreEntryType.Alliance);
-        }
-
         private bool TryIgnoreForRow(PilotBoardRow selectedRow, IgnoreEntryType type)
         {
             var id = GetIgnoreId(selectedRow, type);
@@ -1304,33 +1161,6 @@ namespace PitmastersGrill
                    FindVisualParent<TextBox>(source) != null ||
                    FindVisualParent<ComboBox>(source) != null ||
                    FindVisualParent<Thumb>(source) != null;
-        }
-
-        private static T? FindVisualDescendant<T>(DependencyObject? root)
-            where T : DependencyObject
-        {
-            if (root == null)
-            {
-                return null;
-            }
-
-            var childCount = VisualTreeHelper.GetChildrenCount(root);
-            for (var index = 0; index < childCount; index++)
-            {
-                var child = VisualTreeHelper.GetChild(root, index);
-                if (child is T match)
-                {
-                    return match;
-                }
-
-                var nested = FindVisualDescendant<T>(child);
-                if (nested != null)
-                {
-                    return nested;
-                }
-            }
-
-            return null;
         }
 
         private static T? FindVisualParent<T>(DependencyObject? source)
