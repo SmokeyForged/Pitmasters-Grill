@@ -9,9 +9,14 @@ namespace PitmastersGrill.Services
     {
         public void OpenUrl(string url)
         {
+            _ = TryOpenUrl(url);
+        }
+
+        public bool TryOpenUrl(string url)
+        {
             if (string.IsNullOrWhiteSpace(url))
             {
-                return;
+                return false;
             }
 
             try
@@ -24,10 +29,12 @@ namespace PitmastersGrill.Services
 
                 Process.Start(startInfo);
                 AppLogger.UiInfo($"Opened external URL. url={url}");
+                return true;
             }
             catch (Exception ex)
             {
                 AppLogger.UiError($"Failed to open external URL. url={url}", ex);
+                return false;
             }
         }
 
