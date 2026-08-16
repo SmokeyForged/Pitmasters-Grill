@@ -106,6 +106,7 @@ namespace PitmastersGrill
         private readonly ObservableCollection<AnalysisAffiliationListItem> _analysisCorpItems = new();
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
+        private readonly BoardAffiliationCountService _boardAffiliationCountService = new();
         private bool _isApplyingSettings;
         private bool _isShuttingDown;
         private bool _compactDragPending;
@@ -853,62 +854,12 @@ namespace PitmastersGrill
 
         private void RecomputeCorpAllianceCounts()
         {
-            var showCounts = _appSettings.ShowCorpAllianceCounts;
-
-            var corpCounts = _currentBoardSession.Rows
-                .Select(row => new { Row = row, Key = GetCorpCountKey(row) })
-                .Where(item => !string.IsNullOrWhiteSpace(item.Key))
-                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-
-            var allianceCounts = _currentBoardSession.Rows
-                .Select(row => new { Row = row, Key = GetAllianceCountKey(row) })
-                .Where(item => !string.IsNullOrWhiteSpace(item.Key))
-                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-
-            foreach (var row in _currentBoardSession.Rows)
-            {
-                row.ShowCorpAllianceCounts = showCounts;
-
-                var corpKey = GetCorpCountKey(row);
-                row.CorpLocalCount = !string.IsNullOrWhiteSpace(corpKey) && corpCounts.TryGetValue(corpKey, out var corpCount)
-                    ? corpCount
-                    : 0;
-
-                var allianceKey = GetAllianceCountKey(row);
-                row.AllianceLocalCount = !string.IsNullOrWhiteSpace(allianceKey) && allianceCounts.TryGetValue(allianceKey, out var allianceCount)
-                    ? allianceCount
-                    : 0;
-            }
+            _boardAffiliationCountService.ApplyCounts(
+                _currentBoardSession.Rows,
+                _appSettings.ShowCorpAllianceCounts);
 
             _analysisTabPresenter.UpdateBoardSummary(_currentBoardSession.Rows);
             _analysisTabPresenter.UpdateAnalysisTab(_currentBoardSession.Rows);
-        }
-
-        private static string GetCorpCountKey(PilotBoardRow row)
-        {
-            return BuildAffiliationCountKey(row.CorpId, row.CorpName);
-        }
-
-        private static string GetAllianceCountKey(PilotBoardRow row)
-        {
-            return BuildAffiliationCountKey(row.AllianceId, row.AllianceName);
-        }
-
-        private static string BuildAffiliationCountKey(string id, string name)
-        {
-            if (!string.IsNullOrWhiteSpace(id))
-            {
-                return $"id:{id.Trim()}";
-            }
-
-            if (!string.IsNullOrWhiteSpace(name))
-            {
-                return $"name:{name.Trim().ToUpperInvariant()}";
-            }
-
-            return string.Empty;
         }
 
         private void PilotBoard_SelectionChanged(object sender, SelectionChangedEventArgs e)
