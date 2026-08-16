@@ -747,41 +747,6 @@ namespace PitmastersGrill
             _boardPopulationTimingMarkerTracker.HandleMarker(markerKind, generation, message);
         }
 
-        private void BuildInitialBoard(
-            List<string> characterNames,
-            Dictionary<string, ResolverCacheEntry> identities,
-            Dictionary<string, StatsCacheEntry> stats)
-        {
-            _diagnostics.InitialBoardBuildStart(characterNames.Count, identities.Count, stats.Count);
-
-            var buildStopwatch = Stopwatch.StartNew();
-            var initialRows = _boardRowFactory.CreateRows(characterNames, identities, stats);
-
-            ResetManualBoardSort();
-
-            foreach (var row in initialRows)
-            {
-                row.KnownCynoOverride = _notesRepository.GetKnownCynoOverride(row.CharacterName);
-                row.BaitOverride = _notesRepository.GetBaitOverride(row.CharacterName);
-                row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
-                ApplyWatchedState(row);
-                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState(row);
-            }
-
-            _currentBoardSession.ReplaceRows(initialRows);
-            ApplyCurrentBoardOrdering();
-            ApplyIgnoredAllianceRowsToCurrentBoard();
-            RecomputeCorpAllianceCounts();
-
-            PilotBoard.SelectedItem = null;
-            _pilotDetailSurface.HideDetailPane();
-            _pilotDetailSurface.CloseActiveDetailWindow();
-            UpdateLastRefreshed();
-
-            buildStopwatch.Stop();
-            _diagnostics.InitialBoardBuildComplete(_currentBoardSession.Count, buildStopwatch.ElapsedMilliseconds);
-        }
-
         private void RemoveIgnoredAllianceRowFromCurrentBoard(PilotBoardRow row)
         {
             if (row == null)

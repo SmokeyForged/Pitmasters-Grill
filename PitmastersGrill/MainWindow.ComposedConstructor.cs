@@ -52,6 +52,12 @@ namespace PitmastersGrill
             _ignoreAllianceBoardController = runtime.IgnoreAllianceBoardController;
             _zkillUrlBuilder = runtime.ZkillUrlBuilder;
             _browserLauncher = runtime.BrowserLauncher;
+            _boardRowStateHydrator = new BoardRowStateHydrator(
+                _notesRepository.GetKnownCynoOverride,
+                _notesRepository.GetBaitOverride,
+                _notesRepository.HasNotes,
+                _watchedPilotRepository.IsWatched,
+                _pilotBoardRowDetailFormatter.UpdateConfirmedCynoModuleState);
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");
