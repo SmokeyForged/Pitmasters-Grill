@@ -37,13 +37,12 @@ namespace PitmastersGrill
             try
             {
                 var sequence = Interlocked.Increment(ref _lifecycleDiagnosticSequence);
-                var barrierStatus = _shutdownBarrierTask?.Status.ToString() ?? "none";
                 var suffix = string.IsNullOrWhiteSpace(detail) ? string.Empty : $" {detail}";
 
                 AppLogger.UiInfo(
                     $"MainWindow lifecycle. seq={sequence} event='{eventName}' thread={Environment.CurrentManagedThreadId} " +
                     $"windowState='{WindowState}' visible={IsVisible} shuttingDown={_isShuttingDown} " +
-                    $"barrierStatus='{barrierStatus}' barrierComplete={_shutdownBarrierComplete} " +
+                    $"barrierStatus='{ShutdownBarrierStatus}' barrierComplete={ShutdownBarrierComplete} " +
                     $"dispatcherShutdownStarted={Dispatcher.HasShutdownStarted} dispatcherShutdownFinished={Dispatcher.HasShutdownFinished}.{suffix}");
             }
             catch (Exception ex)
