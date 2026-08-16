@@ -9,6 +9,7 @@ namespace PitmastersGrill
     {
         private BoardRowStateHydrator _boardRowStateHydrator = null!;
         private BoardInitialSessionAssembler _boardInitialSessionAssembler = null!;
+        private BoardRowProcessingCoordinator _boardRowProcessingCoordinator = null!;
 
         private void BuildInitialBoard(
             List<string> characterNames,

@@ -69,6 +69,27 @@ namespace PitmastersGrill
                     restoreSelectedRow: static _ => { }),
                 rows => _ignoreAllianceBoardController.ApplyToCurrentRows(rows, selectedRow: null).RemovedRows,
                 rows => _boardAffiliationCountService.ApplyCounts(rows, _appSettings.ShowCorpAllianceCounts));
+            _boardRowProcessingCoordinator = new BoardRowProcessingCoordinator(
+                _currentBoardSession,
+                (row, generation, runOnUiAsync) => _boardPopulationRowProcessor.ProcessAsync(
+                    row,
+                    generation,
+                    () => _currentBoardSession.CurrentGeneration,
+                    runOnUiAsync,
+                    RefreshDetailWindowIfSelected,
+                    UpdateLastRefreshed,
+                    (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message),
+                    rowToEvaluate => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(rowToEvaluate)),
+                action => Dispatcher.InvokeAsync(action).Task,
+                ApplyWatchedState,
+                ApplyCurrentBoardOrdering,
+                () => _pilotDetailSurface.UpdateWatchPilotDetailActionState(
+                    _pilotDetailSurface.GetSelectedOrDisplayedDetailRow(
+                        PilotBoard?.SelectedItem as Models.PilotBoardRow,
+                        _currentBoardSession.Rows)),
+                RefreshDetailWindowIfSelected,
+                row => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(row),
+                RemoveIgnoredAllianceRowFromCurrentBoard);
 
             _isApplyingSettings = true;
             AppLogger.UiInfo("MainWindow InitializeComponent begin.");

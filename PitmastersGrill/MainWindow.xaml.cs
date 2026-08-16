@@ -683,63 +683,9 @@ namespace PitmastersGrill
                 Resources);
         }
 
-        private async Task ProcessSingleRowAsync(PilotBoardRow row, SemaphoreSlim semaphore, int generation)
+        private Task ProcessSingleRowAsync(PilotBoardRow row, SemaphoreSlim semaphore, int generation)
         {
-            await semaphore.WaitAsync();
-
-            try
-            {
-                await _boardPopulationRowProcessor.ProcessAsync(
-                    row,
-                    generation,
-                    () => _currentBoardSession.CurrentGeneration,
-                    action => Dispatcher.InvokeAsync(() =>
-                    {
-                        if (!_currentBoardSession.IsCurrentGeneration(generation))
-                        {
-                            return;
-                        }
-
-                        action();
-                    }).Task,
-                    RefreshDetailWindowIfSelected,
-                    UpdateLastRefreshed,
-                    (markerKind, message) => HandleRowProcessorMarker(markerKind, generation, message),
-                    rowToEvaluate => _ignoreAllianceBoardController.ShouldRemoveResolvedRow(rowToEvaluate));
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (!_currentBoardSession.IsCurrentGeneration(generation))
-                    {
-                        return;
-                    }
-
-                    ApplyWatchedState(row);
-                    ApplyCurrentBoardOrdering();
-                    _pilotDetailSurface.UpdateWatchPilotDetailActionState(
-                        _pilotDetailSurface.GetSelectedOrDisplayedDetailRow(
-                            PilotBoard?.SelectedItem as PilotBoardRow,
-                            _currentBoardSession.Rows));
-                    RefreshDetailWindowIfSelected(row);
-                });
-
-                if (_ignoreAllianceBoardController.ShouldRemoveResolvedRow(row))
-                {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        if (!_currentBoardSession.IsCurrentGeneration(generation))
-                        {
-                            return;
-                        }
-
-                        RemoveIgnoredAllianceRowFromCurrentBoard(row);
-                    });
-                }
-            }
-            finally
-            {
-                semaphore.Release();
-            }
+            return _boardRowProcessingCoordinator.ProcessSingleRowAsync(row, semaphore, generation);
         }
 
         private void HandleRowProcessorMarker(BoardRowProcessMarkerKind markerKind, int generation, string message)
@@ -1106,19 +1052,19 @@ namespace PitmastersGrill
             return _intelSupportSurface.GetVisibleCharacterIdsForBackgroundHistoricalRepair();
         }
 
-        private async Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
+        private Task RefreshCurrentBoardRowsFromLocalIntelAsync(string reason)
         {
-            if (_currentBoardSession.Count == 0)
+            if (_currentBoardSession.Count > 0)
             {
-                return;
+                AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentBoardSession.Count}");
             }
-            AppLogger.UiInfo($"Refreshing current Grill rows from local intel. reason='{reason}' rowCount={_currentBoardSession.Count}");
-            CancelBoardPopulationRetry();
-            var generation = _currentBoardSession.BeginProcessingGeneration();
-            UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral);
-            await ProcessRowBatchAsync(_currentBoardSession.Snapshot().ToList(), generation);
-            FinalizeBoardPopulationPass(generation);
-            UpdateLastRefreshed();
+
+            return _boardRowProcessingCoordinator.RefreshCurrentRowsFromLocalIntelAsync(
+                CancelBoardPopulationRetry,
+                () => UpdateBoardPopulationStatus("Refreshing Grill from local intel", BoardPopulationStatusKind.Neutral),
+                (rows, generation) => ProcessRowBatchAsync(rows.ToList(), generation),
+                FinalizeBoardPopulationPass,
+                UpdateLastRefreshed);
         }
 
         private void OpenZkillForRow(PilotBoardRow selectedRow)
