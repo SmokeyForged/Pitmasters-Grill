@@ -22,7 +22,8 @@ namespace PitmastersGrill.Tests.Services
             Assert.True(result.Attempted);
             Assert.True(result.Succeeded);
             Assert.Equal("https://zkillboard.com/character/9001/", result.Url);
-            Assert.Single(opened, result.Url);
+            Assert.Single(opened);
+            Assert.Equal(result.Url, opened[0]);
         }
 
         [Fact]
