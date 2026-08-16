@@ -1251,11 +1251,6 @@ namespace PitmastersGrill
                 PilotBoard?.SelectedItem as PilotBoardRow,
                 _currentBoardSession.Rows);
         }
-        private bool TryIgnoreAllianceForRow(PilotBoardRow selectedRow)
-        {
-            return TryIgnoreForRow(selectedRow, IgnoreEntryType.Alliance);
-        }
-
         private bool TryIgnoreForRow(PilotBoardRow selectedRow, IgnoreEntryType type)
         {
             var id = GetIgnoreId(selectedRow, type);
@@ -1304,33 +1299,6 @@ namespace PitmastersGrill
                    FindVisualParent<TextBox>(source) != null ||
                    FindVisualParent<ComboBox>(source) != null ||
                    FindVisualParent<Thumb>(source) != null;
-        }
-
-        private static T? FindVisualDescendant<T>(DependencyObject? root)
-            where T : DependencyObject
-        {
-            if (root == null)
-            {
-                return null;
-            }
-
-            var childCount = VisualTreeHelper.GetChildrenCount(root);
-            for (var index = 0; index < childCount; index++)
-            {
-                var child = VisualTreeHelper.GetChild(root, index);
-                if (child is T match)
-                {
-                    return match;
-                }
-
-                var nested = FindVisualDescendant<T>(child);
-                if (nested != null)
-                {
-                    return nested;
-                }
-            }
-
-            return null;
         }
 
         private static T? FindVisualParent<T>(DependencyObject? source)

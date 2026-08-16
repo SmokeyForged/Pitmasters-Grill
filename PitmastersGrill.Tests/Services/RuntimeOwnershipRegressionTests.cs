@@ -21,6 +21,17 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
+        public void MainWindow_ProvenDeadTransitionalHelpersRemainAbsent()
+        {
+            var source = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
+
+            Assert.DoesNotContain("TryIgnoreAllianceForRow(", source);
+            Assert.DoesNotContain("FindVisualDescendant<", source);
+            Assert.Contains("TryIgnoreForRow(", source);
+            Assert.Contains("FindVisualParent<", source);
+        }
+
+        [Fact]
         public void R2Z2EvidencePersistence_DelegatesToIncrementalImport()
         {
             var source = ReadRepoFile("PitmastersGrill", "Services", "R2Z2LiveKillmailService.cs");
