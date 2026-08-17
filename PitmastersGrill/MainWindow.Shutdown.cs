@@ -17,7 +17,7 @@ namespace PitmastersGrill
                 async () => await Dispatcher.InvokeAsync(Close),
                 AppLogger.UiInfo,
                 AppLogger.UiError,
-                LogMainWindowLifecycle);
+                ObserveMainWindowLifecycle);
 
         private string ShutdownBarrierStatus => _deterministicShutdownCoordinator?.BarrierStatus ?? "none";
         private bool ShutdownBarrierComplete => _deterministicShutdownCoordinator?.IsComplete == true;
@@ -25,7 +25,7 @@ namespace PitmastersGrill
         protected override void OnInitialized(EventArgs e)
         {
             base.OnInitialized(e);
-            EnableMainWindowLifecycleDiagnostics();
+            EnableMainWindowLifecycleObserver();
             Closing += MainWindow_DeterministicClosing;
         }
 
