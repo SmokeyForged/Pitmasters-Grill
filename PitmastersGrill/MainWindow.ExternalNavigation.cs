@@ -31,23 +31,11 @@ namespace PitmastersGrill
                 MessageBoxImage.Error);
         }
 
-        private void VersionUpdateView_RepositoryNavigateRequested(object sender, RequestNavigateEventArgs e)
-        {
-            var url = e.Uri?.AbsoluteUri ?? "https://github.com/SmokeyForged/Pitmasters-Grill";
-            var result = ExternalNavigation.OpenUrl(url, "GitHub repository");
-            ShowExternalNavigationErrorIfNeeded(result);
-            e.Handled = true;
-        }
+        private void VersionUpdateView_RepositoryNavigateRequested(object sender, RequestNavigateEventArgs e) =>
+            GitHubRepoLink_RequestNavigate(sender, e);
 
-        private async void VersionUpdateView_ManualUpdateCheckRequested(object sender, RoutedEventArgs e)
-        {
-            if (_manualUpdateCheckController == null)
-            {
-                return;
-            }
-
-            await _manualUpdateCheckController.RunAsync();
-        }
+        private void VersionUpdateView_ManualUpdateCheckRequested(object sender, RoutedEventArgs e) =>
+            ManualUpdateCheckButton_Click(sender, e);
 
         private void OpenManualUpdateReleasePage(string url)
         {
