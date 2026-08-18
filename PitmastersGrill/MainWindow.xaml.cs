@@ -1216,7 +1216,7 @@ namespace PitmastersGrill
 
         private void UpdateLastRefreshed()
         {
-            LastRefreshedText.Text = $"Last Refreshed: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            LastRefreshedText.Text = _boardStatusPresenter.BuildLastRefreshedText();
         }
         private void CurrentBoardSession_Changed(object? sender, CurrentBoardSessionChangedEventArgs e)
         {
