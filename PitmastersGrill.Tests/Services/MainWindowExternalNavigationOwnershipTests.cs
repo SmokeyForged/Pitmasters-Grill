@@ -26,7 +26,7 @@ namespace PitmastersGrill.Tests.Services
             AssertMethodHasNoTryCatch(source, "private void OpenZkillForRow", "private void Window_PreviewKeyDown");
             AssertMethodHasNoTryCatch(source, "private void GitHubRepoLink_RequestNavigate", "private void ApplyWatchedState");
             AssertMethodHasNoTryCatch(source, "private void AnalysisHyperlink_RequestNavigate", "private void AnalysisAllianceListBox_MouseDoubleClick");
-            AssertMethodHasNoTryCatch(source, "private void OpenAnalysisAffiliationItem", "private void NestedScrollViewer_PreviewMouseWheel");
+            AssertMethodHasNoTryCatch(source, "private void OpenAnalysisAffiliationItem", next: null);
         }
 
         [Fact]
@@ -37,7 +37,7 @@ namespace PitmastersGrill.Tests.Services
             var pilotMethod = SliceMethod(source, "private void OpenZkillForRow", "private void Window_PreviewKeyDown");
             var githubMethod = SliceMethod(source, "private void GitHubRepoLink_RequestNavigate", "private void ApplyWatchedState");
             var analysisMethod = SliceMethod(source, "private void AnalysisHyperlink_RequestNavigate", "private void AnalysisAllianceListBox_MouseDoubleClick");
-            var affiliationMethod = SliceMethod(source, "private void OpenAnalysisAffiliationItem", "private void NestedScrollViewer_PreviewMouseWheel");
+            var affiliationMethod = SliceMethod(source, "private void OpenAnalysisAffiliationItem", next: null);
 
             Assert.Contains("ShowExternalNavigationErrorIfNeeded(result);", pilotMethod, StringComparison.Ordinal);
             Assert.Contains("ShowExternalNavigationErrorIfNeeded(result);", githubMethod, StringComparison.Ordinal);
@@ -51,7 +51,7 @@ namespace PitmastersGrill.Tests.Services
         public void MainWindow_AffiliationRouting_NoLongerDefaultsUnsupportedTypesToCorporation()
         {
             var source = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
-            var method = SliceMethod(source, "private void OpenAnalysisAffiliationItem", "private void NestedScrollViewer_PreviewMouseWheel");
+            var method = SliceMethod(source, "private void OpenAnalysisAffiliationItem", next: null);
 
             Assert.DoesNotContain("BuildAllianceZkillUrl", method, StringComparison.Ordinal);
             Assert.DoesNotContain("BuildCorporationZkillUrl", method, StringComparison.Ordinal);
@@ -72,19 +72,21 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains("if (result.Exception == null)", source, StringComparison.Ordinal);
         }
 
-        private static void AssertMethodHasNoTryCatch(string source, string start, string next)
+        private static void AssertMethodHasNoTryCatch(string source, string start, string? next)
         {
             var method = SliceMethod(source, start, next);
             Assert.DoesNotContain("try", method, StringComparison.Ordinal);
             Assert.DoesNotContain("catch", method, StringComparison.Ordinal);
         }
 
-        private static string SliceMethod(string source, string start, string next)
+        private static string SliceMethod(string source, string start, string? next)
         {
             var startIndex = source.IndexOf(start, StringComparison.Ordinal);
             Assert.True(startIndex >= 0, $"Could not find method marker: {start}");
 
-            var endIndex = source.IndexOf(next, startIndex, StringComparison.Ordinal);
+            var endIndex = next is null
+                ? source.Length
+                : source.IndexOf(next, startIndex, StringComparison.Ordinal);
             Assert.True(endIndex > startIndex, $"Could not isolate method beginning with: {start}");
 
             return source[startIndex..endIndex];
