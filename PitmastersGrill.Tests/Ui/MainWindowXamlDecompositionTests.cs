@@ -46,12 +46,58 @@ namespace PitmastersGrill.Tests.Ui
         }
 
         [Fact]
+        public void GrillVisualTree_IsOwnedByFocusedView_WithoutAbsorbingPilotDetail()
+        {
+            var mainWindowXaml = ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
+            var grillXaml = ReadRepoFile("PitmastersGrill", "Views", "GrillView.xaml");
+            var compatibilitySource = ReadRepoFile("PitmastersGrill", "MainWindow.GrillView.cs");
+
+            Assert.Contains("<views:GrillView x:Name=\"GrillViewControl\"", mainWindowXaml);
+            Assert.DoesNotContain("<DataGrid x:Name=\"PilotBoard\"", mainWindowXaml);
+            Assert.DoesNotContain("x:Name=\"BoardOverlayHost\"", mainWindowXaml);
+            Assert.DoesNotContain("x:Name=\"BoardModeHintOverlay\"", mainWindowXaml);
+
+            // Pilot Detail remains a separate later extraction (PMG-24); PMG-23 must not absorb it.
+            Assert.Contains("x:Name=\"DetailPane\"", mainWindowXaml);
+            Assert.Contains("x:Name=\"KnownCynoOverrideCheckBox\"", mainWindowXaml);
+            Assert.Contains("x:Name=\"NotesTagsBox\"", mainWindowXaml);
+            Assert.DoesNotContain("x:Name=\"DetailPane\"", grillXaml);
+
+            Assert.Contains("AutomationProperties.AutomationId=\"BoardOverlayHost\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"PilotBoard\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"BoardModeHintOverlay\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"SigColumn\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"CharacterColumn\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"CynoHullSeenColumn\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"PilotNoteButton\"", grillXaml);
+            Assert.Contains("AutomationProperties.AutomationId=\"WatchedPilotMarker\"", grillXaml);
+
+            Assert.Contains("GrillViewControl.PilotBoardControl", compatibilitySource);
+            Assert.Contains("GrillViewControl.BoardOverlayHostGrid", compatibilitySource);
+            Assert.Contains("GrillViewControl.CharacterColumnControl", compatibilitySource);
+            Assert.Contains("GrillViewControl.CynoHullSeenColumnControl", compatibilitySource);
+        }
+
+        [Fact]
         public void AnalysisView_InheritedWindowResourcesUseDeferredLookup()
         {
             var analysisXaml = ReadRepoFile("PitmastersGrill", "Views", "AnalysisView.xaml");
 
             Assert.Contains("Style=\"{DynamicResource SettingsLabelStyle}\"", analysisXaml);
             Assert.DoesNotContain("Style=\"{StaticResource SettingsLabelStyle}\"", analysisXaml);
+        }
+
+        [Fact]
+        public void GrillView_InheritedWindowResourcesUseDeferredLookup()
+        {
+            var grillXaml = ReadRepoFile("PitmastersGrill", "Views", "GrillView.xaml");
+
+            Assert.Contains("ColumnHeaderStyle=\"{DynamicResource PilotBoardColumnHeaderStyle}\"", grillXaml);
+            Assert.Contains("CellStyle=\"{DynamicResource PilotBoardCellStyle}\"", grillXaml);
+            Assert.Contains("Style=\"{DynamicResource PilotNoteButtonStyle}\"", grillXaml);
+            Assert.DoesNotContain("{StaticResource PilotBoardColumnHeaderStyle}", grillXaml);
+            Assert.DoesNotContain("{StaticResource PilotBoardCellStyle}", grillXaml);
+            Assert.DoesNotContain("{StaticResource PilotNoteButtonStyle}", grillXaml);
         }
 
         [Fact]
@@ -79,6 +125,30 @@ namespace PitmastersGrill.Tests.Ui
         }
 
         [Fact]
+        public void GrillView_XamlLoadsWithoutParentResourceScope()
+        {
+            Exception? loadFailure = null;
+
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    _ = new GrillView();
+                }
+                catch (Exception ex)
+                {
+                    loadFailure = ex;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            Assert.Null(loadFailure);
+        }
+
+        [Fact]
         public void AnalysisViewCodeBehind_RemainsPresentationOnly()
         {
             var source = ReadRepoFile("PitmastersGrill", "Views", "AnalysisView.xaml.cs");
@@ -89,6 +159,20 @@ namespace PitmastersGrill.Tests.Ui
             Assert.DoesNotContain("Repository", source);
             Assert.DoesNotContain("Service", source);
             Assert.DoesNotContain("Persistence", source);
+        }
+
+        [Fact]
+        public void GrillViewCodeBehind_RemainsPresentationOnly()
+        {
+            var source = ReadRepoFile("PitmastersGrill", "Views", "GrillView.xaml.cs");
+
+            Assert.Contains("PilotBoardControl", source);
+            Assert.Contains("PilotNoteClick", source);
+            Assert.Contains("BoardPreviewMouseRightButtonUp", source);
+            Assert.DoesNotContain("Repository", source);
+            Assert.DoesNotContain("Service", source);
+            Assert.DoesNotContain("Persistence", source);
+            Assert.DoesNotContain("AppSettings", source);
         }
 
         private static string ReadRepoFile(params string[] relativeSegments)
