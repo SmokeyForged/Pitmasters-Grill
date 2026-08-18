@@ -5,13 +5,42 @@ using System.IO;
 
 namespace PitmastersGrill.Services
 {
+    public sealed record BrowserLaunchResult(
+        bool Attempted,
+        bool Succeeded,
+        string Url,
+        Exception? Exception = null);
+
     public class BrowserLauncher
     {
         public void OpenUrl(string url)
         {
-            if (string.IsNullOrWhiteSpace(url))
+            var result = TryOpenUrl(url);
+            if (!result.Attempted)
             {
                 return;
+            }
+
+            if (result.Succeeded)
+            {
+                AppLogger.UiInfo($"Opened external URL. url={result.Url}");
+                return;
+            }
+
+            if (result.Exception != null)
+            {
+                AppLogger.UiError($"Failed to open external URL. url={result.Url}", result.Exception);
+                return;
+            }
+
+            AppLogger.UiWarn($"Failed to open external URL. url={result.Url}");
+        }
+
+        public BrowserLaunchResult TryOpenUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return new BrowserLaunchResult(false, false, string.Empty);
             }
 
             try
@@ -23,11 +52,11 @@ namespace PitmastersGrill.Services
                 };
 
                 Process.Start(startInfo);
-                AppLogger.UiInfo($"Opened external URL. url={url}");
+                return new BrowserLaunchResult(true, true, url);
             }
             catch (Exception ex)
             {
-                AppLogger.UiError($"Failed to open external URL. url={url}", ex);
+                return new BrowserLaunchResult(true, false, url, ex);
             }
         }
 
