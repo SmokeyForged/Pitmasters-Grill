@@ -24,10 +24,12 @@ namespace PitmastersGrill.Tests.Services
         public void MainWindow_ProvenDeadTransitionalHelpersRemainAbsent()
         {
             var source = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
+            var typedIgnoreSource = ReadRepoFile("PitmastersGrill", "MainWindow.TypedIgnoreActions.cs");
 
             Assert.DoesNotContain("TryIgnoreAllianceForRow(", source);
             Assert.DoesNotContain("FindVisualDescendant<", source);
-            Assert.Contains("TryIgnoreForRow(", source);
+            Assert.DoesNotContain("TryIgnoreForRow(", source);
+            Assert.Contains("TryIgnoreForRow(", typedIgnoreSource);
             Assert.Contains("FindVisualParent<", source);
         }
 
