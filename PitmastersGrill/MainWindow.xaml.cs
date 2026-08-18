@@ -950,22 +950,10 @@ namespace PitmastersGrill
 
         private void OpenPilotNotesWindow(PilotBoardRow row)
         {
-            var notesWindow = new PilotNotesWindow(row, _notesRepository)
-            {
-                Owner = this,
-                Topmost = Topmost
-            };
-
-            notesWindow.Resources.MergedDictionaries.Clear();
-            foreach (var key in Resources.Keys)
-            {
-                notesWindow.Resources[key] = Resources[key];
-            }
-            notesWindow.ShowDialog();
-            row.HasNotes = _notesRepository.HasNotes(row.CharacterName);
+            var result = PilotNotesDialogLifecycle.Open(row, this, Topmost, Resources);
             PilotBoard.Items.Refresh();
             RefreshDetailWindowIfSelected(row);
-            AppLogger.UiInfo($"Pilot notes window closed. character='{row.CharacterName}' hasNotes={row.HasNotes}");
+            AppLogger.UiInfo($"Pilot notes window closed. character='{row.CharacterName}' hasNotes={result.HasNotes}");
         }
 
         private void WatchPilotDetailAction_Click(object sender, RoutedEventArgs e)
