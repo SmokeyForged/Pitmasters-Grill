@@ -110,7 +110,7 @@ namespace PitmastersGrill
             _clipboardDebounceTimer.Tick += ClipboardDebounceTimer_Tick;
             _compactDragHoldTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher)
             {
-                Interval = TimeSpan.FromMilliseconds(CompactDragHoldMilliseconds)
+                Interval = CompactBoardDragController.HoldDuration
             };
             _compactDragHoldTimer.Tick += CompactDragHoldTimer_Tick;
             _boardColumnLayoutSaveTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
