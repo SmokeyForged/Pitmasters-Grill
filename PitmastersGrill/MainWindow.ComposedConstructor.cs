@@ -51,6 +51,7 @@ namespace PitmastersGrill
             _boardPopulationEntryController = runtime.BoardPopulationEntryController;
             _boardPopulationSurface = runtime.BoardPopulationSurface;
             _ignoreAllianceCoordinator = runtime.IgnoreAllianceCoordinator;
+            _typedIgnoreActionCoordinator = runtime.TypedIgnoreActionCoordinator;
             _ignoreAllianceBoardController = runtime.IgnoreAllianceBoardController;
             _zkillUrlBuilder = runtime.ZkillUrlBuilder;
             _browserLauncher = runtime.BrowserLauncher;
