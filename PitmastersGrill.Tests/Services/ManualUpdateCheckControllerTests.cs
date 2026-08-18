@@ -51,7 +51,7 @@ namespace PitmastersGrill.Tests.Services
             Assert.Equal(new[] { false, true }, harness.EnabledStates);
             Assert.Equal("https://example.test/release", Assert.Single(harness.OpenedUrls));
             Assert.Empty(harness.SavedSettings);
-            Assert.Null(harness.RuntimeSettings.SkippedUpdateVersion);
+            Assert.Empty(harness.RuntimeSettings.SkippedUpdateVersion);
             Assert.Contains(harness.StatusTexts, text => text.Contains("PMG 1.3.0 is available", StringComparison.Ordinal));
             Assert.Equal(MessageBoxButton.YesNoCancel, Assert.Single(harness.Messages).Buttons);
         }
@@ -71,7 +71,7 @@ namespace PitmastersGrill.Tests.Services
             Assert.Equal(new[] { false, true }, harness.EnabledStates);
             Assert.Empty(harness.OpenedUrls);
             Assert.Empty(harness.SavedSettings);
-            Assert.Null(harness.RuntimeSettings.SkippedUpdateVersion);
+            Assert.Empty(harness.RuntimeSettings.SkippedUpdateVersion);
             Assert.Contains(harness.StatusTexts, text => text.Contains("PMG 1.3.0 is available", StringComparison.Ordinal));
         }
 
