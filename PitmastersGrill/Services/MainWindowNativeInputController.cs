@@ -11,24 +11,24 @@ namespace PitmastersGrill.Services
 
         public void Attach(
             IntPtr hwnd,
-            Func<IntPtr, bool> addClipboardFormatListener,
-            Func<IntPtr, int, uint, uint, bool> registerHotKey,
+            INativeInputApi nativeInputApi,
             uint modControl,
             int globalResetWindowHotKeyId,
             int globalClearBoardHotKeyId,
             int globalToggleBoardModeHotKeyId,
             Action<string> logInfo,
-            Action<string> logWarn,
-            Func<int> getLastWin32Error)
+            Action<string> logWarn)
         {
+            ArgumentNullException.ThrowIfNull(nativeInputApi);
+
             if (hwnd == IntPtr.Zero)
             {
                 return;
             }
 
-            addClipboardFormatListener(hwnd);
+            nativeInputApi.AddClipboardFormatListener(hwnd);
 
-            _globalClearBoardHotKeyRegistered = registerHotKey(
+            _globalClearBoardHotKeyRegistered = nativeInputApi.RegisterHotKey(
                 hwnd,
                 globalClearBoardHotKeyId,
                 0,
@@ -40,10 +40,10 @@ namespace PitmastersGrill.Services
             }
             else
             {
-                logWarn($"Global Delete clear-board hotkey registration failed. error={getLastWin32Error()}");
+                logWarn($"Global Delete clear-board hotkey registration failed. error={nativeInputApi.GetLastError()}");
             }
 
-            _globalToggleBoardModeHotKeyRegistered = registerHotKey(
+            _globalToggleBoardModeHotKeyRegistered = nativeInputApi.RegisterHotKey(
                 hwnd,
                 globalToggleBoardModeHotKeyId,
                 0,
@@ -55,10 +55,10 @@ namespace PitmastersGrill.Services
             }
             else
             {
-                logWarn($"Global Insert board-mode hotkey registration failed. error={getLastWin32Error()}");
+                logWarn($"Global Insert board-mode hotkey registration failed. error={nativeInputApi.GetLastError()}");
             }
 
-            _globalResetWindowHotKeyRegistered = registerHotKey(
+            _globalResetWindowHotKeyRegistered = nativeInputApi.RegisterHotKey(
                 hwnd,
                 globalResetWindowHotKeyId,
                 modControl,
@@ -70,21 +70,21 @@ namespace PitmastersGrill.Services
             }
             else
             {
-                logWarn($"Global Ctrl+Home hotkey registration failed. win32Error={getLastWin32Error()}");
+                logWarn($"Global Ctrl+Home hotkey registration failed. win32Error={nativeInputApi.GetLastError()}");
             }
         }
 
         public void Detach(
             IntPtr hwnd,
-            Func<IntPtr, bool> removeClipboardFormatListener,
-            Func<IntPtr, int, bool> unregisterHotKey,
+            INativeInputApi nativeInputApi,
             int globalResetWindowHotKeyId,
             int globalClearBoardHotKeyId,
             int globalToggleBoardModeHotKeyId,
             Action<string> logInfo,
-            Action<string> logWarn,
-            Func<int> getLastWin32Error)
+            Action<string> logWarn)
         {
+            ArgumentNullException.ThrowIfNull(nativeInputApi);
+
             if (hwnd == IntPtr.Zero)
             {
                 return;
@@ -92,13 +92,13 @@ namespace PitmastersGrill.Services
 
             if (_globalClearBoardHotKeyRegistered)
             {
-                if (unregisterHotKey(hwnd, globalClearBoardHotKeyId))
+                if (nativeInputApi.UnregisterHotKey(hwnd, globalClearBoardHotKeyId))
                 {
                     logInfo("Global Delete clear-board hotkey unregistered.");
                 }
                 else
                 {
-                    logWarn($"Global Delete clear-board hotkey unregister failed. error={getLastWin32Error()}");
+                    logWarn($"Global Delete clear-board hotkey unregister failed. error={nativeInputApi.GetLastError()}");
                 }
 
                 _globalClearBoardHotKeyRegistered = false;
@@ -106,13 +106,13 @@ namespace PitmastersGrill.Services
 
             if (_globalToggleBoardModeHotKeyRegistered)
             {
-                if (unregisterHotKey(hwnd, globalToggleBoardModeHotKeyId))
+                if (nativeInputApi.UnregisterHotKey(hwnd, globalToggleBoardModeHotKeyId))
                 {
                     logInfo("Global Insert board-mode hotkey unregistered.");
                 }
                 else
                 {
-                    logWarn($"Global Insert board-mode hotkey unregister failed. error={getLastWin32Error()}");
+                    logWarn($"Global Insert board-mode hotkey unregister failed. error={nativeInputApi.GetLastError()}");
                 }
 
                 _globalToggleBoardModeHotKeyRegistered = false;
@@ -120,15 +120,15 @@ namespace PitmastersGrill.Services
 
             if (_globalResetWindowHotKeyRegistered)
             {
-                if (!unregisterHotKey(hwnd, globalResetWindowHotKeyId))
+                if (!nativeInputApi.UnregisterHotKey(hwnd, globalResetWindowHotKeyId))
                 {
-                    logWarn($"Global Ctrl+Home hotkey unregistration failed. win32Error={getLastWin32Error()}");
+                    logWarn($"Global Ctrl+Home hotkey unregistration failed. win32Error={nativeInputApi.GetLastError()}");
                 }
 
                 _globalResetWindowHotKeyRegistered = false;
             }
 
-            removeClipboardFormatListener(hwnd);
+            nativeInputApi.RemoveClipboardFormatListener(hwnd);
         }
     }
 }

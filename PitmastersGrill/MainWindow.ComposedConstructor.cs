@@ -34,7 +34,9 @@ namespace PitmastersGrill
             _mainWindowShellModeCoordinator = runtime.MainWindowShellModeCoordinator;
             _mainWindowInteropController = runtime.MainWindowInteropController;
             _windowLayoutController = runtime.WindowLayoutController;
+            _windowWorkAreaProvider = runtime.WindowWorkAreaProvider;
             _mainWindowNativeInputController = runtime.MainWindowNativeInputController;
+            _nativeInputApi = runtime.NativeInputApi;
             _boardPopulationStatusController = runtime.BoardPopulationStatusController;
             _pilotDetailActionsPresenter = runtime.PilotDetailActionsPresenter;
             _boardPopulationTimingMarkerTracker = runtime.BoardPopulationTimingMarkerTracker;
@@ -163,7 +165,9 @@ namespace PitmastersGrill
             _windowLayoutSurface = new WindowLayoutSurface(
                 _windowLayoutController,
                 settings => _mainWindowAppearanceController.SaveSettings(settings),
-                GetMonitorWorkAreasDip);
+                () => _windowWorkAreaProvider.GetWorkAreasDip(this)
+                    .Where(_windowLayoutController.IsUsableWindowBounds)
+                    .ToList());
             _mainWindowShellSurface = new MainWindowShellSurface(
                 _mainWindowShellModeCoordinator,
                 _mainWindowInteropController,
