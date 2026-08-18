@@ -17,31 +17,36 @@ namespace PitmastersGrill.Tests.Ui
         }
 
         [Fact]
-        public void MainWindowXaml_AppliesNestedStyleToAtLeastTwoSubTabControls()
+        public void MainWindowAndHelpView_ApplySharedNestedTabStyles()
         {
-            var xaml = ReadMainWindowXaml();
+            var mainWindowXaml = ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
+            var helpViewXaml = ReadRepoFile("PitmastersGrill", "Views", "HelpView.xaml");
 
-            var styledControlCount = CountOccurrences(xaml, "Style=\"{StaticResource PmgNestedSubTabControlStyle}\"");
-            var styledItemCount = CountOccurrences(xaml, "Style=\"{StaticResource PmgNestedSubTabItemStyle}\"");
-
-            Assert.True(styledControlCount >= 2, $"Expected at least two styled nested TabControls, found {styledControlCount}.");
-            Assert.True(styledItemCount >= 2, $"Expected at least two styled nested TabItems, found {styledItemCount}.");
+            Assert.True(
+                CountOccurrences(mainWindowXaml, "Style=\"{StaticResource PmgNestedSubTabControlStyle}\"") >= 1,
+                "Expected MainWindow Settings to retain the shared nested TabControl style.");
+            Assert.True(
+                CountOccurrences(mainWindowXaml, "Style=\"{StaticResource PmgNestedSubTabItemStyle}\"") >= 1,
+                "Expected MainWindow Settings to retain the shared nested TabItem style.");
+            Assert.Equal(1, CountOccurrences(helpViewXaml, "Style=\"{StaticResource PmgNestedSubTabControlStyle}\""));
+            Assert.Equal(2, CountOccurrences(helpViewXaml, "Style=\"{StaticResource PmgNestedSubTabItemStyle}\""));
         }
 
         [Fact]
-        public void MainWindowXaml_HelpScrollViewersUseMouseWheelHandler()
+        public void HelpView_OwnsHelpTabsAndMouseWheelHandlers()
         {
-            var xaml = ReadMainWindowXaml();
+            var mainWindowXaml = ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
+            var helpViewXaml = ReadRepoFile("PitmastersGrill", "Views", "HelpView.xaml");
 
-            Assert.Contains("Header=\"Help\"", xaml);
-            Assert.Contains("General / Getting Started", xaml);
-            Assert.Contains("Signal Reference", xaml);
-            Assert.Contains("NestedScrollViewer_PreviewMouseWheel", xaml);
-        }
+            Assert.Contains("Header=\"Help\"", mainWindowXaml);
+            Assert.Contains("<views:HelpView x:Name=\"HelpViewControl\"", mainWindowXaml);
+            Assert.DoesNotContain("General / Getting Started", mainWindowXaml);
+            Assert.DoesNotContain("Signal Reference", mainWindowXaml);
+            Assert.DoesNotContain("NestedScrollViewer_PreviewMouseWheel", mainWindowXaml);
 
-        private static string ReadMainWindowXaml()
-        {
-            return ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
+            Assert.Contains("General / Getting Started", helpViewXaml);
+            Assert.Contains("Signal Reference", helpViewXaml);
+            Assert.Equal(3, CountOccurrences(helpViewXaml, "NestedScrollViewer_PreviewMouseWheel"));
         }
 
         private static string ReadRepoFile(params string[] relativeParts)
