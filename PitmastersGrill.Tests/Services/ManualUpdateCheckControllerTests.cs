@@ -12,23 +12,23 @@ namespace PitmastersGrill.Tests.Services
         [Fact]
         public async Task RunAsync_WhenCurrent_DisablesThenEnablesAndShowsCurrentStatus()
         {
+            string? observedSkip = null;
             var harness = new Harness
             {
                 CheckAsync = (skipped, _) =>
                 {
-                    harnessObservedSkip = skipped;
+                    observedSkip = skipped;
                     return Task.FromResult(PmgUpdateAwarenessResult.Current("1.2.3"));
                 }
             };
             harness.LoadedSettings.SkippedUpdateVersion = "1.1.0";
-            string? harnessObservedSkip = null;
 
             await harness.CreateSubject().RunAsync();
 
             Assert.Equal(new[] { false, true }, harness.EnabledStates);
             Assert.Contains(harness.StatusTexts, text => text.StartsWith("Checking GitHub", StringComparison.Ordinal));
             Assert.Contains(harness.StatusTexts, text => text.Contains("PMG is current. Current version: 1.2.3.", StringComparison.Ordinal));
-            Assert.Equal("1.1.0", harnessObservedSkip);
+            Assert.Equal("1.1.0", observedSkip);
             Assert.Empty(harness.OpenedUrls);
             Assert.Empty(harness.SavedSettings);
             var message = Assert.Single(harness.Messages);
