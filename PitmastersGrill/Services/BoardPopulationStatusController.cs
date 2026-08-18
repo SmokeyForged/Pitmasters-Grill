@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace PitmastersGrill.Services
@@ -22,27 +21,24 @@ namespace PitmastersGrill.Services
         public void UpdateStatus(
             string statusText,
             BoardPopulationStatusKind kind,
-            TextBlock statusTextBlock,
+            Action<string> setStatusText,
+            Action<Brush> setStatusForeground,
             ResourceDictionary resources)
         {
-            if (statusTextBlock == null)
-            {
-                throw new ArgumentNullException(nameof(statusTextBlock));
-            }
+            ArgumentNullException.ThrowIfNull(setStatusText);
+            ArgumentNullException.ThrowIfNull(setStatusForeground);
 
-            statusTextBlock.Text = statusText ?? string.Empty;
+            setStatusText(statusText ?? string.Empty);
             _currentKind = kind;
-            ApplyStatusVisual(statusTextBlock, resources);
+            ApplyStatusVisual(setStatusForeground, resources);
         }
 
-        public void ApplyStatusVisual(TextBlock statusTextBlock, ResourceDictionary resources)
+        public void ApplyStatusVisual(
+            Action<Brush> setStatusForeground,
+            ResourceDictionary resources)
         {
-            if (statusTextBlock == null)
-            {
-                throw new ArgumentNullException(nameof(statusTextBlock));
-            }
-
-            statusTextBlock.Foreground = ResolveBrush(resources, _currentKind);
+            ArgumentNullException.ThrowIfNull(setStatusForeground);
+            setStatusForeground(ResolveBrush(resources, _currentKind));
         }
 
         private static Brush ResolveBrush(ResourceDictionary resources, BoardPopulationStatusKind kind)
