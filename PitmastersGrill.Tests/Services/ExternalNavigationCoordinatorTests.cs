@@ -67,6 +67,10 @@ namespace PitmastersGrill.Tests.Services
         [Theory]
         [InlineData("alliance", "not-a-number")]
         [InlineData("corporation", "")]
+        [InlineData("alliance", "0")]
+        [InlineData("corporation", "0")]
+        [InlineData("alliance", "-1")]
+        [InlineData("corporation", "-1")]
         [InlineData("other", "123")]
         public void OpenAffiliationZkill_WithInvalidOrUnsupportedInput_DoesNotLaunch(
             string entityType,
