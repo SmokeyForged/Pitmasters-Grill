@@ -1,6 +1,7 @@
 using PitmastersGrill.Persistence;
 using PitmastersGrill.Services;
 using System.Windows;
+using System.Windows.Navigation;
 
 namespace PitmastersGrill
 {
@@ -28,6 +29,29 @@ namespace PitmastersGrill
                 "PMG Browser Error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+        }
+
+        private void VersionUpdateView_RepositoryNavigateRequested(object sender, RequestNavigateEventArgs e)
+        {
+            var url = e.Uri?.AbsoluteUri ?? "https://github.com/SmokeyForged/Pitmasters-Grill";
+            var result = ExternalNavigation.OpenUrl(url, "GitHub repository");
+            ShowExternalNavigationErrorIfNeeded(result);
+            e.Handled = true;
+        }
+
+        private async void VersionUpdateView_ManualUpdateCheckRequested(object sender, RoutedEventArgs e)
+        {
+            if (_manualUpdateCheckController == null)
+            {
+                return;
+            }
+
+            await _manualUpdateCheckController.RunAsync();
+        }
+
+        private void OpenManualUpdateReleasePage(string url)
+        {
+            _ = ExternalNavigation.OpenUrl(url, "manual update release page");
         }
     }
 }
