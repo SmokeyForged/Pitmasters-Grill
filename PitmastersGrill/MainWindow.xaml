@@ -1125,54 +1125,9 @@
                 </TabItem>
             </TabControl>
 
-            <Border x:Name="BoardStatusFooter"
-                    Grid.Row="2"
-                    Margin="0,6,0,0"
-                    Padding="8,5"
-                    Background="{DynamicResource SurfaceAltBrush}"
-                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                    BorderThickness="1" AutomationProperties.AutomationId="BoardStatusFooter">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock x:Name="BoardPopulationStatusText"
-                               Grid.Row="0"
-                               Grid.Column="0"
-                               Foreground="{DynamicResource MutedTextBrush}"
-                               Text="Board population idle"
-                               TextWrapping="NoWrap"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"
-                               Margin="0,0,12,0" AutomationProperties.AutomationId="BoardPopulationStatusText"/>
-
-                    <TextBlock x:Name="LastRefreshedText"
-                               Grid.Row="0"
-                               Grid.Column="1"
-                               Foreground="{DynamicResource MutedTextBrush}"
-                               Text="Last Refreshed: --"
-                               TextWrapping="NoWrap"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" AutomationProperties.AutomationId="LastRefreshedText"/>
-
-                    <TextBlock x:Name="BoardSummaryText"
-                               Grid.Row="1"
-                               Grid.Column="0"
-                               Grid.ColumnSpan="2"
-                               Foreground="{DynamicResource BodyTextBrush}"
-                               Text="Visible 0 | Watched 0"
-                               Margin="0,5,0,0"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" AutomationProperties.AutomationId="BoardSummaryText"/>
-                </Grid>
-            </Border>
+            <views:BoardStatusView x:Name="BoardStatusViewControl"
+                                   Grid.Row="2"
+                                   AutomationProperties.AutomationId="BoardStatusViewControl"/>
         </Grid>
     </Grid>
 </Window>
