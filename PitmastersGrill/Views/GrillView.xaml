@@ -21,8 +21,8 @@
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   IsReadOnly="True"
-                  ColumnHeaderStyle="{StaticResource PilotBoardColumnHeaderStyle}"
-                  CellStyle="{StaticResource PilotBoardCellStyle}"
+                  ColumnHeaderStyle="{DynamicResource PilotBoardColumnHeaderStyle}"
+                  CellStyle="{DynamicResource PilotBoardCellStyle}"
                   CanUserResizeColumns="True"
                   SelectionMode="Single"
                   SelectionUnit="FullRow"
@@ -86,7 +86,7 @@
                                            AutomationProperties.AutomationId="WatchedPilotMarker"/>
                                 <Button x:Name="PilotNoteButton"
                                         DockPanel.Dock="Right"
-                                        Style="{StaticResource PilotNoteButtonStyle}"
+                                        Style="{DynamicResource PilotNoteButtonStyle}"
                                         Content="✎"
                                         Click="PilotNoteButton_Click"
                                         AutomationProperties.AutomationId="PilotNoteButton"/>
