@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using PitmastersGrill.Models;
 using PitmastersGrill.Persistence;
 using PitmastersGrill.Services;
@@ -133,6 +134,7 @@ namespace PitmastersGrill.Tests.Services
             }
             finally
             {
+                SqliteConnection.ClearAllPools();
                 if (File.Exists(databasePath))
                 {
                     File.Delete(databasePath);
