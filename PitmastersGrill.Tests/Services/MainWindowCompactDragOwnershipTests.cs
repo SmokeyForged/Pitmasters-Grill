@@ -45,12 +45,12 @@ namespace PitmastersGrill.Tests.Services
 
             Assert.DoesNotContain("FindVisualParent<DataGridColumnHeader>(source)", source, StringComparison.Ordinal);
             Assert.DoesNotContain("FindVisualParent<ScrollBar>(source) != null", source, StringComparison.Ordinal);
-            Assert.Contains("FindVisualParent<DataGridColumnHeader>(source)", controllerSource, StringComparison.Ordinal);
-            Assert.Contains("FindVisualParent<Thumb>(source) != null", controllerSource, StringComparison.Ordinal);
-            Assert.Contains("FindVisualParent<ButtonBase>(source) != null", controllerSource, StringComparison.Ordinal);
-            Assert.Contains("FindVisualParent<ScrollBar>(source) != null", controllerSource, StringComparison.Ordinal);
-            Assert.Contains("FindVisualParent<TextBox>(source) != null", controllerSource, StringComparison.Ordinal);
-            Assert.Contains("FindVisualParent<ComboBox>(source) != null", controllerSource, StringComparison.Ordinal);
+            Assert.Contains("FindParent<DataGridColumnHeader>(source)", controllerSource, StringComparison.Ordinal);
+            Assert.Contains("FindParent<Thumb>(source) != null", controllerSource, StringComparison.Ordinal);
+            Assert.Contains("FindParent<ButtonBase>(source) != null", controllerSource, StringComparison.Ordinal);
+            Assert.Contains("FindParent<ScrollBar>(source) != null", controllerSource, StringComparison.Ordinal);
+            Assert.Contains("FindParent<TextBox>(source) != null", controllerSource, StringComparison.Ordinal);
+            Assert.Contains("FindParent<ComboBox>(source) != null", controllerSource, StringComparison.Ordinal);
         }
 
         [Fact]
