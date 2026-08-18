@@ -280,320 +280,215 @@
                 </TabItem>
                 <TabItem Header="Grill">
                     <Grid Background="{DynamicResource WindowBackgroundBrush}">
-                        <Grid x:Name="BoardOverlayHost" AutomationProperties.AutomationId="BoardOverlayHost">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="60*"/>
-                                <ColumnDefinition Width="12*"/>
-                                <ColumnDefinition Width="9*"/>
-                                <ColumnDefinition Width="649*"/>
-                            </Grid.ColumnDefinitions>
-                            <DataGrid x:Name="PilotBoard"
-                                      AutoGenerateColumns="False"
-                                      CanUserAddRows="False"
-                                      IsReadOnly="True"
-                                      ColumnHeaderStyle="{StaticResource PilotBoardColumnHeaderStyle}"
-                                      CellStyle="{StaticResource PilotBoardCellStyle}"
-                                      CanUserResizeColumns="True"
-                                      SelectionMode="Single"
-                                      SelectionUnit="FullRow"
-                                      EnableRowVirtualization="True"
-                                      EnableColumnVirtualization="True"
-                                      FontSize="12"
-                                      VirtualizingPanel.IsVirtualizing="True"
-                                      VirtualizingPanel.VirtualizationMode="Recycling"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                      Sorting="PilotBoard_Sorting"
-                                      ColumnReordered="PilotBoard_ColumnReordered"
-                                      SelectionChanged="PilotBoard_SelectionChanged"
-                                      MouseDoubleClick="PilotBoard_MouseDoubleClick"
-                                      PreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
-                                      PreviewMouseLeftButtonDown="PilotBoard_PreviewMouseLeftButtonDown"
-                                      PreviewMouseLeftButtonUp="PilotBoard_PreviewMouseLeftButtonUp"
-                                      PreviewMouseMove="PilotBoard_PreviewMouseMove"
-                                      SizeChanged="PilotBoard_SizeChanged" Grid.ColumnSpan="4" AutomationProperties.AutomationId="PilotBoard">
-                                <DataGrid.Resources>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
-                                </DataGrid.Resources>
-                                <DataGrid.Columns>
-                                    <DataGridTemplateColumn x:Name="SigColumn" Header="Sig" Width="42" MinWidth="34" AutomationProperties.AutomationId="SigColumn">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           FontWeight="Bold"
-                                                           Text="{Binding BoardSignalIcon}"
-                                                           ToolTip="{Binding BoardHoverToolTip}"
-                                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}"/>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
+                        <views:GrillView x:Name="GrillViewControl"
+                                         Sorting="PilotBoard_Sorting"
+                                         ColumnReordered="PilotBoard_ColumnReordered"
+                                         BoardSelectionChanged="PilotBoard_SelectionChanged"
+                                         BoardMouseDoubleClick="PilotBoard_MouseDoubleClick"
+                                         BoardPreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
+                                         BoardPreviewMouseLeftButtonDown="PilotBoard_PreviewMouseLeftButtonDown"
+                                         BoardPreviewMouseLeftButtonUp="PilotBoard_PreviewMouseLeftButtonUp"
+                                         BoardPreviewMouseMove="PilotBoard_PreviewMouseMove"
+                                         BoardSizeChanged="PilotBoard_SizeChanged"
+                                         PilotNoteClick="PilotNoteButton_Click"
+                                         AutomationProperties.AutomationId="GrillViewControl"/>
 
-                                    <DataGridTemplateColumn x:Name="CharacterColumn" Header="Character" SortMemberPath="CharacterName" Width="120" MinWidth="72" AutomationProperties.AutomationId="CharacterColumn">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <DockPanel LastChildFill="True">
-                                                    <TextBlock x:Name="WatchedPilotMarker"
-                                                               DockPanel.Dock="Left"
-                                                               Margin="0,0,6,0"
-                                                               VerticalAlignment="Center"
-                                                               FontWeight="Bold"
-                                                               Foreground="{DynamicResource WatchedPilotMarkerBrush}"
-                                                               Text="★"
-                                                               Visibility="Collapsed" AutomationProperties.AutomationId="WatchedPilotMarker"/>
-                                                    <Button x:Name="PilotNoteButton"
-                                                            DockPanel.Dock="Right"
-                                                            Style="{StaticResource PilotNoteButtonStyle}"
-                                                            Content="✎"
-                                                            Click="PilotNoteButton_Click" AutomationProperties.AutomationId="PilotNoteButton"/>
-                                                    <TextBlock Text="{Binding CharacterName}"
-                                                               VerticalAlignment="Center"
-                                                               ToolTip="{Binding BoardHoverToolTip}"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                </DockPanel>
-                                                <DataTemplate.Triggers>
-                                                    <DataTrigger Binding="{Binding IsWatched}" Value="True">
-                                                        <Setter TargetName="WatchedPilotMarker" Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding HasNotes}" Value="True">
-                                                        <Setter TargetName="PilotNoteButton" Property="Content" Value="⚑"/>
-                                                        <Setter TargetName="PilotNoteButton" Property="ToolTip" Value="View/edit note"/>
-                                                        <Setter TargetName="PilotNoteButton" Property="Foreground" Value="{DynamicResource PilotNoteFlagBrush}"/>
-                                                    </DataTrigger>
-                                                </DataTemplate.Triggers>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                    <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="120" MinWidth="72" AutomationProperties.AutomationId="AllianceColumn"/>
-                                    <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="140" MinWidth="82" AutomationProperties.AutomationId="CorpColumn"/>
-                                    <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="55" MinWidth="42" AutomationProperties.AutomationId="KillsColumn"/>
-                                    <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="55" MinWidth="42" AutomationProperties.AutomationId="LossesColumn"/>
-                                    <DataGridTextColumn x:Name="AvgFleetSizeColumn"
-                                                        Header="Avg Fleet Size"
-                                                        Binding="{Binding AvgAttackersWhenAttacking, StringFormat={}{0:0}}"
-                                                        Width="70" MinWidth="48" AutomationProperties.AutomationId="AvgFleetSizeColumn"/>
-                                    <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="100" MinWidth="64" AutomationProperties.AutomationId="LastShipSeenColumn"/>
-                                    <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" SortMemberPath="LastShipSeenAtUtc" Width="90" MinWidth="54" AutomationProperties.AutomationId="LastSeenColumn"/>
-                                    <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="110" MinWidth="70" AutomationProperties.AutomationId="CynoHullSeenColumn"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
+                        <Border x:Name="DetailPane"
+                                Visibility="Collapsed"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Width="300"
+                                Height="380"
+                                Margin="0,0,8,8"
+                                Padding="12"
+                                Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Panel.ZIndex="10" AutomationProperties.AutomationId="DetailPane">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                            <Border x:Name="BoardModeHintOverlay"
-                                    Visibility="Collapsed"
-                                    IsHitTestVisible="False"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Top"
-                                    Margin="0,16,0,0"
-                                    Padding="12,8"
-                                    Background="#DD101010"
-                                    BorderBrush="{DynamicResource AccentEmberBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Panel.ZIndex="20"
-                                    Grid.ColumnSpan="4" AutomationProperties.AutomationId="BoardModeHintOverlay">
-                                <TextBlock Text="Board Mode enabled. Press Insert to return to normal mode."
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="0"
+                                           x:Name="SelectedCharacterText"
+                                           Text="Selected Character"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
                                            Foreground="{DynamicResource HeaderTextBrush}"
-                                           FontWeight="SemiBold"/>
-                            </Border>
+                                           TextWrapping="Wrap"
+                                           TextTrimming="None"
+                                           Margin="0,0,12,0" AutomationProperties.AutomationId="SelectedCharacterText"/>
 
-                            <Border x:Name="DetailPane"
-                                    Visibility="Collapsed"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Bottom"
-                                    Width="300"
-                                    Height="380"
-                                    Margin="0,0,8,8"
-                                    Padding="12"
-                                    Background="{DynamicResource SurfaceAltBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Panel.ZIndex="10" Grid.Column="3" AutomationProperties.AutomationId="DetailPane">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                                <Button Grid.Row="0"
+                                        Grid.Column="1"
+                                        x:Name="CloseDetailsButton"
+                                        Padding="12,4"
+                                        Content="Close Details"
+                                        Click="CloseDetailsButton_Click" AutomationProperties.AutomationId="CloseDetailsButton"/>
 
+                                <TextBlock Grid.Row="1"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="FullCorpText"
+                                           Margin="0,12,0,0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Full Corp: --" AutomationProperties.AutomationId="FullCorpText"/>
+
+                                <TextBlock Grid.Row="2"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="FullAllianceText"
+                                           Margin="0,8,0,0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Full Alliance: --" AutomationProperties.AutomationId="FullAllianceText"/>
+
+                                <TextBlock Grid.Row="3"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="FreshnessText"
+                                           Margin="0,8,0,0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Freshness: --" AutomationProperties.AutomationId="FreshnessText"/>
+
+                                <TextBlock Grid.Row="4"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="RecentPublicActivityText"
+                                           Margin="0,8,0,0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Recent Public Kill/Loss Activity: --" AutomationProperties.AutomationId="RecentPublicActivityText"/>
+
+                                <TextBlock Grid.Row="5"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="CynoSignalText"
+                                           Margin="0,10,0,4"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentEmberBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Cyno Signal: Unknown" AutomationProperties.AutomationId="CynoSignalText"/>
+
+                                <ProgressBar Grid.Row="6"
+                                             Grid.ColumnSpan="2"
+                                             x:Name="CynoConfidenceBar"
+                                             Height="8"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="0"
+                                             Foreground="{DynamicResource AccentEmberBrush}"
+                                             Background="{DynamicResource SurfaceBrush}"
+                                             Margin="0,0,0,6" AutomationProperties.AutomationId="CynoConfidenceBar"/>
+
+                                <TextBlock Grid.Row="7"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="CynoEvidenceText"
+                                           Margin="0,0,0,4"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Evidence: --" AutomationProperties.AutomationId="CynoEvidenceText"/>
+
+                                <TextBlock Grid.Row="8"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="CynoLimitationsText"
+                                           Margin="0,0,0,4"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Limitations: --" AutomationProperties.AutomationId="CynoLimitationsText"/>
+
+                                <TextBlock Grid.Row="9"
+                                           Grid.ColumnSpan="2"
+                                           x:Name="ExplainabilityText"
+                                           Margin="0,8,0,0"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Sources / Freshness: --" AutomationProperties.AutomationId="ExplainabilityText"/>
+
+                                <Grid Grid.Row="10"
+                                      Grid.ColumnSpan="2"
+                                      Margin="0,12,0,4">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Row="0"
-                                               Grid.Column="0"
-                                               x:Name="SelectedCharacterText"
-                                               Text="Selected Character"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
+                                    <TextBlock Grid.Column="0"
                                                Foreground="{DynamicResource HeaderTextBrush}"
-                                               TextWrapping="Wrap"
-                                               TextTrimming="None"
-                                               Margin="0,0,12,0" AutomationProperties.AutomationId="SelectedCharacterText"/>
+                                               Text="Notes / Tags"/>
 
-                                    <Button Grid.Row="0"
-                                            Grid.Column="1"
-                                            x:Name="CloseDetailsButton"
-                                            Padding="12,4"
-                                            Content="Close Details"
-                                            Click="CloseDetailsButton_Click" AutomationProperties.AutomationId="CloseDetailsButton"/>
-
-                                    <TextBlock Grid.Row="1"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="FullCorpText"
-                                               Margin="0,12,0,0"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Full Corp: --" AutomationProperties.AutomationId="FullCorpText"/>
-
-                                    <TextBlock Grid.Row="2"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="FullAllianceText"
-                                               Margin="0,8,0,0"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Full Alliance: --" AutomationProperties.AutomationId="FullAllianceText"/>
-
-                                    <TextBlock Grid.Row="3"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="FreshnessText"
-                                               Margin="0,8,0,0"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Freshness: --" AutomationProperties.AutomationId="FreshnessText"/>
-
-                                    <TextBlock Grid.Row="4"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="RecentPublicActivityText"
-                                               Margin="0,8,0,0"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Recent Public Kill/Loss Activity: --" AutomationProperties.AutomationId="RecentPublicActivityText"/>
-
-                                    <TextBlock Grid.Row="5"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="CynoSignalText"
-                                               Margin="0,10,0,4"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AccentEmberBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Cyno Signal: Unknown" AutomationProperties.AutomationId="CynoSignalText"/>
-
-                                    <ProgressBar Grid.Row="6"
-                                                 Grid.ColumnSpan="2"
-                                                 x:Name="CynoConfidenceBar"
-                                                 Height="8"
-                                                 Minimum="0"
-                                                 Maximum="100"
-                                                 Value="0"
-                                                 Foreground="{DynamicResource AccentEmberBrush}"
-                                                 Background="{DynamicResource SurfaceBrush}"
-                                                 Margin="0,0,0,6" AutomationProperties.AutomationId="CynoConfidenceBar"/>
-
-                                    <TextBlock Grid.Row="7"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="CynoEvidenceText"
-                                               Margin="0,0,0,4"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Evidence: --" AutomationProperties.AutomationId="CynoEvidenceText"/>
-
-                                    <TextBlock Grid.Row="8"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="CynoLimitationsText"
-                                               Margin="0,0,0,4"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Limitations: --" AutomationProperties.AutomationId="CynoLimitationsText"/>
-
-                                    <TextBlock Grid.Row="9"
-                                               Grid.ColumnSpan="2"
-                                               x:Name="ExplainabilityText"
-                                               Margin="0,8,0,0"
-                                               Foreground="{DynamicResource MutedTextBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="Sources / Freshness: --" AutomationProperties.AutomationId="ExplainabilityText"/>
-
-                                    <Grid Grid.Row="10"
-                                          Grid.ColumnSpan="2"
-                                          Margin="0,12,0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <TextBlock Grid.Column="0"
-                                                   Foreground="{DynamicResource HeaderTextBrush}"
-                                                   Text="Notes / Tags"/>
-
-                                        <StackPanel Grid.Column="1"
-                                                    Orientation="Horizontal"
-                                                    VerticalAlignment="Center">
-                                            <Button x:Name="WatchPilotDetailAction"
-                                                    Style="{StaticResource DetailActionLinkButtonStyle}"
-                                                    Foreground="{DynamicResource SuccessGreenBrush}"
-                                                    Content="Watch"
-                                                    Click="WatchPilotDetailAction_Click" AutomationProperties.AutomationId="WatchPilotDetailAction"/>
-                                            <CheckBox x:Name="BaitOverrideCheckBox"
-                                                      VerticalAlignment="Center"
-                                                      Foreground="{DynamicResource BodyTextBrush}"
-                                                      Content="Bait"
-                                                      Margin="0,0,10,0"
-                                                      Checked="BaitOverrideCheckBox_Changed"
-                                                      Unchecked="BaitOverrideCheckBox_Changed" AutomationProperties.AutomationId="BaitOverrideCheckBox"/>
-                                            <CheckBox x:Name="KnownCynoOverrideCheckBox"
-                                                      VerticalAlignment="Center"
-                                                      Foreground="{DynamicResource BodyTextBrush}"
-                                                      Content="Known-Cyno Override"
-                                                      Checked="KnownCynoOverrideCheckBox_Changed"
-                                                      Unchecked="KnownCynoOverrideCheckBox_Changed" AutomationProperties.AutomationId="KnownCynoOverrideCheckBox"/>
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <Grid Grid.Row="11"
-                                          Grid.ColumnSpan="2">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBox Grid.Row="0"
-                                                 x:Name="NotesTagsBox"
-                                                 Margin="0,0,0,12"
-                                                 AcceptsReturn="True"
-                                                 TextWrapping="Wrap"
-                                                 VerticalScrollBarVisibility="Auto"
-                                                 MinHeight="100" AutomationProperties.AutomationId="NotesTagsBox"/>
-
-                                        <StackPanel Grid.Row="1"
-                                                    Orientation="Horizontal"
-                                                    HorizontalAlignment="Right">
-                                            <Button x:Name="IgnoreAllianceButton"
-                                                    Padding="12,6"
-                                                    Margin="0,0,8,0"
-                                                    Content="Ignore Alliance"
-                                                    Click="IgnoreAllianceButton_Click" AutomationProperties.AutomationId="IgnoreAllianceButton"/>
-
-                                            <Button x:Name="OpenZkillButton"
-                                                    Padding="12,6"
-                                                    Content="Open zKill"
-                                                    Click="OpenZkillButton_Click" AutomationProperties.AutomationId="OpenZkillButton"/>
-                                        </StackPanel>
-                                    </Grid>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <Button x:Name="WatchPilotDetailAction"
+                                                Style="{StaticResource DetailActionLinkButtonStyle}"
+                                                Foreground="{DynamicResource SuccessGreenBrush}"
+                                                Content="Watch"
+                                                Click="WatchPilotDetailAction_Click" AutomationProperties.AutomationId="WatchPilotDetailAction"/>
+                                        <CheckBox x:Name="BaitOverrideCheckBox"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource BodyTextBrush}"
+                                                  Content="Bait"
+                                                  Margin="0,0,10,0"
+                                                  Checked="BaitOverrideCheckBox_Changed"
+                                                  Unchecked="BaitOverrideCheckBox_Changed" AutomationProperties.AutomationId="BaitOverrideCheckBox"/>
+                                        <CheckBox x:Name="KnownCynoOverrideCheckBox"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource BodyTextBrush}"
+                                                  Content="Known-Cyno Override"
+                                                  Checked="KnownCynoOverrideCheckBox_Changed"
+                                                  Unchecked="KnownCynoOverrideCheckBox_Changed" AutomationProperties.AutomationId="KnownCynoOverrideCheckBox"/>
+                                    </StackPanel>
                                 </Grid>
-                            </Border>
-                        </Grid>
+
+                                <Grid Grid.Row="11"
+                                      Grid.ColumnSpan="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBox Grid.Row="0"
+                                             x:Name="NotesTagsBox"
+                                             Margin="0,0,0,12"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto"
+                                             MinHeight="100" AutomationProperties.AutomationId="NotesTagsBox"/>
+
+                                    <StackPanel Grid.Row="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right">
+                                        <Button x:Name="IgnoreAllianceButton"
+                                                Padding="12,6"
+                                                Margin="0,0,8,0"
+                                                Content="Ignore Alliance"
+                                                Click="IgnoreAllianceButton_Click" AutomationProperties.AutomationId="IgnoreAllianceButton"/>
+
+                                        <Button x:Name="OpenZkillButton"
+                                                Padding="12,6"
+                                                Content="Open zKill"
+                                                Click="OpenZkillButton_Click" AutomationProperties.AutomationId="OpenZkillButton"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
                     </Grid>
                 </TabItem>
 

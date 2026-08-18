@@ -105,10 +105,9 @@ namespace PitmastersGrill
         private readonly CacheMaintenanceService _cacheMaintenanceService = new();
         private readonly KillmailDerivedIntelRebuildService _killmailDerivedIntelRebuildService = new();
         private readonly BoardAffiliationCountService _boardAffiliationCountService = new();
+        private readonly CompactBoardDragController _compactBoardDragController = new();
         private bool _isApplyingSettings;
         private bool _isShuttingDown;
-        private bool _compactDragPending;
-        private Point _compactDragStartPoint;
         private bool _isMainWindowInitialized;
         protected override void OnSourceInitialized(EventArgs e)
         {
@@ -870,10 +869,7 @@ namespace PitmastersGrill
 
         private void PilotBoard_PreviewMouseMoveHandledToo(object sender, MouseEventArgs e)
         {
-            if (_compactDragPending && e.LeftButton != MouseButtonState.Pressed)
-            {
-                CancelCompactBoardDrag();
-            }
+            CancelCompactBoardDragIfLeftButtonReleased(e);
         }
 
         private void PilotBoard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -888,51 +884,49 @@ namespace PitmastersGrill
 
         private void PilotBoard_PreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (_compactDragPending && e.LeftButton != MouseButtonState.Pressed)
-            {
-                CancelCompactBoardDrag();
-            }
+            CancelCompactBoardDragIfLeftButtonReleased(e);
         }
 
         private void BeginCompactBoardDragIfAllowed(MouseButtonEventArgs e)
         {
-            if (_compactDragPending || CompactModeToggleButton?.IsChecked != true)
+            var started = _compactBoardDragController.TryBegin(
+                CompactModeToggleButton?.IsChecked == true,
+                e.ClickCount,
+                IsFromCompactDragBlockedElement(e.OriginalSource as DependencyObject));
+            if (!started)
             {
                 return;
             }
 
-            if (e.ClickCount > 1)
-            {
-                CancelCompactBoardDrag();
-                return;
-            }
-
-            if (IsFromCompactDragBlockedElement(e.OriginalSource as DependencyObject))
-            {
-                return;
-            }
-
-            _compactDragPending = true;
-            _compactDragStartPoint = e.GetPosition(this);
             _compactDragHoldTimer.Stop();
             _compactDragHoldTimer.Start();
         }
 
         private void CancelCompactBoardDrag()
         {
-            _compactDragPending = false;
+            _compactBoardDragController.Cancel();
             _compactDragHoldTimer.Stop();
+        }
+
+        private void CancelCompactBoardDragIfLeftButtonReleased(MouseEventArgs e)
+        {
+            if (_compactBoardDragController.CancelIfLeftButtonReleased(
+                    e.LeftButton == MouseButtonState.Pressed))
+            {
+                _compactDragHoldTimer.Stop();
+            }
         }
 
         private void CompactDragHoldTimer_Tick(object? sender, EventArgs e)
         {
             _compactDragHoldTimer.Stop();
-            if (!_compactDragPending || CompactModeToggleButton?.IsChecked != true || Mouse.LeftButton != MouseButtonState.Pressed)
+            if (!_compactBoardDragController.CompleteHold(
+                    CompactModeToggleButton?.IsChecked == true,
+                    Mouse.LeftButton == MouseButtonState.Pressed))
             {
-                _compactDragPending = false;
                 return;
             }
-            _compactDragPending = false;
+
             try
             {
                 Mouse.Capture(null);
@@ -1222,7 +1216,7 @@ namespace PitmastersGrill
 
         private void UpdateLastRefreshed()
         {
-            LastRefreshedText.Text = $"Last Refreshed: {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            LastRefreshedText.Text = _boardStatusPresenter.BuildLastRefreshedText();
         }
         private void CurrentBoardSession_Changed(object? sender, CurrentBoardSessionChangedEventArgs e)
         {
@@ -1247,7 +1241,6 @@ namespace PitmastersGrill
                 AppLogger.UiError($"Failed to open analysis hyperlink. url='{url}'", ex);
             }
         }
-
         private void AnalysisAllianceListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             OpenAnalysisAffiliationItem(AnalysisAllianceListBox?.SelectedItem as AnalysisAffiliationListItem);
