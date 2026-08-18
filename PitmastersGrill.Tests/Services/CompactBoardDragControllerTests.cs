@@ -83,6 +83,19 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
+        public void TryBegin_DataGridRow_RemainsDragEligible()
+        {
+            RunSta(() =>
+            {
+                var subject = new CompactBoardDragController();
+                var row = new DataGridRow();
+
+                Assert.True(subject.TryBegin(true, 1, row));
+                Assert.True(subject.IsPending);
+            });
+        }
+
+        [Fact]
         public void TryBegin_ColumnHeaderAndOrdinaryHeaderContent_RemainDragEligible()
         {
             RunSta(() =>
