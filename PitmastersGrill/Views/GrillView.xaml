@@ -1,0 +1,141 @@
+<UserControl x:Class="PitmastersGrill.Views.GrillView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="520"
+             d:DesignWidth="900"
+             Background="{DynamicResource WindowBackgroundBrush}">
+    <Grid x:Name="BoardOverlayHost"
+          Background="{DynamicResource WindowBackgroundBrush}"
+          AutomationProperties.AutomationId="BoardOverlayHost">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="60*"/>
+            <ColumnDefinition Width="12*"/>
+            <ColumnDefinition Width="9*"/>
+            <ColumnDefinition Width="649*"/>
+        </Grid.ColumnDefinitions>
+
+        <DataGrid x:Name="PilotBoard"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  ColumnHeaderStyle="{StaticResource PilotBoardColumnHeaderStyle}"
+                  CellStyle="{StaticResource PilotBoardCellStyle}"
+                  CanUserResizeColumns="True"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow"
+                  EnableRowVirtualization="True"
+                  EnableColumnVirtualization="True"
+                  FontSize="12"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  Sorting="PilotBoard_Sorting"
+                  ColumnReordered="PilotBoard_ColumnReordered"
+                  SelectionChanged="PilotBoard_SelectionChanged"
+                  MouseDoubleClick="PilotBoard_MouseDoubleClick"
+                  PreviewMouseRightButtonUp="PilotBoard_PreviewMouseRightButtonUp"
+                  PreviewMouseLeftButtonDown="PilotBoard_PreviewMouseLeftButtonDown"
+                  PreviewMouseLeftButtonUp="PilotBoard_PreviewMouseLeftButtonUp"
+                  PreviewMouseMove="PilotBoard_PreviewMouseMove"
+                  SizeChanged="PilotBoard_SizeChanged"
+                  Grid.ColumnSpan="4"
+                  AutomationProperties.AutomationId="PilotBoard">
+            <DataGrid.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
+            </DataGrid.Resources>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn x:Name="SigColumn"
+                                        Header="Sig"
+                                        Width="42"
+                                        MinWidth="34"
+                                        AutomationProperties.AutomationId="SigColumn">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Text="{Binding BoardSignalIcon}"
+                                       ToolTip="{Binding BoardHoverToolTip}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn x:Name="CharacterColumn"
+                                        Header="Character"
+                                        SortMemberPath="CharacterName"
+                                        Width="120"
+                                        MinWidth="72"
+                                        AutomationProperties.AutomationId="CharacterColumn">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <DockPanel LastChildFill="True">
+                                <TextBlock x:Name="WatchedPilotMarker"
+                                           DockPanel.Dock="Left"
+                                           Margin="0,0,6,0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource WatchedPilotMarkerBrush}"
+                                           Text="★"
+                                           Visibility="Collapsed"
+                                           AutomationProperties.AutomationId="WatchedPilotMarker"/>
+                                <Button x:Name="PilotNoteButton"
+                                        DockPanel.Dock="Right"
+                                        Style="{StaticResource PilotNoteButtonStyle}"
+                                        Content="✎"
+                                        Click="PilotNoteButton_Click"
+                                        AutomationProperties.AutomationId="PilotNoteButton"/>
+                                <TextBlock Text="{Binding CharacterName}"
+                                           VerticalAlignment="Center"
+                                           ToolTip="{Binding BoardHoverToolTip}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </DockPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsWatched}" Value="True">
+                                    <Setter TargetName="WatchedPilotMarker" Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasNotes}" Value="True">
+                                    <Setter TargetName="PilotNoteButton" Property="Content" Value="⚑"/>
+                                    <Setter TargetName="PilotNoteButton" Property="ToolTip" Value="View/edit note"/>
+                                    <Setter TargetName="PilotNoteButton" Property="Foreground" Value="{DynamicResource PilotNoteFlagBrush}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn x:Name="AllianceColumn" Header="Alliance" Binding="{Binding AllianceNameDisplay}" Width="120" MinWidth="72" AutomationProperties.AutomationId="AllianceColumn"/>
+                <DataGridTextColumn x:Name="CorpColumn" Header="Corp" Binding="{Binding CorpNameDisplay}" Width="140" MinWidth="82" AutomationProperties.AutomationId="CorpColumn"/>
+                <DataGridTextColumn x:Name="KillsColumn" Header="Kills" Binding="{Binding KillCount}" Width="55" MinWidth="42" AutomationProperties.AutomationId="KillsColumn"/>
+                <DataGridTextColumn x:Name="LossesColumn" Header="Losses" Binding="{Binding LossCount}" Width="55" MinWidth="42" AutomationProperties.AutomationId="LossesColumn"/>
+                <DataGridTextColumn x:Name="AvgFleetSizeColumn" Header="Avg Fleet Size" Binding="{Binding AvgAttackersWhenAttacking, StringFormat={}{0:0}}" Width="70" MinWidth="48" AutomationProperties.AutomationId="AvgFleetSizeColumn"/>
+                <DataGridTextColumn x:Name="LastShipSeenColumn" Header="Last Ship Seen" Binding="{Binding LastShipSeenName}" Width="100" MinWidth="64" AutomationProperties.AutomationId="LastShipSeenColumn"/>
+                <DataGridTextColumn x:Name="LastSeenColumn" Header="Last Seen" Binding="{Binding LastShipSeenDateDisplay}" SortMemberPath="LastShipSeenAtUtc" Width="90" MinWidth="54" AutomationProperties.AutomationId="LastSeenColumn"/>
+                <DataGridTextColumn x:Name="CynoHullSeenColumn" Header="Cyno Hull Seen" Binding="{Binding LastPublicCynoCapableHull}" Width="110" MinWidth="70" AutomationProperties.AutomationId="CynoHullSeenColumn"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Border x:Name="BoardModeHintOverlay"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,16,0,0"
+                Padding="12,8"
+                Background="#DD101010"
+                BorderBrush="{DynamicResource AccentEmberBrush}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Panel.ZIndex="20"
+                Grid.ColumnSpan="4"
+                AutomationProperties.AutomationId="BoardModeHintOverlay">
+            <TextBlock Text="Board Mode enabled. Press Insert to return to normal mode."
+                       Foreground="{DynamicResource HeaderTextBrush}"
+                       FontWeight="SemiBold"/>
+        </Border>
+    </Grid>
+</UserControl>
