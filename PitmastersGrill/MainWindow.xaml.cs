@@ -1057,27 +1057,10 @@ namespace PitmastersGrill
 
         private void OpenZkillForRow(PilotBoardRow selectedRow)
         {
-            try
-            {
-                var url = string.IsNullOrWhiteSpace(selectedRow.CharacterId)
-                    ? _zkillUrlBuilder.BuildSearchUrl(selectedRow.CharacterName)
-                    : _zkillUrlBuilder.BuildCharacterUrl(selectedRow.CharacterId);
-
-                AppLogger.UiInfo(
-                    $"Opening zKill. character='{selectedRow.CharacterName}' characterId='{selectedRow.CharacterId ?? ""}'");
-                _browserLauncher.OpenUrl(url);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError(
-                    $"Failed to open zKill. character='{selectedRow?.CharacterName ?? ""}'",
-                    ex);
-                MessageBox.Show(
-                    $"Failed to open browser.\n\n{ex.Message}",
-                    "PMG Browser Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            var result = ExternalNavigation.OpenPilotZkill(
+                selectedRow.CharacterId,
+                selectedRow.CharacterName);
+            ShowExternalNavigationErrorIfNeeded(result);
         }
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1147,27 +1130,10 @@ namespace PitmastersGrill
 
         private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
-            try
-            {
-                var url = e.Uri?.AbsoluteUri ?? "https://github.com/SmokeyForged/Pitmasters-Grill";
-
-                AppLogger.UiInfo($"Opening GitHub repo. url='{url}'");
-
-                _browserLauncher.OpenUrl(url);
-                e.Handled = true;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError("Failed to open GitHub repo link.", ex);
-
-                MessageBox.Show(
-                    $"Failed to open browser.\n\n{ex.Message}",
-                    "PMG Browser Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-
-                e.Handled = true;
-            }
+            var url = e.Uri?.AbsoluteUri ?? "https://github.com/SmokeyForged/Pitmasters-Grill";
+            var result = ExternalNavigation.OpenUrl(url, "GitHub repository");
+            ShowExternalNavigationErrorIfNeeded(result);
+            e.Handled = true;
         }
 
         private void ApplyWatchedState(PilotBoardRow row)
@@ -1215,14 +1181,8 @@ namespace PitmastersGrill
             {
                 return;
             }
-            try
-            {
-                _browserLauncher.OpenUrl(url);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError($"Failed to open analysis hyperlink. url='{url}'", ex);
-            }
+
+            ExternalNavigation.OpenUrl(url, "analysis hyperlink");
         }
         private void AnalysisAllianceListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
@@ -1235,26 +1195,12 @@ namespace PitmastersGrill
 
         private void OpenAnalysisAffiliationItem(AnalysisAffiliationListItem? item)
         {
-            if (item == null || string.IsNullOrWhiteSpace(item.Id) || !long.TryParse(item.Id, out _))
+            if (item == null)
             {
                 return;
             }
 
-            var url = string.Equals(item.EntityType, "alliance", StringComparison.OrdinalIgnoreCase)
-                ? _analysisTabPresenter.BuildAllianceZkillUrl(item.Id)
-                : _analysisTabPresenter.BuildCorporationZkillUrl(item.Id);
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                return;
-            }
-            try
-            {
-                _browserLauncher.OpenUrl(url);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.UiError($"Failed to open analysis affiliation item. type='{item.EntityType}' id='{item.Id}'", ex);
-            }
+            ExternalNavigation.OpenAffiliationZkill(item.EntityType, item.Id);
         }
 
         private void NestedScrollViewer_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)

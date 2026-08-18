@@ -1,0 +1,76 @@
+<UserControl x:Class="PitmastersGrill.Views.VersionUpdateView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:services="clr-namespace:PitmastersGrill.Services"
+             mc:Ignorable="d"
+             d:DesignHeight="420"
+             d:DesignWidth="720"
+             AutomationProperties.AutomationId="VersionUpdateView">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/PitmastersGrill;component/Resources/MainWindowResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  Padding="12">
+        <Border Background="{DynamicResource SurfaceAltBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
+                BorderThickness="1"
+                Padding="16">
+            <StackPanel>
+                <TextBlock Text="Version Information"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource HeaderTextBrush}"
+                           Margin="0,0,0,12"
+                           AutomationProperties.AutomationId="VersionInformationHeading"/>
+
+                <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                           Text="{x:Static services:AppReleaseMetadata.ReleaseLabel}"
+                           AutomationProperties.AutomationId="VersionReleaseLabelText"/>
+
+                <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                           Margin="0,4,0,0"
+                           Text="SmokeyLabs"
+                           AutomationProperties.AutomationId="VersionPublisherText"/>
+
+                <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                           Margin="0,12,0,0">
+                    <Run Text="For more information, visit the GitHub repo: "/>
+                    <Hyperlink NavigateUri="https://github.com/SmokeyForged/Pitmasters-Grill"
+                               RequestNavigate="RepositoryLink_RequestNavigate"
+                               AutomationProperties.AutomationId="GitHubRepositoryLink">
+                        <Run Text="https://github.com/SmokeyForged/Pitmasters-Grill"/>
+                    </Hyperlink>
+                </TextBlock>
+
+                <StackPanel Margin="0,18,0,0">
+                    <TextBlock Text="Updates"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,4"
+                               AutomationProperties.AutomationId="UpdatesHeading"/>
+                    <TextBlock Text="Check GitHub for the latest stable PMG release. This does not download, install, or replace files."
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"
+                               AutomationProperties.AutomationId="UpdatesDescriptionText"/>
+                    <Button x:Name="ManualUpdateCheckButton"
+                            Content="Check for Updates"
+                            Width="150"
+                            HorizontalAlignment="Left"
+                            Click="ManualUpdateCheckButton_Click"
+                            AutomationProperties.AutomationId="ManualUpdateCheckButton"/>
+                    <TextBlock x:Name="ManualUpdateStatusText"
+                               Text="Manual update check has not run this session."
+                               TextWrapping="Wrap"
+                               Margin="0,8,0,0"
+                               AutomationProperties.AutomationId="ManualUpdateStatusText"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

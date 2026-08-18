@@ -5,62 +5,84 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace PitmastersGrill.Services
 {
     public sealed class ManualUpdateCheckController
     {
-        private readonly Window _owner;
-        private readonly Button _manualUpdateCheckButton;
-        private readonly TextBlock _manualUpdateStatusText;
-        private readonly BrowserLauncher _browserLauncher;
+        private readonly Action<bool> _setManualUpdateCheckEnabled;
+        private readonly Action<string> _setManualUpdateStatusText;
+        private readonly Action<string> _openReleasePage;
         private readonly AppSettings _appSettings;
         private readonly CancellationToken _shutdownToken;
         private readonly Func<bool> _isShuttingDown;
+        private readonly Func<AppSettings> _loadSettings;
+        private readonly Action<AppSettings> _saveSettings;
+        private readonly Func<string?, CancellationToken, Task<PmgUpdateAwarenessResult>> _checkForUpdatesAsync;
+        private readonly Func<string, string, MessageBoxButton, MessageBoxImage, MessageBoxResult> _showMessage;
 
         public ManualUpdateCheckController(
             Window owner,
-            Button manualUpdateCheckButton,
-            TextBlock manualUpdateStatusText,
-            BrowserLauncher browserLauncher,
+            Action<bool> setManualUpdateCheckEnabled,
+            Action<string> setManualUpdateStatusText,
+            Action<string> openReleasePage,
             AppSettings appSettings,
             CancellationToken shutdownToken,
             Func<bool> isShuttingDown)
+            : this(
+                setManualUpdateCheckEnabled,
+                setManualUpdateStatusText,
+                openReleasePage,
+                appSettings,
+                shutdownToken,
+                isShuttingDown,
+                LoadSettings,
+                SaveSettings,
+                CheckForUpdatesAsync,
+                CreateMessagePresenter(owner))
         {
-            _owner = owner ?? throw new ArgumentNullException(nameof(owner));
-            _manualUpdateCheckButton = manualUpdateCheckButton ?? throw new ArgumentNullException(nameof(manualUpdateCheckButton));
-            _manualUpdateStatusText = manualUpdateStatusText ?? throw new ArgumentNullException(nameof(manualUpdateStatusText));
-            _browserLauncher = browserLauncher ?? throw new ArgumentNullException(nameof(browserLauncher));
+        }
+
+        internal ManualUpdateCheckController(
+            Action<bool> setManualUpdateCheckEnabled,
+            Action<string> setManualUpdateStatusText,
+            Action<string> openReleasePage,
+            AppSettings appSettings,
+            CancellationToken shutdownToken,
+            Func<bool> isShuttingDown,
+            Func<AppSettings> loadSettings,
+            Action<AppSettings> saveSettings,
+            Func<string?, CancellationToken, Task<PmgUpdateAwarenessResult>> checkForUpdatesAsync,
+            Func<string, string, MessageBoxButton, MessageBoxImage, MessageBoxResult> showMessage)
+        {
+            _setManualUpdateCheckEnabled = setManualUpdateCheckEnabled ?? throw new ArgumentNullException(nameof(setManualUpdateCheckEnabled));
+            _setManualUpdateStatusText = setManualUpdateStatusText ?? throw new ArgumentNullException(nameof(setManualUpdateStatusText));
+            _openReleasePage = openReleasePage ?? throw new ArgumentNullException(nameof(openReleasePage));
             _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
             _shutdownToken = shutdownToken;
             _isShuttingDown = isShuttingDown ?? throw new ArgumentNullException(nameof(isShuttingDown));
+            _loadSettings = loadSettings ?? throw new ArgumentNullException(nameof(loadSettings));
+            _saveSettings = saveSettings ?? throw new ArgumentNullException(nameof(saveSettings));
+            _checkForUpdatesAsync = checkForUpdatesAsync ?? throw new ArgumentNullException(nameof(checkForUpdatesAsync));
+            _showMessage = showMessage ?? throw new ArgumentNullException(nameof(showMessage));
         }
 
         public async Task RunAsync()
         {
             try
             {
-                _manualUpdateCheckButton.IsEnabled = false;
-                _manualUpdateStatusText.Text = "Checking GitHub for the latest stable PMG release...";
+                _setManualUpdateCheckEnabled(false);
+                _setManualUpdateStatusText("Checking GitHub for the latest stable PMG release...");
 
-                var appSettingsService = new AppSettingsService();
-                var settings = appSettingsService.Load();
-                var currentVersion = AppReleaseMetadata.VersionText;
-
-                var updateService = new PmgUpdateAwarenessService(new GitHubLatestReleaseChecker(), currentVersion);
-                var result = await updateService.CheckAsync(
-                    settings.SkippedUpdateVersion,
-                    respectSkippedVersion: false,
-                    _shutdownToken);
+                var settings = _loadSettings();
+                var result = await _checkForUpdatesAsync(settings.SkippedUpdateVersion, _shutdownToken);
 
                 if (!result.IsUpdateAvailable)
                 {
-                    _manualUpdateStatusText.Text =
-                        $"PMG is current. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.";
+                    _setManualUpdateStatusText(
+                        $"PMG is current. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.");
 
-                    MessageBox.Show(
-                        _owner,
+                    _showMessage(
                         $"PMG is current.\n\nCurrent version: {result.CurrentVersion}",
                         "PMG Update Check",
                         MessageBoxButton.OK,
@@ -69,8 +91,8 @@ namespace PitmastersGrill.Services
                     return;
                 }
 
-                _manualUpdateStatusText.Text =
-                    $"PMG {result.LatestVersion} is available. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.";
+                _setManualUpdateStatusText(
+                    $"PMG {result.LatestVersion} is available. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.");
 
                 var message =
                     $"PMG {result.LatestVersion} is available.\n\n" +
@@ -80,8 +102,7 @@ namespace PitmastersGrill.Services
                     "No: leave this reminder available.\n" +
                     "Cancel: skip this version.";
 
-                var response = MessageBox.Show(
-                    _owner,
+                var response = _showMessage(
                     message,
                     "PMG Update Available",
                     MessageBoxButton.YesNoCancel,
@@ -89,29 +110,28 @@ namespace PitmastersGrill.Services
 
                 if (response == MessageBoxResult.Yes)
                 {
-                    _browserLauncher.OpenUrl(result.ReleasePageUrl);
+                    _openReleasePage(result.ReleasePageUrl);
                 }
                 else if (response == MessageBoxResult.Cancel)
                 {
                     settings.SkippedUpdateVersion = result.LatestVersion;
                     _appSettings.SkippedUpdateVersion = result.LatestVersion;
-                    appSettingsService.Save(settings);
+                    _saveSettings(settings);
 
-                    _manualUpdateStatusText.Text =
-                        $"Skipped PMG {result.LatestVersion}. Manual checks will still show available releases.";
+                    _setManualUpdateStatusText(
+                        $"Skipped PMG {result.LatestVersion}. Manual checks will still show available releases.");
                 }
             }
             catch (OperationCanceledException) when (_isShuttingDown() || _shutdownToken.IsCancellationRequested)
             {
-                _manualUpdateStatusText.Text = "Update check cancelled.";
+                _setManualUpdateStatusText("Update check cancelled.");
             }
             catch (Exception ex)
             {
                 AppLogger.UiError("Manual update check failed.", ex);
-                _manualUpdateStatusText.Text = $"Update check failed: {ex.Message}";
+                _setManualUpdateStatusText($"Update check failed: {ex.Message}");
 
-                MessageBox.Show(
-                    _owner,
+                _showMessage(
                     $"PMG could not check for updates.\n\n{ex.Message}",
                     "PMG Update Check",
                     MessageBoxButton.OK,
@@ -119,8 +139,31 @@ namespace PitmastersGrill.Services
             }
             finally
             {
-                _manualUpdateCheckButton.IsEnabled = true;
+                _setManualUpdateCheckEnabled(true);
             }
+        }
+
+        private static AppSettings LoadSettings() => new AppSettingsService().Load();
+
+        private static void SaveSettings(AppSettings settings) => new AppSettingsService().Save(settings);
+
+        private static Task<PmgUpdateAwarenessResult> CheckForUpdatesAsync(
+            string? skippedUpdateVersion,
+            CancellationToken cancellationToken)
+        {
+            var updateService = new PmgUpdateAwarenessService(
+                new GitHubLatestReleaseChecker(),
+                AppReleaseMetadata.VersionText);
+            return updateService.CheckAsync(
+                skippedUpdateVersion,
+                respectSkippedVersion: false,
+                cancellationToken);
+        }
+
+        private static Func<string, string, MessageBoxButton, MessageBoxImage, MessageBoxResult> CreateMessagePresenter(Window owner)
+        {
+            ArgumentNullException.ThrowIfNull(owner);
+            return (message, title, buttons, image) => MessageBox.Show(owner, message, title, buttons, image);
         }
     }
 }
