@@ -1107,33 +1107,6 @@ namespace PitmastersGrill
                 PilotBoard?.SelectedItem as PilotBoardRow,
                 _currentBoardSession.Rows);
         }
-        private bool TryIgnoreForRow(PilotBoardRow selectedRow, IgnoreEntryType type)
-        {
-            var id = GetIgnoreId(selectedRow, type);
-            if (!id.HasValue)
-            {
-                AppLogger.UiWarn($"Ignore requested without a valid ID. character='{selectedRow.CharacterName}' type={type}");
-                return false;
-            }
-            var displayName = GetIgnoreDisplayName(selectedRow, type);
-            var added = _ignoreAllianceCoordinator.AddEntryAndPersist(
-                type,
-                id.Value,
-                $"detail window ignore {type}",
-                displayName);
-            if (!added)
-            {
-                AppLogger.UiInfo($"Ignore requested for existing entry. character='{selectedRow.CharacterName}' type={type} id='{id.Value}'");
-                _pilotDetailSurface.UpdateIgnoreAllianceButtonState(selectedRow);
-                _ignoreAllianceListView?.RefreshFromCoordinator();
-                return false;
-            }
-            AppLogger.UiInfo($"Typed ignore added from details. character='{selectedRow.CharacterName}' type={type} id='{id.Value}' name='{displayName}'");
-            _ignoreAllianceListView?.RefreshFromCoordinator();
-            ApplyIgnoredAllianceRowsToCurrentBoard();
-            RecomputeCorpAllianceCounts();
-            return true;
-        }
         private static bool IsTextEditingElement(DependencyObject? source)
         {
             return FindVisualParent<TextBox>(source) != null ||
@@ -1245,28 +1218,6 @@ namespace PitmastersGrill
         private void ResetManualBoardSort()
         {
             _boardSortController.ResetManualBoardSort(PilotBoard, CharacterColumn);
-        }
-
-        private long? GetIgnoreId(PilotBoardRow row, IgnoreEntryType type)
-        {
-            return type switch
-            {
-                IgnoreEntryType.Pilot => _pilotDetailActionsPresenter.TryGetPilotId(row.CharacterId),
-                IgnoreEntryType.Corporation => _pilotDetailActionsPresenter.TryGetAllianceId(row.CorpId),
-                IgnoreEntryType.Alliance => _pilotDetailActionsPresenter.TryGetAllianceId(row.AllianceId),
-                _ => null
-            };
-        }
-
-        private static string GetIgnoreDisplayName(PilotBoardRow row, IgnoreEntryType type)
-        {
-            return type switch
-            {
-                IgnoreEntryType.Pilot => string.IsNullOrWhiteSpace(row.CharacterName) ? "Unresolved" : row.CharacterName,
-                IgnoreEntryType.Corporation => string.IsNullOrWhiteSpace(row.CorpName) ? "Unresolved" : row.CorpName,
-                IgnoreEntryType.Alliance => string.IsNullOrWhiteSpace(row.AllianceName) ? "Unresolved" : row.AllianceName,
-                _ => "Unresolved"
-            };
         }
 
         private void UpdateLastRefreshed()
