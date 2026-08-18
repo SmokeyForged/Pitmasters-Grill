@@ -45,6 +45,30 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
+        public void Attach_LogsAdapterError_WhenClipboardListenerCannotRegister()
+        {
+            var controller = new MainWindowNativeInputController();
+            var nativeInputApi = new FakeNativeInputApi
+            {
+                AddClipboardResult = false,
+                LastError = 87
+            };
+            var warnLogs = new List<string>();
+
+            controller.Attach(
+                new IntPtr(42),
+                nativeInputApi,
+                modControl: 2,
+                globalResetWindowHotKeyId: 11,
+                globalClearBoardHotKeyId: 12,
+                globalToggleBoardModeHotKeyId: 13,
+                _ => { },
+                warnLogs.Add);
+
+            Assert.Contains(warnLogs, message => message.Contains("Clipboard listener registration failed. error=87", StringComparison.Ordinal));
+        }
+
+        [Fact]
         public void Detach_UnregistersOnlySuccessfullyRegisteredHotkeys_AndRemovesClipboardListener()
         {
             var controller = new MainWindowNativeInputController();
@@ -85,6 +109,39 @@ namespace PitmastersGrill.Tests.Services
                 _ => { });
 
             Assert.Equal(new[] { 13, 11 }, nativeInputApi.Unregistrations);
+        }
+
+        [Fact]
+        public void Detach_LogsAdapterError_WhenClipboardListenerCannotRemove()
+        {
+            var controller = new MainWindowNativeInputController();
+            var nativeInputApi = new FakeNativeInputApi
+            {
+                RemoveClipboardResult = false,
+                LastError = 5
+            };
+            var warnLogs = new List<string>();
+
+            controller.Attach(
+                new IntPtr(42),
+                nativeInputApi,
+                modControl: 2,
+                globalResetWindowHotKeyId: 11,
+                globalClearBoardHotKeyId: 12,
+                globalToggleBoardModeHotKeyId: 13,
+                _ => { },
+                _ => { });
+
+            controller.Detach(
+                new IntPtr(42),
+                nativeInputApi,
+                globalResetWindowHotKeyId: 11,
+                globalClearBoardHotKeyId: 12,
+                globalToggleBoardModeHotKeyId: 13,
+                _ => { },
+                warnLogs.Add);
+
+            Assert.Contains(warnLogs, message => message.Contains("Clipboard listener removal failed. error=5", StringComparison.Ordinal));
         }
 
         [Fact]
@@ -162,18 +219,20 @@ namespace PitmastersGrill.Tests.Services
             public List<int> Unregistrations { get; } = new();
             public IntPtr? ClipboardListenerAddedFor { get; private set; }
             public IntPtr? ClipboardListenerRemovedFor { get; private set; }
+            public bool AddClipboardResult { get; init; } = true;
+            public bool RemoveClipboardResult { get; init; } = true;
             public int LastError { get; init; }
 
             public bool AddClipboardFormatListener(IntPtr hwnd)
             {
                 ClipboardListenerAddedFor = hwnd;
-                return true;
+                return AddClipboardResult;
             }
 
             public bool RemoveClipboardFormatListener(IntPtr hwnd)
             {
                 ClipboardListenerRemovedFor = hwnd;
-                return true;
+                return RemoveClipboardResult;
             }
 
             public bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint virtualKey)

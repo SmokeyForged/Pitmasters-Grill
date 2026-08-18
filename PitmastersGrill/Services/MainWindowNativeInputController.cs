@@ -26,7 +26,10 @@ namespace PitmastersGrill.Services
                 return;
             }
 
-            nativeInputApi.AddClipboardFormatListener(hwnd);
+            if (!nativeInputApi.AddClipboardFormatListener(hwnd))
+            {
+                logWarn($"Clipboard listener registration failed. error={nativeInputApi.GetLastError()}");
+            }
 
             _globalClearBoardHotKeyRegistered = nativeInputApi.RegisterHotKey(
                 hwnd,
@@ -128,7 +131,10 @@ namespace PitmastersGrill.Services
                 _globalResetWindowHotKeyRegistered = false;
             }
 
-            nativeInputApi.RemoveClipboardFormatListener(hwnd);
+            if (!nativeInputApi.RemoveClipboardFormatListener(hwnd))
+            {
+                logWarn($"Clipboard listener removal failed. error={nativeInputApi.GetLastError()}");
+            }
         }
     }
 }

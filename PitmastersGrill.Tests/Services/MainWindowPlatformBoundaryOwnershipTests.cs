@@ -19,6 +19,17 @@ namespace PitmastersGrill.Tests.Services
         }
 
         [Fact]
+        public void MainWindow_DoesNotClaimClipboardListenerSuccessUnconditionally()
+        {
+            var source = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
+
+            Assert.DoesNotContain("Clipboard listener attached", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Clipboard listener removed", source, StringComparison.Ordinal);
+            Assert.Contains("Native input attach attempt complete", source, StringComparison.Ordinal);
+            Assert.Contains("Native input detach attempt complete", source, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void MainWindow_DoesNotOwnMonitorEnumerationOrDpiConversion()
         {
             var source = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
