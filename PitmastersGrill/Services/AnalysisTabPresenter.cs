@@ -14,7 +14,7 @@ namespace PitmastersGrill.Services
         private readonly AnalysisTabController _analysisTabController;
         private readonly ZkillUrlBuilder _zkillUrlBuilder;
         private readonly RequestNavigateEventHandler _analysisHyperlinkRequestNavigate;
-        private readonly TextBlock? _boardSummaryText;
+        private readonly Action<string>? _setBoardSummaryText;
         private readonly TextBlock? _analysisEmptyStateText;
         private readonly UIElement? _analysisDetailsPanel;
         private readonly TextBlock? _analysisVisibleCountsText;
@@ -30,7 +30,7 @@ namespace PitmastersGrill.Services
             AnalysisTabController analysisTabController,
             ZkillUrlBuilder zkillUrlBuilder,
             RequestNavigateEventHandler analysisHyperlinkRequestNavigate,
-            TextBlock? boardSummaryText,
+            Action<string>? setBoardSummaryText,
             TextBlock? analysisEmptyStateText,
             UIElement? analysisDetailsPanel,
             TextBlock? analysisVisibleCountsText,
@@ -45,7 +45,7 @@ namespace PitmastersGrill.Services
             _analysisTabController = analysisTabController ?? throw new ArgumentNullException(nameof(analysisTabController));
             _zkillUrlBuilder = zkillUrlBuilder ?? throw new ArgumentNullException(nameof(zkillUrlBuilder));
             _analysisHyperlinkRequestNavigate = analysisHyperlinkRequestNavigate ?? throw new ArgumentNullException(nameof(analysisHyperlinkRequestNavigate));
-            _boardSummaryText = boardSummaryText;
+            _setBoardSummaryText = setBoardSummaryText;
             _analysisEmptyStateText = analysisEmptyStateText;
             _analysisDetailsPanel = analysisDetailsPanel;
             _analysisVisibleCountsText = analysisVisibleCountsText;
@@ -60,12 +60,12 @@ namespace PitmastersGrill.Services
 
         public void UpdateBoardSummary(IReadOnlyList<PilotBoardRow> currentRows)
         {
-            if (_boardSummaryText == null)
+            if (_setBoardSummaryText == null)
             {
                 return;
             }
 
-            _boardSummaryText.Text = BoardSummaryTextBuilder.Build(currentRows);
+            _setBoardSummaryText(BoardSummaryTextBuilder.Build(currentRows));
         }
 
         public void UpdateAnalysisTab(IReadOnlyList<PilotBoardRow> currentRows)
