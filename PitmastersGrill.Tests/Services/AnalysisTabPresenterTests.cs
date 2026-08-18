@@ -124,7 +124,7 @@ namespace PitmastersGrill.Tests.Services
                 new AnalysisTabController(),
                 new ZkillUrlBuilder(),
                 (_, _) => { },
-                controls.BoardSummaryText,
+                text => controls.BoardSummaryText.Text = text,
                 controls.AnalysisEmptyStateText,
                 controls.AnalysisDetailsPanel,
                 controls.AnalysisVisibleCountsText,
