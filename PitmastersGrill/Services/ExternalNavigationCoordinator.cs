@@ -37,7 +37,9 @@ namespace PitmastersGrill.Services
 
         public BrowserLaunchResult OpenAffiliationZkill(string? entityType, string? entityId)
         {
-            if (string.IsNullOrWhiteSpace(entityId) || !long.TryParse(entityId, out _))
+            if (string.IsNullOrWhiteSpace(entityId) ||
+                !long.TryParse(entityId, out var parsedId) ||
+                parsedId <= 0)
             {
                 _logWarn($"External navigation ignored invalid affiliation id. type='{entityType ?? string.Empty}' id='{entityId ?? string.Empty}'");
                 return new BrowserLaunchResult(false, false, string.Empty);
