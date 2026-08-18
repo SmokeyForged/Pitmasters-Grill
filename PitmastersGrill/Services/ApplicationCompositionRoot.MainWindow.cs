@@ -32,7 +32,9 @@ namespace PitmastersGrill.Services
             MainWindowShellModeCoordinator mainWindowShellModeCoordinator,
             MainWindowInteropController mainWindowInteropController,
             WindowLayoutController windowLayoutController,
+            IWindowWorkAreaProvider windowWorkAreaProvider,
             MainWindowNativeInputController mainWindowNativeInputController,
+            INativeInputApi nativeInputApi,
             BoardPopulationStatusController boardPopulationStatusController,
             BoardPopulationRowProcessor boardPopulationRowProcessor,
             BoardPopulationPassController boardPopulationPassController,
@@ -69,7 +71,9 @@ namespace PitmastersGrill.Services
             MainWindowShellModeCoordinator = mainWindowShellModeCoordinator ?? throw new ArgumentNullException(nameof(mainWindowShellModeCoordinator));
             MainWindowInteropController = mainWindowInteropController ?? throw new ArgumentNullException(nameof(mainWindowInteropController));
             WindowLayoutController = windowLayoutController ?? throw new ArgumentNullException(nameof(windowLayoutController));
+            WindowWorkAreaProvider = windowWorkAreaProvider ?? throw new ArgumentNullException(nameof(windowWorkAreaProvider));
             MainWindowNativeInputController = mainWindowNativeInputController ?? throw new ArgumentNullException(nameof(mainWindowNativeInputController));
+            NativeInputApi = nativeInputApi ?? throw new ArgumentNullException(nameof(nativeInputApi));
             BoardPopulationStatusController = boardPopulationStatusController ?? throw new ArgumentNullException(nameof(boardPopulationStatusController));
             BoardPopulationRowProcessor = boardPopulationRowProcessor ?? throw new ArgumentNullException(nameof(boardPopulationRowProcessor));
             BoardPopulationPassController = boardPopulationPassController ?? throw new ArgumentNullException(nameof(boardPopulationPassController));
@@ -107,7 +111,9 @@ namespace PitmastersGrill.Services
         public MainWindowShellModeCoordinator MainWindowShellModeCoordinator { get; }
         public MainWindowInteropController MainWindowInteropController { get; }
         public WindowLayoutController WindowLayoutController { get; }
+        public IWindowWorkAreaProvider WindowWorkAreaProvider { get; }
         public MainWindowNativeInputController MainWindowNativeInputController { get; }
+        public INativeInputApi NativeInputApi { get; }
         public BoardPopulationStatusController BoardPopulationStatusController { get; }
         public BoardPopulationRowProcessor BoardPopulationRowProcessor { get; }
         public BoardPopulationPassController BoardPopulationPassController { get; }
@@ -158,7 +164,9 @@ namespace PitmastersGrill.Services
             var mainWindowShellModeCoordinator = new MainWindowShellModeCoordinator();
             var mainWindowInteropController = new MainWindowInteropController();
             var windowLayoutController = new WindowLayoutController();
+            var windowWorkAreaProvider = new WindowsWindowWorkAreaProvider();
             var mainWindowNativeInputController = new MainWindowNativeInputController();
+            var nativeInputApi = new Win32NativeInputApi();
             var boardPopulationStatusController = new BoardPopulationStatusController();
             var pilotDetailActionsPresenter = new PilotDetailActionsPresenter();
             var boardPopulationTimingMarkerTracker = new BoardPopulationTimingMarkerTracker();
@@ -190,11 +198,7 @@ namespace PitmastersGrill.Services
             var esiExactNameResolverProvider = new EsiExactNameResolverProvider();
             var esiPublicAffiliationProvider = new EsiPublicAffiliationProvider();
             var zkillStatsProvider = new ZkillStatsProvider();
-            var resolverService = new ResolverService(
-                resolverCacheRepository,
-                zkillSearchResolverProvider,
-                esiExactNameResolverProvider,
-                esiPublicAffiliationProvider);
+            var resolverService = new ResolverService(resolverCacheRepository, zkillSearchResolverProvider, esiExactNameResolverProvider, esiPublicAffiliationProvider);
             var statsService = new StatsService(statsCacheRepository, zkillStatsProvider);
 
             var boardPopulationRowProcessor = new BoardPopulationRowProcessor(
@@ -249,7 +253,9 @@ namespace PitmastersGrill.Services
                 mainWindowShellModeCoordinator,
                 mainWindowInteropController,
                 windowLayoutController,
+                windowWorkAreaProvider,
                 mainWindowNativeInputController,
+                nativeInputApi,
                 boardPopulationStatusController,
                 boardPopulationRowProcessor,
                 boardPopulationPassController,
