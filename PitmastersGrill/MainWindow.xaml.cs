@@ -25,7 +25,6 @@ namespace PitmastersGrill
         private const uint ModControl = 0x0002;
         private const int ClipboardDebounceMilliseconds = 250;
         private const int MaxBoardPopulationRetryAttempts = 5;
-        private const int CompactDragHoldMilliseconds = 300;
         private const int BoardModeHintMilliseconds = 5000;
         private const int TripleEscapeWindowMilliseconds = 1500;
         private const int GlobalResetWindowHotKeyId = 0x504D47;
@@ -403,7 +402,7 @@ namespace PitmastersGrill
             IntelSupportViewControl.EnableKillmailDbPullRequested += async (_, _) => await _intelSupportSurface.RunEnableKillmailDbPullAsync();
             IntelSupportViewControl.EnableLiveZkillFeedToggled += async (_, _) =>
                 await _intelSupportSurface.HandleLiveFeedToggleAsync(
-                    IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl.IsChecked == true);
+                    IntelSupportViewControl.EnableLiveKillfeedCheckBoxControl.IsChecked == true);
             IntelSupportViewControl.BackgroundHistoricalRepairToggled += (_, _) =>
                 _mainWindowSettingsCoordinator.HandleBackgroundHistoricalRepairChanged(
                     _isApplyingSettings,
@@ -892,7 +891,7 @@ namespace PitmastersGrill
             var started = _compactBoardDragController.TryBegin(
                 CompactModeToggleButton?.IsChecked == true,
                 e.ClickCount,
-                IsFromCompactDragBlockedElement(e.OriginalSource as DependencyObject));
+                e.OriginalSource as DependencyObject);
             if (!started)
             {
                 return;
@@ -920,9 +919,9 @@ namespace PitmastersGrill
         private void CompactDragHoldTimer_Tick(object? sender, EventArgs e)
         {
             _compactDragHoldTimer.Stop();
-            if (!_compactBoardDragController.CompleteHold(
+            if (_compactBoardDragController.CompleteHoldAction(
                     CompactModeToggleButton?.IsChecked == true,
-                    Mouse.LeftButton == MouseButtonState.Pressed))
+                    Mouse.LeftButton == MouseButtonState.Pressed) != CompactBoardDragAction.RequestDrag)
             {
                 return;
             }
@@ -1105,23 +1104,6 @@ namespace PitmastersGrill
         {
             return FindVisualParent<TextBox>(source) != null ||
                    FindVisualParent<ComboBox>(source) != null;
-        }
-
-        private static bool IsFromCompactDragBlockedElement(DependencyObject? source)
-        {
-            // Rows and column headers are valid compact-mode drag surfaces.
-            // Only block elements where click/hold has a separate interactive meaning.
-            // DataGridColumnHeader derives from ButtonBase in WPF, so allow it before the generic button check.
-            if (FindVisualParent<DataGridColumnHeader>(source) != null)
-            {
-                return FindVisualParent<Thumb>(source) != null;
-            }
-
-            return FindVisualParent<ButtonBase>(source) != null ||
-                   FindVisualParent<ScrollBar>(source) != null ||
-                   FindVisualParent<TextBox>(source) != null ||
-                   FindVisualParent<ComboBox>(source) != null ||
-                   FindVisualParent<Thumb>(source) != null;
         }
 
         private static T? FindVisualParent<T>(DependencyObject? source)
