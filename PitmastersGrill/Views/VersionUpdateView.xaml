@@ -8,6 +8,14 @@
              d:DesignHeight="420"
              d:DesignWidth="720"
              AutomationProperties.AutomationId="VersionUpdateView">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/PitmastersGrill;component/Resources/MainWindowResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   Padding="12">
         <Border Background="{DynamicResource SurfaceAltBrush}"
@@ -22,24 +30,17 @@
                            Margin="0,0,0,12"
                            AutomationProperties.AutomationId="VersionInformationHeading"/>
 
-                <TextBlock Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,0,0,8"
-                           TextWrapping="Wrap"
-                           TextTrimming="None"
+                <TextBlock Style="{StaticResource SettingsLabelStyle}"
                            Text="{x:Static services:AppReleaseMetadata.ReleaseLabel}"
                            AutomationProperties.AutomationId="VersionReleaseLabelText"/>
 
-                <TextBlock Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,4,0,8"
-                           TextWrapping="Wrap"
-                           TextTrimming="None"
+                <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                           Margin="0,4,0,0"
                            Text="SmokeyLabs"
                            AutomationProperties.AutomationId="VersionPublisherText"/>
 
-                <TextBlock Foreground="{DynamicResource BodyTextBrush}"
-                           Margin="0,12,0,8"
-                           TextWrapping="Wrap"
-                           TextTrimming="None">
+                <TextBlock Style="{StaticResource SettingsLabelStyle}"
+                           Margin="0,12,0,0">
                     <Run Text="For more information, visit the GitHub repo: "/>
                     <Hyperlink NavigateUri="https://github.com/SmokeyForged/Pitmasters-Grill"
                                RequestNavigate="RepositoryLink_RequestNavigate"
