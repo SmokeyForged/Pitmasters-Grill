@@ -402,7 +402,7 @@ namespace PitmastersGrill
             IntelSupportViewControl.EnableKillmailDbPullRequested += async (_, _) => await _intelSupportSurface.RunEnableKillmailDbPullAsync();
             IntelSupportViewControl.EnableLiveZkillFeedToggled += async (_, _) =>
                 await _intelSupportSurface.HandleLiveFeedToggleAsync(
-                    IntelSupportViewControl.EnableLiveKillfeedCheckBoxControl.IsChecked == true);
+                    IntelSupportViewControl.EnableLiveZkillFeedCheckBoxControl.IsChecked == true);
             IntelSupportViewControl.BackgroundHistoricalRepairToggled += (_, _) =>
                 _mainWindowSettingsCoordinator.HandleBackgroundHistoricalRepairChanged(
                     _isApplyingSettings,
@@ -664,14 +664,15 @@ namespace PitmastersGrill
             _boardPopulationStatusController.UpdateStatus(
                 statusText,
                 kind,
-                BoardPopulationStatusText,
+                BoardStatusViewControl.SetPopulationStatusText,
+                BoardStatusViewControl.SetPopulationStatusForeground,
                 Resources);
         }
 
         private void ApplyBoardPopulationStatusVisual()
         {
             _boardPopulationStatusController.ApplyStatusVisual(
-                BoardPopulationStatusText,
+                BoardStatusViewControl.SetPopulationStatusForeground,
                 Resources);
         }
 
@@ -1198,7 +1199,7 @@ namespace PitmastersGrill
 
         private void UpdateLastRefreshed()
         {
-            LastRefreshedText.Text = _boardStatusPresenter.BuildLastRefreshedText();
+            BoardStatusViewControl.SetLastRefreshedText(_boardStatusPresenter.BuildLastRefreshedText());
         }
         private void CurrentBoardSession_Changed(object? sender, CurrentBoardSessionChangedEventArgs e)
         {
