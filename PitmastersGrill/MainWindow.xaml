@@ -824,55 +824,10 @@
                             </TabItem>
 
                             <TabItem Header="Version" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                              Padding="12">
-                                    <Border Background="{DynamicResource SurfaceAltBrush}"
-                                            BorderBrush="{DynamicResource PanelBorderBrush}"
-                                            BorderThickness="1"
-                                            Padding="16">
-                                        <StackPanel>
-                                            <TextBlock Text="Version Information"
-                                                       FontSize="18"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource HeaderTextBrush}"
-                                                       Margin="0,0,0,12"/>
-
-                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Text="{x:Static services:AppReleaseMetadata.ReleaseLabel}"/>
-
-                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Margin="0,4,0,0"
-                                                       Text="SmokeyLabs"/>
-
-                                            <TextBlock Style="{StaticResource SettingsLabelStyle}"
-                                                       Margin="0,12,0,0">
-                                                <Run Text="For more information, visit the GitHub repo: "/>
-                                                <Hyperlink NavigateUri="https://github.com/SmokeyForged/Pitmasters-Grill"
-                                                           RequestNavigate="GitHubRepoLink_RequestNavigate">
-                                                    <Run Text="https://github.com/SmokeyForged/Pitmasters-Grill"/>
-                                                </Hyperlink>
-                                            </TextBlock>
-
-                        <StackPanel Margin="0,18,0,0">
-                            <TextBlock Text="Updates"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,4" />
-                            <TextBlock Text="Check GitHub for the latest stable PMG release. This does not download, install, or replace files."
-                                       TextWrapping="Wrap"
-                                       Margin="0,0,0,8" />
-                            <Button x:Name="ManualUpdateCheckButton"
-                                    Content="Check for Updates"
-                                    Width="150"
-                                    HorizontalAlignment="Left"
-                                    Click="ManualUpdateCheckButton_Click"  AutomationProperties.AutomationId="ManualUpdateCheckButton"/>
-                            <TextBlock x:Name="ManualUpdateStatusText"
-                                       Text="Manual update check has not run this session."
-                                       TextWrapping="Wrap"
-                                       Margin="0,8,0,0"  AutomationProperties.AutomationId="ManualUpdateStatusText"/>
-                        </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </ScrollViewer>
+                                <views:VersionUpdateView x:Name="VersionUpdateViewControl"
+                                                         RepositoryNavigateRequested="VersionUpdateView_RepositoryNavigateRequested"
+                                                         ManualUpdateCheckRequested="VersionUpdateView_ManualUpdateCheckRequested"
+                                                         AutomationProperties.AutomationId="VersionUpdateViewControl"/>
                             </TabItem>
 
                             <TabItem Header="Diagnostics" Style="{StaticResource PmgNestedSubTabItemStyle}" Background="#1E252C" Foreground="#F2EFE6">
