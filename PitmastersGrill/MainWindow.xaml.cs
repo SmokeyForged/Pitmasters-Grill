@@ -6,7 +6,6 @@ using PitmastersGrill.Views;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -16,7 +15,6 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Navigation;
 using System.Windows.Threading;
-using FormsScreen = System.Windows.Forms.Screen;
 
 namespace PitmastersGrill
 {
@@ -124,15 +122,13 @@ namespace PitmastersGrill
             _mainWindowShellSurface.RestoreWindowLayoutFromSettings();
             _mainWindowNativeInputController.Attach(
                 hwnd,
-                AddClipboardFormatListener,
-                RegisterHotKey,
+                _nativeInputApi,
                 ModControl,
                 GlobalResetWindowHotKeyId,
                 GlobalClearBoardHotKeyId,
                 GlobalToggleBoardModeHotKeyId,
                 AppLogger.UiInfo,
-                AppLogger.UiWarn,
-                Marshal.GetLastWin32Error);
+                AppLogger.UiWarn);
             _mainWindowShellSurface.UpdateWindowStateUi();
             _eveSessionContextSurface.TriggerRefresh("startup", force: false);
 
@@ -194,14 +190,12 @@ namespace PitmastersGrill
             var hwnd = new WindowInteropHelper(this).Handle;
             _mainWindowNativeInputController.Detach(
                 hwnd,
-                RemoveClipboardFormatListener,
-                UnregisterHotKey,
+                _nativeInputApi,
                 GlobalResetWindowHotKeyId,
                 GlobalClearBoardHotKeyId,
                 GlobalToggleBoardModeHotKeyId,
                 AppLogger.UiInfo,
-                AppLogger.UiWarn,
-                Marshal.GetLastWin32Error);
+                AppLogger.UiWarn);
 
             AppLogger.UiInfo("MainWindow closed. Clipboard listener removed, retry state cancelled, and background work stop requested.");
 
@@ -1335,44 +1329,6 @@ namespace PitmastersGrill
                 AppLogger.UiError($"Failed to open analysis affiliation item. type='{item.EntityType}' id='{item.Id}'", ex);
             }
         }
-
-        private IReadOnlyList<Rect> GetMonitorWorkAreasDip()
-        {
-            return FormsScreen.AllScreens
-                .Select(GetScreenWorkAreaDip)
-                .Where(_windowLayoutController.IsUsableWindowBounds)
-                .ToList();
-        }
-
-        private Rect GetScreenWorkAreaDip(FormsScreen screen)
-        {
-            var workArea = screen.WorkingArea;
-            var topLeft = DevicePixelsToDip(new Point(workArea.Left, workArea.Top));
-            var bottomRight = DevicePixelsToDip(new Point(workArea.Right, workArea.Bottom));
-            return new Rect(topLeft, bottomRight);
-        }
-        private Point DevicePixelsToDip(Point devicePoint)
-        {
-            var source = PresentationSource.FromVisual(this);
-            if (source?.CompositionTarget != null)
-            {
-                return source.CompositionTarget.TransformFromDevice.Transform(devicePoint);
-            }
-
-            return devicePoint;
-        }
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool AddClipboardFormatListener(IntPtr hwnd);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint fsModifiers, uint vk);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
 
         private void NestedScrollViewer_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
         {
