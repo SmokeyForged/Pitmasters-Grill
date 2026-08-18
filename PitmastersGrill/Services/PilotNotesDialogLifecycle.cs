@@ -12,7 +12,7 @@ namespace PitmastersGrill.Services
     {
         bool Saved { get; }
 
-        void ConfigureOwner(object owner, bool topmost);
+        void ConfigureOwner(Window owner, bool topmost);
 
         void CopyResourcesFrom(ResourceDictionary resources);
 
@@ -46,7 +46,7 @@ namespace PitmastersGrill.Services
 
         public PilotNotesDialogResult Open(
             PilotBoardRow row,
-            object owner,
+            Window owner,
             bool topmost,
             ResourceDictionary resources)
         {
@@ -92,14 +92,10 @@ namespace PitmastersGrill.Services
 
             public bool Saved => _window.Saved;
 
-            public void ConfigureOwner(object owner, bool topmost)
+            public void ConfigureOwner(Window owner, bool topmost)
             {
-                if (owner is not Window ownerWindow)
-                {
-                    throw new ArgumentException("Pilot Notes owner must be a WPF Window.", nameof(owner));
-                }
-
-                _window.Owner = ownerWindow;
+                ArgumentNullException.ThrowIfNull(owner);
+                _window.Owner = owner;
                 _window.Topmost = topmost;
             }
 
