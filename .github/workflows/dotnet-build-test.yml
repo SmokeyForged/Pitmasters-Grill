@@ -7,7 +7,124 @@ on:
       - v*
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
+  pmg18-mainwindow-cutover:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/pmg-18-external-navigation-version'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply exact PMG-36 method cutover
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('PitmastersGrill/MainWindow.xaml.cs')
+          text = path.read_text(encoding='utf-8-sig')
+
+          def replace_between(source: str, start: str, next_start: str, replacement: str) -> str:
+              if source.count(start) != 1:
+                  raise SystemExit(f'expected exactly one start marker: {start!r}, found {source.count(start)}')
+              if source.count(next_start) != 1:
+                  raise SystemExit(f'expected exactly one next marker: {next_start!r}, found {source.count(next_start)}')
+              begin = source.index(start)
+              end = source.index(next_start, begin)
+              return source[:begin] + replacement.rstrip() + '\n\n        ' + source[end:]
+
+          text = replace_between(
+              text,
+              'private void OpenZkillForRow(PilotBoardRow selectedRow)',
+              'private void Window_PreviewKeyDown',
+              '''private void OpenZkillForRow(PilotBoardRow selectedRow)
+        {
+            var result = ExternalNavigation.OpenPilotZkill(
+                selectedRow.CharacterId,
+                selectedRow.CharacterName);
+            ShowExternalNavigationErrorIfNeeded(result);
+        }''')
+
+          text = replace_between(
+              text,
+              'private void GitHubRepoLink_RequestNavigate',
+              'private void ApplyWatchedState',
+              '''private void GitHubRepoLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            var url = e.Uri?.AbsoluteUri ?? "https://github.com/SmokeyForged/Pitmasters-Grill";
+            var result = ExternalNavigation.OpenUrl(url, "GitHub repository");
+            ShowExternalNavigationErrorIfNeeded(result);
+            e.Handled = true;
+        }''')
+
+          text = replace_between(
+              text,
+              'private void AnalysisHyperlink_RequestNavigate',
+              'private void AnalysisAllianceListBox_MouseDoubleClick',
+              '''private void AnalysisHyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            e.Handled = true;
+            var url = e.Uri?.AbsoluteUri;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return;
+            }
+
+            ExternalNavigation.OpenUrl(url, "analysis hyperlink");
+        }''')
+
+          text = replace_between(
+              text,
+              'private void OpenAnalysisAffiliationItem',
+              'private void NestedScrollViewer_PreviewMouseWheel',
+              '''private void OpenAnalysisAffiliationItem(AnalysisAffiliationListItem? item)
+        {
+            if (item == null)
+            {
+                return;
+            }
+
+            ExternalNavigation.OpenAffiliationZkill(item.EntityType, item.Id);
+        }''')
+
+          for marker in (
+              'ExternalNavigation.OpenPilotZkill(',
+              'ExternalNavigation.OpenUrl(url, "GitHub repository")',
+              'ExternalNavigation.OpenUrl(url, "analysis hyperlink")',
+              'ExternalNavigation.OpenAffiliationZkill(item.EntityType, item.Id)',
+          ):
+              if text.count(marker) != 1:
+                  raise SystemExit(f'cutover verification failed for {marker!r}: {text.count(marker)}')
+
+          if '_browserLauncher.OpenUrl(' in text:
+              raise SystemExit('direct BrowserLauncher.OpenUrl remains in MainWindow.xaml.cs')
+          if '? _analysisTabPresenter.BuildAllianceZkillUrl' in text:
+              raise SystemExit('old affiliation default-routing expression remains')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit exact cutover if needed
+        shell: bash
+        run: |
+          if git diff --quiet -- PitmastersGrill/MainWindow.xaml.cs; then
+            echo "No cutover changes needed."
+            exit 0
+          fi
+          git --no-pager diff --check
+          git --no-pager diff -- PitmastersGrill/MainWindow.xaml.cs
+          git config user.name "Athena"
+          git config user.email "athena@users.noreply.github.com"
+          git add PitmastersGrill/MainWindow.xaml.cs
+          git commit -m "PMG-36 rewire MainWindow external navigation"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
   build-test:
     runs-on: windows-latest
 
