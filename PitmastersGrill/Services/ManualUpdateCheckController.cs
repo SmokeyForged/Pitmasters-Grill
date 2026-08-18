@@ -5,33 +5,32 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace PitmastersGrill.Services
 {
     public sealed class ManualUpdateCheckController
     {
         private readonly Window _owner;
-        private readonly Button _manualUpdateCheckButton;
-        private readonly TextBlock _manualUpdateStatusText;
-        private readonly BrowserLauncher _browserLauncher;
+        private readonly Action<bool> _setManualUpdateCheckEnabled;
+        private readonly Action<string> _setManualUpdateStatusText;
+        private readonly Action<string> _openReleasePage;
         private readonly AppSettings _appSettings;
         private readonly CancellationToken _shutdownToken;
         private readonly Func<bool> _isShuttingDown;
 
         public ManualUpdateCheckController(
             Window owner,
-            Button manualUpdateCheckButton,
-            TextBlock manualUpdateStatusText,
-            BrowserLauncher browserLauncher,
+            Action<bool> setManualUpdateCheckEnabled,
+            Action<string> setManualUpdateStatusText,
+            Action<string> openReleasePage,
             AppSettings appSettings,
             CancellationToken shutdownToken,
             Func<bool> isShuttingDown)
         {
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
-            _manualUpdateCheckButton = manualUpdateCheckButton ?? throw new ArgumentNullException(nameof(manualUpdateCheckButton));
-            _manualUpdateStatusText = manualUpdateStatusText ?? throw new ArgumentNullException(nameof(manualUpdateStatusText));
-            _browserLauncher = browserLauncher ?? throw new ArgumentNullException(nameof(browserLauncher));
+            _setManualUpdateCheckEnabled = setManualUpdateCheckEnabled ?? throw new ArgumentNullException(nameof(setManualUpdateCheckEnabled));
+            _setManualUpdateStatusText = setManualUpdateStatusText ?? throw new ArgumentNullException(nameof(setManualUpdateStatusText));
+            _openReleasePage = openReleasePage ?? throw new ArgumentNullException(nameof(openReleasePage));
             _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
             _shutdownToken = shutdownToken;
             _isShuttingDown = isShuttingDown ?? throw new ArgumentNullException(nameof(isShuttingDown));
@@ -41,8 +40,8 @@ namespace PitmastersGrill.Services
         {
             try
             {
-                _manualUpdateCheckButton.IsEnabled = false;
-                _manualUpdateStatusText.Text = "Checking GitHub for the latest stable PMG release...";
+                _setManualUpdateCheckEnabled(false);
+                _setManualUpdateStatusText("Checking GitHub for the latest stable PMG release...");
 
                 var appSettingsService = new AppSettingsService();
                 var settings = appSettingsService.Load();
@@ -56,8 +55,8 @@ namespace PitmastersGrill.Services
 
                 if (!result.IsUpdateAvailable)
                 {
-                    _manualUpdateStatusText.Text =
-                        $"PMG is current. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.";
+                    _setManualUpdateStatusText(
+                        $"PMG is current. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.");
 
                     MessageBox.Show(
                         _owner,
@@ -69,8 +68,8 @@ namespace PitmastersGrill.Services
                     return;
                 }
 
-                _manualUpdateStatusText.Text =
-                    $"PMG {result.LatestVersion} is available. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.";
+                _setManualUpdateStatusText(
+                    $"PMG {result.LatestVersion} is available. Current version: {result.CurrentVersion}. Checked {DateTime.Now:g}.");
 
                 var message =
                     $"PMG {result.LatestVersion} is available.\n\n" +
@@ -89,7 +88,7 @@ namespace PitmastersGrill.Services
 
                 if (response == MessageBoxResult.Yes)
                 {
-                    _browserLauncher.OpenUrl(result.ReleasePageUrl);
+                    _openReleasePage(result.ReleasePageUrl);
                 }
                 else if (response == MessageBoxResult.Cancel)
                 {
@@ -97,18 +96,18 @@ namespace PitmastersGrill.Services
                     _appSettings.SkippedUpdateVersion = result.LatestVersion;
                     appSettingsService.Save(settings);
 
-                    _manualUpdateStatusText.Text =
-                        $"Skipped PMG {result.LatestVersion}. Manual checks will still show available releases.";
+                    _setManualUpdateStatusText(
+                        $"Skipped PMG {result.LatestVersion}. Manual checks will still show available releases.");
                 }
             }
             catch (OperationCanceledException) when (_isShuttingDown() || _shutdownToken.IsCancellationRequested)
             {
-                _manualUpdateStatusText.Text = "Update check cancelled.";
+                _setManualUpdateStatusText("Update check cancelled.");
             }
             catch (Exception ex)
             {
                 AppLogger.UiError("Manual update check failed.", ex);
-                _manualUpdateStatusText.Text = $"Update check failed: {ex.Message}";
+                _setManualUpdateStatusText($"Update check failed: {ex.Message}");
 
                 MessageBox.Show(
                     _owner,
@@ -119,7 +118,7 @@ namespace PitmastersGrill.Services
             }
             finally
             {
-                _manualUpdateCheckButton.IsEnabled = true;
+                _setManualUpdateCheckEnabled(true);
             }
         }
     }
