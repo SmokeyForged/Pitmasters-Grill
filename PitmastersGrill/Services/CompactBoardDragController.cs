@@ -41,30 +41,6 @@ namespace PitmastersGrill.Services
             return true;
         }
 
-        // Temporary compatibility seam while MainWindow is rewired on this branch. The final
-        // PMG-16 commit removes this overload so compact-drag policy has one focused owner.
-        public bool TryBegin(bool boardModeEnabled, int clickCount, bool blockedByInteractiveElement)
-        {
-            if (IsPending || !boardModeEnabled)
-            {
-                return false;
-            }
-
-            if (clickCount > 1)
-            {
-                Cancel();
-                return false;
-            }
-
-            if (blockedByInteractiveElement)
-            {
-                return false;
-            }
-
-            IsPending = true;
-            return true;
-        }
-
         public void Cancel()
         {
             IsPending = false;
@@ -92,10 +68,6 @@ namespace PitmastersGrill.Services
             IsPending = false;
             return CompactBoardDragAction.RequestDrag;
         }
-
-        // Temporary compatibility seam while MainWindow is rewired on this branch.
-        public bool CompleteHold(bool boardModeEnabled, bool leftButtonPressed) =>
-            CompleteHoldAction(boardModeEnabled, leftButtonPressed) == CompactBoardDragAction.RequestDrag;
 
         public static bool IsBlockedByInteractiveElement(DependencyObject? source)
         {
