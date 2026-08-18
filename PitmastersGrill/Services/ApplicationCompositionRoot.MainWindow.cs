@@ -44,6 +44,7 @@ namespace PitmastersGrill.Services
             PilotDetailActionsPresenter pilotDetailActionsPresenter,
             BoardPopulationTimingMarkerTracker boardPopulationTimingMarkerTracker,
             IgnoreAllianceCoordinator ignoreAllianceCoordinator,
+            TypedIgnoreActionCoordinator typedIgnoreActionCoordinator,
             IgnoreAllianceBoardController ignoreAllianceBoardController,
             ZkillUrlBuilder zkillUrlBuilder,
             BrowserLauncher browserLauncher)
@@ -83,6 +84,7 @@ namespace PitmastersGrill.Services
             PilotDetailActionsPresenter = pilotDetailActionsPresenter ?? throw new ArgumentNullException(nameof(pilotDetailActionsPresenter));
             BoardPopulationTimingMarkerTracker = boardPopulationTimingMarkerTracker ?? throw new ArgumentNullException(nameof(boardPopulationTimingMarkerTracker));
             IgnoreAllianceCoordinator = ignoreAllianceCoordinator ?? throw new ArgumentNullException(nameof(ignoreAllianceCoordinator));
+            TypedIgnoreActionCoordinator = typedIgnoreActionCoordinator ?? throw new ArgumentNullException(nameof(typedIgnoreActionCoordinator));
             IgnoreAllianceBoardController = ignoreAllianceBoardController ?? throw new ArgumentNullException(nameof(ignoreAllianceBoardController));
             ZkillUrlBuilder = zkillUrlBuilder ?? throw new ArgumentNullException(nameof(zkillUrlBuilder));
             BrowserLauncher = browserLauncher ?? throw new ArgumentNullException(nameof(browserLauncher));
@@ -123,6 +125,7 @@ namespace PitmastersGrill.Services
         public PilotDetailActionsPresenter PilotDetailActionsPresenter { get; }
         public BoardPopulationTimingMarkerTracker BoardPopulationTimingMarkerTracker { get; }
         public IgnoreAllianceCoordinator IgnoreAllianceCoordinator { get; }
+        public TypedIgnoreActionCoordinator TypedIgnoreActionCoordinator { get; }
         public IgnoreAllianceBoardController IgnoreAllianceBoardController { get; }
         public ZkillUrlBuilder ZkillUrlBuilder { get; }
         public BrowserLauncher BrowserLauncher { get; }
@@ -189,7 +192,7 @@ namespace PitmastersGrill.Services
                 cynoModuleObservationRepository,
                 baitObservationRepository,
                 cynoTackleObservationRepository);
-            var pilotBoardRowEnrichmentApplier = new PilotBoardRowEnrichmentApplier(DefaultBoardPopulationRetryDelaySeconds);
+            var pilotBoardRowEnrichmentApplier = new BoardRowEnrichmentApplier(DefaultBoardPopulationRetryDelaySeconds);
             var detailPaneController = new DetailPaneController(notesRepository, pilotBoardRowDetailFormatter);
 
             var resolverCacheRepository = new ResolverCacheRepository(databasePath);
@@ -227,6 +230,7 @@ namespace PitmastersGrill.Services
             var ignoreAllianceCoordinator = new IgnoreAllianceCoordinator(
                 ignoreAllianceListService,
                 ignoreAllianceFilterService);
+            var typedIgnoreActionCoordinator = new TypedIgnoreActionCoordinator(ignoreAllianceCoordinator);
             var ignoreAllianceBoardController = new IgnoreAllianceBoardController(ignoreAllianceCoordinator);
 
             return new MainWindowRuntimeDependencies(
@@ -265,6 +269,7 @@ namespace PitmastersGrill.Services
                 pilotDetailActionsPresenter,
                 boardPopulationTimingMarkerTracker,
                 ignoreAllianceCoordinator,
+                typedIgnoreActionCoordinator,
                 ignoreAllianceBoardController,
                 new ZkillUrlBuilder(),
                 new BrowserLauncher());
