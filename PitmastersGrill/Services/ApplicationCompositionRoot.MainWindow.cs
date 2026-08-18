@@ -192,7 +192,7 @@ namespace PitmastersGrill.Services
                 cynoModuleObservationRepository,
                 baitObservationRepository,
                 cynoTackleObservationRepository);
-            var pilotBoardRowEnrichmentApplier = new BoardRowEnrichmentApplier(DefaultBoardPopulationRetryDelaySeconds);
+            var pilotBoardRowEnrichmentApplier = new PilotBoardRowEnrichmentApplier(DefaultBoardPopulationRetryDelaySeconds);
             var detailPaneController = new DetailPaneController(notesRepository, pilotBoardRowDetailFormatter);
 
             var resolverCacheRepository = new ResolverCacheRepository(databasePath);
