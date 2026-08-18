@@ -274,9 +274,9 @@ namespace PitmastersGrill
             _appSettings = appSettingsService.Load();
             _manualUpdateCheckController = new ManualUpdateCheckController(
                 this,
-                ManualUpdateCheckButton,
-                ManualUpdateStatusText,
-                _browserLauncher,
+                VersionUpdateViewControl.SetManualUpdateCheckEnabled,
+                VersionUpdateViewControl.SetManualUpdateStatusText,
+                OpenManualUpdateReleasePage,
                 _appSettings,
                 _windowShutdownCts.Token,
                 () => _isShuttingDown);
