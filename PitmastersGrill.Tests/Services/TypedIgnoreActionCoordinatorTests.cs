@@ -2,7 +2,6 @@ using PitmastersGrill.Models;
 using PitmastersGrill.Services;
 using System;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using Xunit;
 
@@ -24,10 +23,10 @@ namespace PitmastersGrill.Tests.Services
 
             Assert.Equal(TypedIgnoreActionOutcome.Added, result.Outcome);
             Assert.Equal(IgnoreEntryType.Pilot, result.Type);
-            Assert.Equal(101, result.Id);
+            Assert.Equal(101L, result.Id);
             Assert.Equal("Alice Example", result.DisplayName);
             var entry = Assert.Single(fixture.IgnoreCoordinator.GetIgnoredEntries());
-            Assert.Equal(101, entry.Id);
+            Assert.Equal(101L, entry.Id);
             Assert.Equal(IgnoreEntryType.Pilot, entry.Type);
             Assert.Equal("Alice Example", entry.DisplayName);
             Assert.Equal("detail window ignore Pilot", entry.Source);
@@ -46,7 +45,7 @@ namespace PitmastersGrill.Tests.Services
             var result = fixture.Subject.TryAdd(row, IgnoreEntryType.Corporation);
 
             Assert.Equal(TypedIgnoreActionOutcome.Added, result.Outcome);
-            Assert.Equal(202, result.Id);
+            Assert.Equal(202L, result.Id);
             var entry = Assert.Single(fixture.IgnoreCoordinator.GetIgnoredEntries());
             Assert.Equal(IgnoreEntryType.Corporation, entry.Type);
             Assert.Equal("Example Corp", entry.DisplayName);
@@ -66,7 +65,7 @@ namespace PitmastersGrill.Tests.Services
             var result = fixture.Subject.TryAdd(row, IgnoreEntryType.Alliance);
 
             Assert.Equal(TypedIgnoreActionOutcome.Added, result.Outcome);
-            Assert.Equal(303, result.Id);
+            Assert.Equal(303L, result.Id);
             var entry = Assert.Single(fixture.IgnoreCoordinator.GetIgnoredEntries());
             Assert.Equal(IgnoreEntryType.Alliance, entry.Type);
             Assert.Equal("Example Alliance", entry.DisplayName);
