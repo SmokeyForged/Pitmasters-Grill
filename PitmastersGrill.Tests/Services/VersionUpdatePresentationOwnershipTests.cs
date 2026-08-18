@@ -56,6 +56,7 @@ namespace PitmastersGrill.Tests.Services
         public void MainWindow_ComposesFocusedVersionViewWithoutRawVersionControls()
         {
             var xaml = ReadRepoFile("PitmastersGrill", "MainWindow.xaml");
+            var mainWindowSource = ReadRepoFile("PitmastersGrill", "MainWindow.xaml.cs");
             var constructor = ReadRepoFile("PitmastersGrill", "MainWindow.ComposedConstructor.cs");
             var navigation = ReadRepoFile("PitmastersGrill", "MainWindow.ExternalNavigation.cs");
             var controller = ReadRepoFile("PitmastersGrill", "Services", "ManualUpdateCheckController.cs");
@@ -70,8 +71,10 @@ namespace PitmastersGrill.Tests.Services
             Assert.Contains("VersionUpdateViewControl.SetManualUpdateCheckEnabled", constructor, StringComparison.Ordinal);
             Assert.Contains("VersionUpdateViewControl.SetManualUpdateStatusText", constructor, StringComparison.Ordinal);
             Assert.Contains("OpenManualUpdateReleasePage", constructor, StringComparison.Ordinal);
-            Assert.Contains("ExternalNavigation.OpenUrl(url, \"GitHub repository\")", navigation, StringComparison.Ordinal);
+            Assert.Contains("GitHubRepoLink_RequestNavigate(sender, e)", navigation, StringComparison.Ordinal);
+            Assert.Contains("ExternalNavigation.OpenUrl(url, \"GitHub repository\")", mainWindowSource, StringComparison.Ordinal);
             Assert.Contains("ExternalNavigation.OpenUrl(url, \"manual update release page\")", navigation, StringComparison.Ordinal);
+            Assert.DoesNotContain("_browserLauncher.OpenUrl", mainWindowSource, StringComparison.Ordinal);
 
             Assert.DoesNotContain("System.Windows.Controls", controller, StringComparison.Ordinal);
             Assert.DoesNotContain("BrowserLauncher", controller, StringComparison.Ordinal);
