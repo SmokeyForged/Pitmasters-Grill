@@ -130,7 +130,7 @@ namespace PitmastersGrill
             _mainWindowShellSurface.UpdateWindowStateUi();
             _eveSessionContextSurface.TriggerRefresh("startup", force: false);
 
-            AppLogger.UiInfo("MainWindow source initialized. Clipboard listener attached and title bar theme applied.");
+            AppLogger.UiInfo("MainWindow source initialized. Native input attach attempt complete; title bar theme applied.");
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -195,7 +195,7 @@ namespace PitmastersGrill
                 AppLogger.UiInfo,
                 AppLogger.UiWarn);
 
-            AppLogger.UiInfo("MainWindow closed. Clipboard listener removed, retry state cancelled, and background work stop requested.");
+            AppLogger.UiInfo("MainWindow closed. Native input detach attempt complete; retry state cancelled and background work stop requested.");
 
             base.OnClosed(e);
         }
