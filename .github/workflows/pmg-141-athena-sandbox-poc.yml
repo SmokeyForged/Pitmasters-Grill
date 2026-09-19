@@ -1,0 +1,413 @@
+name: PMG-141 Athena Sandbox Transport POC
+
+on:
+  push:
+    branches:
+      - chore/PMG-141-athena-sandbox-transport-poc
+    paths:
+      - .github/workflows/pmg-141-athena-sandbox-poc.yml
+
+permissions:
+  contents: read
+
+jobs:
+  source-transport:
+    name: Exact source transport
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Package exact source and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$GITHUB_SHA"
+          tree_sha="$(git rev-parse 'HEAD^{tree}')"
+
+          mkdir -p artifacts/source
+          archive="artifacts/source/pmg-source-$GITHUB_SHA.tar.gz"
+          git archive --format=tar.gz --output "$archive" HEAD
+          archive_sha="$(sha256sum "$archive" | awk '{print $1}')"
+
+          export PMG_TREE_SHA="$tree_sha"
+          export PMG_ARCHIVE_PATH="$archive"
+          export PMG_ARCHIVE_SHA="$archive_sha"
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          manifest = {
+              "jiraKey": "PMG-141",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "ref": os.environ["GITHUB_REF"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "treeSha": os.environ["PMG_TREE_SHA"],
+              "workflowRunId": os.environ["GITHUB_RUN_ID"],
+              "workflowRunAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "createdUtc": datetime.now(timezone.utc).isoformat(),
+              "sourceArchive": os.environ["PMG_ARCHIVE_PATH"].split("/")[-1],
+              "sourceArchiveSha256": os.environ["PMG_ARCHIVE_SHA"],
+          }
+          with open("artifacts/source/provenance.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+
+          cat artifacts/source/provenance.json
+          sha256sum "$archive" > artifacts/source/SHA256SUMS.txt
+
+      - name: Upload exact source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmg-141-source-${{ github.sha }}
+          path: artifacts/source/
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+
+  windows-validation:
+    name: Windows restore build test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Capture environment
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/windows | Out-Null
+          git rev-parse HEAD | Set-Content artifacts/windows/source-sha.txt
+          dotnet --info | Tee-Object -FilePath artifacts/windows/dotnet-info.txt
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet restore PitmastersGrill\PitmastersGrill.slnx 2>&1 |
+            Tee-Object -FilePath artifacts/windows/restore.log
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet build PitmastersGrill\PitmastersGrill.slnx --configuration Release --no-restore 2>&1 |
+            Tee-Object -FilePath artifacts/windows/build.log
+
+      - name: Full test suite
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory -Force artifacts/windows/TestResults | Out-Null
+          dotnet test PitmastersGrill.Tests\PitmastersGrill.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=pmg-141.trx" --results-directory artifacts/windows/TestResults 2>&1 |
+            Tee-Object -FilePath artifacts/windows/test.log
+
+      - name: Diff hygiene
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          git fetch origin main --quiet
+          git --no-pager diff --check origin/main...HEAD 2>&1 |
+            Tee-Object -FilePath artifacts/windows/diff-check.log
+
+      - name: Upload Windows validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmg-141-windows-validation-${{ github.sha }}
+          path: artifacts/windows/
+          retention-days: 7
+          if-no-files-found: warn
+
+  linux-compatibility:
+    name: Linux compatibility lens
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Attempt Windows-targeted restore build and test from Linux
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p artifacts/linux
+          git rev-parse HEAD > artifacts/linux/source-sha.txt
+          dotnet --info > artifacts/linux/dotnet-info.txt 2>&1
+
+          set +e
+          dotnet restore PitmastersGrill/PitmastersGrill.slnx -p:EnableWindowsTargeting=true             > artifacts/linux/restore.log 2>&1
+          restore_exit=$?
+
+          build_exit=125
+          test_exit=125
+
+          if [ "$restore_exit" -eq 0 ]; then
+            dotnet build PitmastersGrill/PitmastersGrill.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true               > artifacts/linux/build.log 2>&1
+            build_exit=$?
+          else
+            printf 'Skipped because restore failed.\n' > artifacts/linux/build.log
+          fi
+
+          if [ "$build_exit" -eq 0 ]; then
+            dotnet test PitmastersGrill.Tests/PitmastersGrill.Tests.csproj --configuration Release --no-build -p:EnableWindowsTargeting=true               > artifacts/linux/test.log 2>&1
+            test_exit=$?
+          else
+            printf 'Skipped because build did not succeed.\n' > artifacts/linux/test.log
+          fi
+          set -e
+
+          export RESTORE_EXIT="$restore_exit"
+          export BUILD_EXIT="$build_exit"
+          export TEST_EXIT="$test_exit"
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          restore_exit = int(os.environ["RESTORE_EXIT"])
+          build_exit = int(os.environ["BUILD_EXIT"])
+          test_exit = int(os.environ["TEST_EXIT"])
+
+          if restore_exit == 0 and build_exit == 0 and test_exit == 0:
+              classification = "CROSS_PLATFORM_TEST_PASS"
+          elif restore_exit == 0 and build_exit == 0:
+              classification = "BUILD_PASS_RUNTIME_BOUNDARY"
+          elif restore_exit == 0:
+              classification = "RESTORE_PASS_BUILD_BOUNDARY_OR_FAIL"
+          else:
+              classification = "RESTORE_BOUNDARY_OR_FAIL"
+
+          result = {
+              "jiraKey": "PMG-141",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "createdUtc": datetime.now(timezone.utc).isoformat(),
+              "restoreExitCode": restore_exit,
+              "buildExitCode": build_exit,
+              "testExitCode": test_exit,
+              "classification": classification,
+              "note": "Linux is an observational compatibility lens; PMG remains a Windows-first net10.0-windows WPF application.",
+          }
+
+          with open("artifacts/linux/result.json", "w", encoding="utf-8") as f:
+              json.dump(result, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+
+          cat artifacts/linux/result.json
+          exit 0
+
+      - name: Upload Linux compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmg-141-linux-compatibility-${{ github.sha }}
+          path: artifacts/linux/
+          retention-days: 7
+          if-no-files-found: error
+
+  sandbox-toolchain-capsule:
+    name: Sandbox offline .NET toolchain capsule
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Acquire exact SDK archive and isolated NuGet cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/toolchain "$RUNNER_TEMP/pmg-nuget"
+          export NUGET_PACKAGES="$RUNNER_TEMP/pmg-nuget"
+
+          sdk_version="$(dotnet --version)"
+          sdk_url="https://builds.dotnet.microsoft.com/dotnet/Sdk/$sdk_version/dotnet-sdk-$sdk_version-linux-x64.tar.gz"
+          sdk_archive="artifacts/toolchain/dotnet-sdk-$sdk_version-linux-x64.tar.gz"
+
+          curl --fail --location --silent --show-error "$sdk_url" --output "$sdk_archive"
+          dotnet restore PitmastersGrill/PitmastersGrill.slnx -p:EnableWindowsTargeting=true
+          tar -C "$NUGET_PACKAGES" -czf artifacts/toolchain/nuget-packages.tar.gz .
+
+          sdk_sha="$(sha256sum "$sdk_archive" | awk '{print $1}')"
+          nuget_sha="$(sha256sum artifacts/toolchain/nuget-packages.tar.gz | awk '{print $1}')"
+
+          export PMG_SDK_VERSION="$sdk_version"
+          export PMG_SDK_URL="$sdk_url"
+          export PMG_SDK_ARCHIVE="$(basename "$sdk_archive")"
+          export PMG_SDK_SHA="$sdk_sha"
+          export PMG_NUGET_SHA="$nuget_sha"
+          export PMG_SDK_BYTES="$(stat -c %s "$sdk_archive")"
+          export PMG_NUGET_BYTES="$(stat -c %s artifacts/toolchain/nuget-packages.tar.gz)"
+
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          manifest = {
+              "jiraKey": "PMG-141",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "workflowRunId": os.environ["GITHUB_RUN_ID"],
+              "createdUtc": datetime.now(timezone.utc).isoformat(),
+              "platform": "linux-x64",
+              "sdkVersion": os.environ["PMG_SDK_VERSION"],
+              "sdkSourceUrl": os.environ["PMG_SDK_URL"],
+              "dotnetArchive": os.environ["PMG_SDK_ARCHIVE"],
+              "dotnetArchiveSha256": os.environ["PMG_SDK_SHA"],
+              "dotnetArchiveBytes": int(os.environ["PMG_SDK_BYTES"]),
+              "nugetArchive": "nuget-packages.tar.gz",
+              "nugetArchiveSha256": os.environ["PMG_NUGET_SHA"],
+              "nugetArchiveBytes": int(os.environ["PMG_NUGET_BYTES"]),
+              "purpose": "Disposable offline producer-build toolchain for Athena sandbox POC; not a release artifact.",
+          }
+          with open("artifacts/toolchain/manifest.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+
+          (cd artifacts/toolchain && sha256sum *.tar.gz manifest.json > SHA256SUMS.txt)
+          cat artifacts/toolchain/manifest.json
+
+      - name: Upload sandbox toolchain capsule
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmg-141-sandbox-toolchain-${{ github.sha }}
+          path: artifacts/toolchain/
+          retention-days: 3
+          if-no-files-found: error
+          compression-level: 0
+
+  public-esi-evidence:
+    name: Public ESI evidence round trip
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v6
+
+      - name: Fetch bounded public ESI evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/esi
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          base = "https://esi.evetech.net"
+          requests = [
+              ("001-status", "/latest/status/?datasource=tranquility"),
+              ("002-tritanium-type", "/latest/universe/types/34/?datasource=tranquility"),
+          ]
+          user_agent = "PitmastersGrill-AthenaValidation/PMG-141 (+https://github.com/SmokeyForged/Pitmasters-Grill)"
+          root = Path("artifacts/esi")
+          results = []
+
+          for request_id, path in requests:
+              if not path.startswith("/latest/"):
+                  raise RuntimeError(f"Refusing non-allowlisted ESI path: {path}")
+
+              url = base + path
+              req = urllib.request.Request(
+                  url,
+                  method="GET",
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": user_agent,
+                  },
+              )
+              fetched_utc = datetime.now(timezone.utc).isoformat()
+              target = root / request_id
+              target.mkdir(parents=True, exist_ok=True)
+
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      status = response.status
+                      body = response.read()
+                      headers = dict(response.headers.items())
+              except urllib.error.HTTPError as exc:
+                  status = exc.code
+                  body = exc.read()
+                  headers = dict(exc.headers.items())
+              except Exception as exc:
+                  (target / "transport-error.txt").write_text(repr(exc) + "\n", encoding="utf-8")
+                  raise
+
+              body_sha = hashlib.sha256(body).hexdigest()
+              (target / "body.json").write_bytes(body)
+              (target / "headers.json").write_text(
+                  json.dumps(headers, indent=2, sort_keys=True) + "\n",
+                  encoding="utf-8",
+              )
+              meta = {
+                  "requestId": request_id,
+                  "method": "GET",
+                  "url": url,
+                  "status": status,
+                  "fetchedUtc": fetched_utc,
+                  "bodySha256": body_sha,
+                  "bodyBytes": len(body),
+              }
+              (target / "meta.json").write_text(
+                  json.dumps(meta, indent=2, sort_keys=True) + "\n",
+                  encoding="utf-8",
+              )
+              results.append(meta)
+
+              if status < 200 or status >= 300:
+                  raise RuntimeError(f"ESI request failed: {url} -> HTTP {status}")
+
+          manifest = {
+              "jiraKey": "PMG-141",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commitSha": os.environ["GITHUB_SHA"],
+              "workflowRunId": os.environ["GITHUB_RUN_ID"],
+              "createdUtc": datetime.now(timezone.utc).isoformat(),
+              "transport": "GitHub-hosted runner -> public ESI -> Actions artifact -> connector -> Athena sandbox",
+              "scope": "anonymous public ESI only",
+              "results": results,
+          }
+          (root / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(manifest, indent=2, sort_keys=True))
+          PY
+
+          (cd artifacts/esi && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+
+      - name: Upload ESI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmg-141-esi-evidence-${{ github.sha }}
+          path: artifacts/esi/
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
