@@ -234,35 +234,31 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore PMG for Linux cross-targeting
+      - name: Acquire exact SDK archive and isolated NuGet cache
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p artifacts/toolchain "$RUNNER_TEMP/pmg-nuget"
+          export NUGET_PACKAGES="$RUNNER_TEMP/pmg-nuget"
+
+          sdk_version="$(dotnet --version)"
+          sdk_url="https://builds.dotnet.microsoft.com/dotnet/Sdk/$sdk_version/dotnet-sdk-$sdk_version-linux-x64.tar.gz"
+          sdk_archive="artifacts/toolchain/dotnet-sdk-$sdk_version-linux-x64.tar.gz"
+
+          curl --fail --location --silent --show-error "$sdk_url" --output "$sdk_archive"
           dotnet restore PitmastersGrill/PitmastersGrill.slnx -p:EnableWindowsTargeting=true
+          tar -C "$NUGET_PACKAGES" -czf artifacts/toolchain/nuget-packages.tar.gz .
 
-      - name: Package SDK and restored NuGet cache
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/toolchain
-
-          dotnet_bin="$(readlink -f "$(command -v dotnet)")"
-          dotnet_root="$(dirname "$dotnet_bin")"
-          nuget_root="$HOME/.nuget/packages"
-
-          test -x "$dotnet_root/dotnet"
-          test -d "$nuget_root"
-
-          tar -C "$dotnet_root" -czf artifacts/toolchain/dotnet-linux-x64.tar.gz .
-          tar -C "$nuget_root" -czf artifacts/toolchain/nuget-packages.tar.gz .
-
-          dotnet_sha="$(sha256sum artifacts/toolchain/dotnet-linux-x64.tar.gz | awk '{print $1}')"
+          sdk_sha="$(sha256sum "$sdk_archive" | awk '{print $1}')"
           nuget_sha="$(sha256sum artifacts/toolchain/nuget-packages.tar.gz | awk '{print $1}')"
 
-          export DOTNET_CAPSULE_SHA="$dotnet_sha"
-          export NUGET_CAPSULE_SHA="$nuget_sha"
-          export DOTNET_CAPSULE_BYTES="$(stat -c %s artifacts/toolchain/dotnet-linux-x64.tar.gz)"
-          export NUGET_CAPSULE_BYTES="$(stat -c %s artifacts/toolchain/nuget-packages.tar.gz)"
+          export PMG_SDK_VERSION="$sdk_version"
+          export PMG_SDK_URL="$sdk_url"
+          export PMG_SDK_ARCHIVE="$(basename "$sdk_archive")"
+          export PMG_SDK_SHA="$sdk_sha"
+          export PMG_NUGET_SHA="$nuget_sha"
+          export PMG_SDK_BYTES="$(stat -c %s "$sdk_archive")"
+          export PMG_NUGET_BYTES="$(stat -c %s artifacts/toolchain/nuget-packages.tar.gz)"
 
           python - <<'PY'
           import json
@@ -276,12 +272,14 @@ jobs:
               "workflowRunId": os.environ["GITHUB_RUN_ID"],
               "createdUtc": datetime.now(timezone.utc).isoformat(),
               "platform": "linux-x64",
-              "dotnetArchive": "dotnet-linux-x64.tar.gz",
-              "dotnetArchiveSha256": os.environ["DOTNET_CAPSULE_SHA"],
-              "dotnetArchiveBytes": int(os.environ["DOTNET_CAPSULE_BYTES"]),
+              "sdkVersion": os.environ["PMG_SDK_VERSION"],
+              "sdkSourceUrl": os.environ["PMG_SDK_URL"],
+              "dotnetArchive": os.environ["PMG_SDK_ARCHIVE"],
+              "dotnetArchiveSha256": os.environ["PMG_SDK_SHA"],
+              "dotnetArchiveBytes": int(os.environ["PMG_SDK_BYTES"]),
               "nugetArchive": "nuget-packages.tar.gz",
-              "nugetArchiveSha256": os.environ["NUGET_CAPSULE_SHA"],
-              "nugetArchiveBytes": int(os.environ["NUGET_CAPSULE_BYTES"]),
+              "nugetArchiveSha256": os.environ["PMG_NUGET_SHA"],
+              "nugetArchiveBytes": int(os.environ["PMG_NUGET_BYTES"]),
               "purpose": "Disposable offline producer-build toolchain for Athena sandbox POC; not a release artifact.",
           }
           with open("artifacts/toolchain/manifest.json", "w", encoding="utf-8") as f:
@@ -289,7 +287,7 @@ jobs:
               f.write("\n")
           PY
 
-          (cd artifacts/toolchain && sha256sum dotnet-linux-x64.tar.gz nuget-packages.tar.gz manifest.json > SHA256SUMS.txt)
+          (cd artifacts/toolchain && sha256sum *.tar.gz manifest.json > SHA256SUMS.txt)
           cat artifacts/toolchain/manifest.json
 
       - name: Upload sandbox toolchain capsule
