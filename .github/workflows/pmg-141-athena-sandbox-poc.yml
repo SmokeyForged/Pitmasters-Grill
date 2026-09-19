@@ -324,7 +324,7 @@ jobs:
           print(json.dumps(manifest, indent=2, sort_keys=True))
           PY
 
-          find artifacts/esi -type f -print0 | sort -z | xargs -0 sha256sum > artifacts/esi/SHA256SUMS.txt
+          (cd artifacts/esi && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
 
       - name: Upload ESI evidence
         uses: actions/upload-artifact@v4
